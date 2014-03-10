@@ -29,6 +29,14 @@ static irqreturn_t mmc_gpio_cd_irqt(int irq, void *dev_id)
 	/* Schedule a card detection after a debounce timeout */
 	struct mmc_host *host = dev_id;
 
+	/*
+	 * In case host->ops are not yet initialized return immediately.
+	 * The card will get detected later when host driver calls
+	 * mmc_add_host() after host->ops are initialized.
+	 */
+	if (!host->ops)
+		goto out;
+
 	if (host->ops->card_event)
 		host->ops->card_event(host);
 
