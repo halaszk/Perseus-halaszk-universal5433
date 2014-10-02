@@ -349,6 +349,7 @@ endif
 CHECKFLAGS     := -D__linux__ -Dlinux -D__STDC__ -Dunix -D__unix__ \
 		  -Wbitwise -Wno-return-void $(CF)
 KERNEL_FLAGS	= -munaligned-access -mfpu=neon-vfpv4 -ffast-math \
+		  -funsafe-math-optimizations
 CFLAGS_MODULE   = -DMODULE $(KERNEL_FLAGS)
 AFLAGS_MODULE   =
 LDFLAGS_MODULE  =
