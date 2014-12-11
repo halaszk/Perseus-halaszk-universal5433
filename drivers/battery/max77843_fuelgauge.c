@@ -10,7 +10,7 @@
  * published by the Free Software Foundation.
  */
 
-#define DEBUG
+//#define DEBUG
 /* #define BATTERY_LOG_MESSAGE */
 
 #include <linux/mfd/max77843-private.h>
@@ -147,9 +147,9 @@ static int fg_read_vcell(struct max77843_fuelgauge_data *fuelgauge)
 	temp2 = temp / 1000000;
 	vcell += (temp2 << 4);
 
-	if (!(fuelgauge->info.pr_cnt % PRINT_COUNT))
-		pr_info("%s: VCELL(%d), data(0x%04x)\n",
-			__func__, vcell, (data[1]<<8) | data[0]);
+	//if (!(fuelgauge->info.pr_cnt % PRINT_COUNT))
+	//	pr_info("%s: VCELL(%d), data(0x%04x)\n",
+	//		__func__, vcell, (data[1]<<8) | data[0]);
 
 	return vcell;
 }
