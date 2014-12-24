@@ -1,153 +1,150 @@
 #!/bin/bash
 
-# location
-export KERNELDIR=`readlink -f .`
-export PARENT_DIR=`readlink -f ..`
-export INITRAMFS_SOURCE=`readlink -f $KERNELDIR/../initramfs`
+###############################################################################
+# To all DEV around the world :)                                              #
+# to build this kernel you need to be ROOT and to have bash as script loader  #
+# do this:                                                                    #
+# cd /bin                                                                     #
+# rm -f sh                                                                    #
+# ln -s bash sh                                                               #
+# now go back to kernel folder and run:                                       # 
+#                                                         		      #
+# sh clean_kernel.sh                                                          #
+#                                                                             #
+# Now you can build my kernel.                                                #
+# using bash will make your life easy. so it's best that way.                 #
+# Have fun and update me if something nice can be added to my source.         #
+###############################################################################
 
-# kernel
-export ARCH=arm
-export USE_SEC_FIPS_MODE=true
-export KERNEL_CONFIG="halaszk_trelte_defconfig"
+# Time of build startup
+res1=$(date +%s.%N)
 
-# build script
-export USER=`whoami`
-# gcc 4.7.3 (Linaro 13.02)
-#export CROSS_COMPILE=/home/dev/KERNEL/arm-eabi-4.6/bin/arm-eabi-
-#export CROSS_COMPILE=/home/dev/KERNEL/google-toolchain-4.8/bin/arm-eabi-;
-#export CROSS_COMPILE=/home/dev/KERNEL/sm-arm-eabi-4.10/bin/arm-eabi-;
-#export CROSS_COMPILE=/home/dev/KERNEL/linaro-arm-eabi-4.10/bin/arm-eabi-;
-export CROSS_COMPILE=/home/dev/KERNEL/arm-eabi-4.9.x/bin/arm-linux-gnueabihf-;
-#export CROSS_COMPILE=/home/dev/KERNEL/arm-eabi-4.7.2/bin/arm-eabi-;
-#if [ "${1}" != "" ];then
-#export KERNELDIR=`readlink -f ${1}`
-#fi
+echo "${bldcya}***** Setting up Environment *****${txtrst}";
 
-# Importing PATCH for GCC depend on GCC version.
-GCCVERSION_OLD=`${CROSS_COMPILE}gcc --version | cut -d " " -f3 | cut -c3-5 | grep -iv "09" | grep -iv "ee" | grep -iv "en"`
-GCCVERSION_NEW=`${CROSS_COMPILE}gcc --version | cut -d " " -f4 | cut -c1-3 | grep -iv "Fre" | grep -iv "sof" | grep -iv "for" | grep -iv "auc"`
+. ./env_setup.sh ${1} || exit 1;
 
 
-NAMBEROFCPUS=`grep 'processor' /proc/cpuinfo | wc -l`
-NR_CPUS=$(expr `grep processor /proc/cpuinfo | wc -l`);
-echo "$NAMBEROFCPUS system CPU detected, setting $NR_CPUS build threads"
+# Generate Ramdisk
+echo "${bldcya}***** Generating Ramdisk *****${txtrst}"
+echo "0" > $TMPFILE;
 
-INITRAMFS_TMP="/tmp/initramfs-source"
+(
 
-if [ ! -f ${KERNELDIR}/.config ]; then
-        cp ${KERNELDIR}/arch/arm/configs/${KERNEL_CONFIG} .config
-        make ${KERNEL_CONFIG}
+	# remove previous initramfs files
+	if [ -d $INITRAMFS_TMP ]; then
+		echo "${bldcya}***** Removing old temp initramfs_source *****${txtrst}";
+		rm -rf $INITRAMFS_TMP;
+	fi;
+
+	mkdir -p $INITRAMFS_TMP;
+	cp -ax $INITRAMFS_SOURCE/* $INITRAMFS_TMP;
+	# clear git repository from tmp-initramfs
+	if [ -d $INITRAMFS_TMP/.git ]; then
+		rm -rf $INITRAMFS_TMP/.git;
+	fi;
+	
+	# clear mercurial repository from tmp-initramfs
+	if [ -d $INITRAMFS_TMP/.hg ]; then
+		rm -rf $INITRAMFS_TMP/.hg;
+	fi;
+
+	# remove empty directory placeholders from tmp-initramfs
+	find $INITRAMFS_TMP -name EMPTY_DIRECTORY | parallel rm -rf {};
+
+	# remove more from from tmp-initramfs ...
+	rm -f $INITRAMFS_TMP/update* >> /dev/null;
+
+	./utilities/mkbootfs $INITRAMFS_TMP | gzip > ramdisk.gz
+
+	echo "1" > $TMPFILE;
+	echo "${bldcya}***** Ramdisk Generation Completed Successfully *****${txtrst}"
+)&
+
+if [ ! -f $KERNELDIR/.config ]; then
+	echo "${bldcya}***** Writing Config *****${txtrst}";
+	cp $KERNELDIR/arch/arm/configs/$KERNEL_CONFIG .config;
+	make $KERNEL_CONFIG;
 fi;
 
-
-. ${KERNELDIR}/.config
-
-cd ${KERNELDIR}/
-
-GETVER=`grep 'perseus-halaszk-*V' .config | sed 's/.*".//g' | sed 's/-S.*//g'`
-nice -n 10 make -j$NAMBEROFCPUS || exit 1
+. $KERNELDIR/.config
 
 # remove previous zImage files
-if [ -e ${KERNELDIR}/zImage ]; then
-rm ${KERNELDIR}/zImage
+if [ -e $KERNELDIR/zImage ]; then
+	rm $KERNELDIR/zImage;
+	rm $KERNELDIR/boot.img;
+fi;
+if [ -e $KERNELDIR/arch/arm/boot/zImage ]; then
+	rm $KERNELDIR/arch/arm/boot/zImage;
 fi;
 
-if [ -e ${KERNELDIR}/arch/arm/boot/zImage ]; then
-rm ${KERNELDIR}/arch/arm/boot/zImage
-fi;
-
-# remove all old modules before compile
-cd ${KERNELDIR}
-
-OLDMODULES=`find -name *.ko`
-for i in $OLDMODULES; do
-rm -f $i
-done;
+# remove previous initramfs files
+rm -rf $KERNELDIR/out/system/lib/modules >> /dev/null;
+rm -rf $KERNELDIR/out/tmp_modules >> /dev/null;
+rm -rf $KERNELDIR/out/temp >> /dev/null;
 
 # clean initramfs old compile data
-rm -f usr/initramfs_data.cpio
-rm -f usr/initramfs_data.o
+rm -f $KERNELDIR/usr/initramfs_data.cpio >> /dev/null;
+rm -f $KERNELDIR/usr/initramfs_data.o >> /dev/null;
+
+# remove all old modules before compile
+find $KERNELDIR -name "*.ko" | parallel rm -rf {};
+
+# wait for the successful ramdisk generation
+while [ $(cat ${TMPFILE}) == 0 ]; do
+	sleep 2;
+	echo "${bldblu}Waiting for Ramdisk generation completion.${txtrst}";
+done;
+
+# make zImage
+echo "${bldcya}***** Compiling kernel *****${txtrst}"
 if [ $USER != "root" ]; then
-make -j$NAMBEROFCPUS modules || exit 1
+#	make CONFIG_NO_ERROR_ON_MISMATCH=y -j5 zImage
+	make CONFIG_DEBUG_SECTION_MISMATCH=y -j5 zImage
 else
-nice -n 10 make -j$NAMBEROFCPUS modules || exit 1
-fi;
-#remove previous ramfs files
-rm -rf $INITRAMFS_TMP
-rm -rf $INITRAMFS_TMP.cpio
-rm -rf $INITRAMFS_TMP.cpio.gz
-# copy initramfs files to tmp directory
-cp -ax $INITRAMFS_SOURCE $INITRAMFS_TMP
-# clear git repositories in initramfs
-if [ -e $INITRAMFS_TMP/.git ]; then
-rm -rf /tmp/initramfs-source/.git
-fi;
-# remove empty directory placeholders
-find $INITRAMFS_TMP -name EMPTY_DIRECTORY -exec rm -rf {} \;
-# remove mercurial repository
-if [ -d $INITRAMFS_TMP/.hg ]; then
-rm -rf $INITRAMFS_TMP/.hg
+	nice -n -15 make -j5 zImage
 fi;
 
-# copy modules into initramfs
-mkdir -p $INITRAMFS/lib/modules
-mkdir -p $INITRAMFS_TMP/lib/modules
-find -name '*.ko' -exec cp -av {} $INITRAMFS_TMP/lib/modules/ \;
-${CROSS_COMPILE}strip --strip-debug $INITRAMFS_TMP/lib/modules/*.ko
-chmod 755 $INITRAMFS_TMP/lib/modules/*
-${CROSS_COMPILE}strip --strip-unneeded $INITRAMFS_TMP/lib/modules/*
-rm -f ${INITRAMFS_TMP}/update*;
-
-cd $INITRAMFS_TMP
-find | fakeroot cpio -H newc -o > $INITRAMFS_TMP.cpio 2>/dev/null
-ls -lh $INITRAMFS_TMP.cpio
-lzma -kvzc $INITRAMFS_TMP.cpio > $INITRAMFS_TMP.cpio.lzma
-# gzip -9 $INITRAMFS_TMP.cpio
-cd -
-
-# make kernel
-nice -n 10 make -j$NAMBEROFCPUS zImage || exit 1
-
-./mkbootimg --kernel ${KERNELDIR}/arch/arm/boot/zImage --ramdisk $INITRAMFS_TMP.cpio.lzma --board universal5433 --base 0x10000000 --pagesize 2048 --ramdiskaddr 0x11000000 -o ${KERNELDIR}/boot.img.pre
-
-${KERNELDIR}/mkshbootimg.py ${KERNELDIR}/boot.img ${KERNELDIR}/boot.img.pre ${KERNELDIR}/payload.tar
-rm -f ${KERNELDIR}/boot.img.pre
-
-	# copy all needed to ready kernel folder.
-cp ${KERNELDIR}/.config ${KERNELDIR}/arch/arm/configs/${KERNEL_CONFIG}
-cp ${KERNELDIR}/.config ${KERNELDIR}/READY/
-rm ${KERNELDIR}/READY/boot/zImage
-rm ${KERNELDIR}/READY/Kernel_*
-stat ${KERNELDIR}/boot.img
-cp ${KERNELDIR}/boot.img /${KERNELDIR}/READY/boot/
-cd ${KERNELDIR}/READY/
-        zip -r Kernel_${GETVER}-`date +"[%H-%M]-[%d-%m]-SM-N910C-PWR-CORE"`.zip .
-rm ${KERNELDIR}/boot.img
-rm ${KERNELDIR}/READY/boot/boot.img
-rm ${KERNELDIR}/READY/.config
-        # push to android
-        ADB_STATUS=`adb get-state`;
-        if [ "$ADB_STATUS" == "device" ]; then
-                read -t 5 -p "push kernel to android, 5sec timeout (y/n)?";
-                if [ "$REPLY" == "y" ]; then
-                        adb push $KERNELDIR/READY/Kernel_*.zip /sdcard/;
-                        read -t 3 -p "reboot to recovery, 3sec timeout (y/n)?";
-                        if [ "$REPLY" == "y" ]; then
-                                adb reboot recovery;
-                        fi;
-                fi;
-        else
-                read -p "push kernel to ftp (y/n)?"
-                if [ "$REPLY" == "y" ]; then
+if [ -e $KERNELDIR/arch/arm/boot/zImage ]; then
+	echo "${bldcya}***** Final Touch for Kernel *****${txtrst}"
+	cp $KERNELDIR/arch/arm/boot/zImage $KERNELDIR/zImage;
+	stat $KERNELDIR/zImage || exit 1;
+	
+	echo "--- Creating boot.img ---"
+	# copy all needed to out kernel folder
+#	./utilities/mkbootimg --kernel zImage --ramdisk ramdisk.gz --cmdline --base 0x10000000 --name SYSMAGIC000K --page_size 2048 --kernel_offset 0x00008000 --ramdisk_offset 0x01000000 --tags_offset 0x00000100 --dt_size 1083392 --output boot.img
+        ./utilities/mkbootimg --kernel zImage --dt $KERNELDIR/utilities/dt.img --ramdisk ramdisk.gz --base 0x10000000 --kernel_offset 0x10000000 --ramdisk_offset 0x10008000 --tags_offset 0x10000100 --pagesize 2048 -o boot.img
+	GETVER=`grep 'perseus-halaszk-*V' .config | sed 's/.*".//g' | sed 's/-S.*//g'`
+	cp ${KERNELDIR}/.config ${KERNELDIR}/arch/arm/configs/${KERNEL_CONFIG}
+	cp ${KERNELDIR}/.config ${KERNELDIR}/READY/
+	stat ${KERNELDIR}/boot.img
+	cp ${KERNELDIR}/boot.img /${KERNELDIR}/READY/boot/
+	cd ${KERNELDIR}/READY/
+	zip -r Kernel_${GETVER}-`date +"[%H-%M]-[%d-%m]-SM-N910C-PWR-CORE"`.zip .
+	rm ${KERNELDIR}/boot.img
+	rm ${KERNELDIR}/READY/boot/boot.img
+	rm ${KERNELDIR}/READY/.config
+	echo "${bldcya}***** Ready *****${txtrst}";
+	# finished? get elapsed time
+	res2=$(date +%s.%N)
+	echo "${bldgrn}Total time elapsed: ${txtrst}${grn}$(echo "($res2 - $res1) / 60"|bc ) minutes ($(echo "$res2 - $res1"|bc ) seconds) ${txtrst}";	
+	while [ "$push_ok" != "y" ] && [ "$push_ok" != "n" ] && [ "$push_ok" != "Y" ] && [ "$push_ok" != "N" ]
+	do
+	      read -p "${bldblu}Do you want to push the kernel to the public FTP szerver?${txtrst}${blu} (y/n)${txtrst}" push_ok;
+		sleep 1;
+	done
+	if [ "$push_ok" == "y" ] || [ "$push_ok" == "Y" ]; then
+		echo "Uploading kernel to FTP server";
+		mv ${KERNELDIR}/READY/Kernel_* ${KERNELDIR}/N910C/
+		ncftpput -f /home/dev/login.cfg -V -R / ${KERNELDIR}/N910C/
+		rm ${KERNELDIR}/N910C/Kernel_*
+		echo "Uploading kernel to FTP server DONE";
 		read -p "push kernel verion update to ftp and synapse (y/n)?"
-		if [ "$REPLY" == "y" ]; then
+	if [ "$REPLY" == "y" ]; then
 		echo "${GETVER}" > ${KERNELDIR}/N910C/latest_version.txt;
-		fi;
-			echo "Uploading kernel to FTP server";
-			mv ${KERNELDIR}/READY/Kernel_* ${KERNELDIR}/N910C/
-			ncftpput -f /home/dev/login.cfg -V -R / ${KERNELDIR}/N910C/
-			rm ${KERNELDIR}/N910C/Kernel_*
-			echo "Uploading kernel to FTP server DONE";
-
-                fi;
+	fi;
+	fi;
+	exit 0;
+else
+	echo "${bldred}Kernel STUCK in BUILD!${txtrst}"
 fi;
+
