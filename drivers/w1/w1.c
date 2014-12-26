@@ -543,6 +543,9 @@ static ssize_t w1_master_attribute_store_remove(struct device *dev,
 
 static ssize_t w1_master_attribute_show_verify_mac(struct device *dev, struct device_attribute *attr, char *buf)
 {
+#ifdef CONFIG_SVIEW_BYPASS
+    return sprintf(buf, "%d\n", 0);
+#else
 	int result = -1;
 
 	struct w1_master *md = dev_to_w1_master(dev);
@@ -583,6 +586,7 @@ static ssize_t w1_master_attribute_show_verify_mac(struct device *dev, struct de
 	pr_info("COVER ACT 1 %s %d, slave_count: %d\n", __func__, result, md->slave_count);
 
 	return sprintf(buf, "%d\n", result);
+#endif
 }
 
 #ifdef CONFIG_W1_CF
@@ -596,7 +600,13 @@ static ssize_t w1_master_attribute_show_cf(struct device *dev, struct device_att
 static ssize_t w1_master_attribute_show_check_id(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	pr_info("COVER ACT 2 %s %d\n", __func__, w1_id);
+
+#ifdef CONFIG_SVIEW_BYPASS
+	return sprintf(buf, "%d\n", 1);
+#else
 	return sprintf(buf, "%d\n", w1_id);
+#endif
+
 }
 
 static ssize_t w1_master_attribute_show_check_color(struct device *dev, struct device_attribute *attr, char *buf)
@@ -608,7 +618,13 @@ static ssize_t w1_master_attribute_show_check_color(struct device *dev, struct d
 static ssize_t w1_master_attribute_show_check_model(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	pr_info("COVER ACT 2 %s %d\n", __func__, w1_model);
+
+#ifdef CONFIG_SVIEW_BYPASS
+	return sprintf(buf, "%d\n", 2);
+#else
 	return sprintf(buf, "%d\n", w1_model);
+#endif
+
 }
 
 static ssize_t w1_master_attribute_show_check_detect(struct device *dev, struct device_attribute *attr, char *buf)

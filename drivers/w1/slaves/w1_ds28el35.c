@@ -165,7 +165,11 @@ static char rom_no[8];
 // debug
 static int ecdsa_debug = 1;
 
+#ifdef CONFIG_SVIEW_BYPASS
+int w1_verification = 0, w1_id = 1, w1_color, w1_model = 2, detect;
+#else
 int w1_verification = -1, w1_id = 2, w1_color = 0, w1_model = 1, detect;  // for samsung
+#endif
 char w1_g_sn[14];
 
 bool w1_attached;
