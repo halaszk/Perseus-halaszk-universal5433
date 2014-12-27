@@ -15,7 +15,7 @@
 
 #define SYSC_DVFS_END_LVL_EGL		SYSC_DVFS_L24
 #define SYSC_DVFS_END_LVL_KFC		SYSC_DVFS_L19
-#define SYSC_DVFS_END_LVL_G3D		SYSC_DVFS_L10
+#define SYSC_DVFS_END_LVL_G3D		SYSC_DVFS_L11
 #define SYSC_DVFS_END_LVL_MIF		SYSC_DVFS_L10
 #define SYSC_DVFS_END_LVL_INT		SYSC_DVFS_L7
 #define SYSC_DVFS_END_LVL_DISP		SYSC_DVFS_L4
@@ -352,6 +352,7 @@ const u32 abb_table_g3d_v3[SYSC_DVFS_END_LVL_EGL+1][MAX_ASV_GROUP+1] = {
 	{ 350,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8},
 	{ 266,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8},
 	{ 160,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8},
+	{ 100,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8,        0x8},
 };
 
 const u32 abb_table_mif_v3[SYSC_DVFS_END_LVL_EGL+1][MAX_ASV_GROUP+1] = {
@@ -755,6 +756,7 @@ const u32 volt_table_g3d_v3[SYSC_DVFS_END_LVL_G3D+1][MAX_ASV_GROUP+1]  = {
 	{350,  925000,  912500,  900000,  887500,  875000,  862500,  850000,  837500,  825000,  812500,  812500,  812500,  800000,  787500,  787500,  775000},
 	{266,  900000,  887500,  875000,  862500,  850000,  837500,  825000,  812500,  806250,  800000,  793750,  787500,  775000,  775000,  775000,  762500},
 	{160,  887500,  875000,  862500,  850000,  837500,  825000,  812500,  800000,  787500,  775000,  775000,  775000,  762500,  750000,  750000,  737500},
+	{100,  887500,  875000,  862500,  850000,  837500,  825000,  812500,  800000,  787500,  775000,  775000,  775000,  762500,  750000,  750000,  737500},
 };
 
 const u32 volt_table_mif_v3[SYSC_DVFS_END_LVL_MIF+1][MAX_ASV_GROUP+1]  = {
