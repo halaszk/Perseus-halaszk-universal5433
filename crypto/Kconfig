@@ -184,6 +184,10 @@ config CRYPTO_GLUE_HELPER_X86
 	depends on X86
 	select CRYPTO_ALGAPI
 
+config CRYPTO_ABLK_HELPER
+	tristate
+	select CRYPTO_CRYPTD
+
 comment "Authenticated Encryption with Associated Data"
 
 config CRYPTO_CCM
