@@ -43,7 +43,6 @@
 #ifdef CONFIG_ANDROID_LOW_MEMORY_KILLER_DO_NOT_KILL_PROCESS
 #include <linux/string.h>
 #endif
-#include <linux/swap.h>
 
 #ifdef CONFIG_HIGHMEM
 #define _ZONE ZONE_HIGHMEM
