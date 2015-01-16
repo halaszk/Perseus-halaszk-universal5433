@@ -810,9 +810,7 @@ static int zswap_frontswap_store(unsigned type, pgoff_t offset,
 	}
 
 	/* store */
-	handle = zs_malloc(tree->pool, dlen,
-		__GFP_NORETRY | __GFP_HIGHMEM | __GFP_NOMEMALLOC |
-			__GFP_NOWARN);
+	handle = zs_malloc(tree->pool, dlen);
 	if (!handle) {
 #ifdef CONFIG_ZSWAP_ENABLE_WRITEBACK
 		zswap_writeback_attempted++;
@@ -836,9 +834,7 @@ static int zswap_frontswap_store(unsigned type, pgoff_t offset,
 		/* TODO: replace with more targeted policy */
 		zswap_writeback_entries(tree, 16);
 		/* try again, allowing wait */
-		handle = zs_malloc(tree->pool, dlen,
-			__GFP_NORETRY | __GFP_HIGHMEM | __GFP_NOMEMALLOC |
-				__GFP_NOWARN);
+		handle = zs_malloc(tree->pool, dlen);
 		if (!handle) {
 			/* still no space, fail */
 			zswap_reject_zsmalloc_fail++;
@@ -1043,7 +1039,7 @@ static void zswap_frontswap_init(unsigned type)
 	tree = kzalloc(sizeof(struct zswap_tree), GFP_ATOMIC);
 	if (!tree)
 		goto err;
-	tree->pool = zs_create_pool(GFP_NOWAIT, &zswap_zs_ops);
+	tree->pool = zs_create_pool(GFP_NOWAIT | __GFP_HIGHMEM);
 	if (!tree->pool)
 		goto freetree;
 	tree->rbroot = RB_ROOT;

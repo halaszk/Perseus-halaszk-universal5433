@@ -15,6 +15,7 @@
 #define _ZS_MALLOC_H_
 
 #include <linux/types.h>
+#include <linux/mm_types.h>
 
 /*
  * zsmalloc mapping modes
@@ -32,6 +33,11 @@ enum zs_mapmode {
 	 * initialized allocations should use ZS_MM_RW to preserve the
 	 * existing data.
 	 */
+};
+
+struct zs_ops {
+	struct page * (*alloc)(gfp_t);
+	void (*free)(struct page *);
 };
 
 struct zs_pool;
