@@ -237,6 +237,14 @@ config CHARGER_MAX77843
 	help
 	  Say Y here to enable support for the MAX77843 charger
 
+config FORCE_FAST_CHARGE
+       bool "Force fast charging (AC/USB) by Yank555.lu"
+       default y
+       help
+        A simple sysfs interface to force adapters that
+         are detected as USB to charge as AC (1A/h) or to set
+         custom charging currents for AC and USB.
+
 config CHARGER_MAX77804
 	tristate "MAX77804 battery charger support"
 	depends on (MFD_MAX77804 || MFD_MAX77804K) && I2C

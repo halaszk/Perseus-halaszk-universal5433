@@ -458,7 +458,7 @@ static void afc_detect_work(struct work_struct *work)
 
 	pr_info("%s\n", __func__);
 
-	if (charger->cable_type == POWER_SUPPLY_TYPE_MAINS) {
+	if (screen_on_current_limit && charger->cable_type == POWER_SUPPLY_TYPE_MAINS) {
 		charger->afc_detect = false;
 		if (charger->siop_level < 100)
 			set_input_current = SIOP_INPUT_LIMIT_CURRENT;
@@ -609,39 +609,6 @@ static void max77843_charger_function_control(
 		charger->charging_current =
 			charger->pdata->charging_current
 			[charger->cable_type].fast_charging_current;
-#ifdef CONFIG_FORCE_FAST_CHARGE
-        /* Yank555 : Use Fast charge currents accroding to user settings */
-        if (force_fast_charge == FAST_CHARGE_FORCE_AC) {/* We are in basic Fast Charge mode, so we substitute AC to USB levels */
-            switch(charger->cable_type) {
-                case POWER_SUPPLY_TYPE_USB:	/* These are low current USB connections, apply usual 1A/h AC levels to USB */
-                case POWER_SUPPLY_TYPE_USB_ACA:
-                case POWER_SUPPLY_TYPE_CARDOCK:
-                case POWER_SUPPLY_TYPE_OTG:	charger->charging_current_max = USB_CHARGE_1000;
-                    charger->charging_current     = USB_CHARGE_1000;
-                    break;
-                default:			/* Don't do anything for any other kind of connections and don't touch when type is unknown */
-                    break;
-            }
-        } else if (force_fast_charge == FAST_CHARGE_FORCE_CUSTOM_MA) { /* We are in custom current Fast Charge mode for both AC and USB */
-            switch(charger->cable_type) {
-                case POWER_SUPPLY_TYPE_USB:
-                case POWER_SUPPLY_TYPE_USB_DCP:
-                case POWER_SUPPLY_TYPE_USB_CDP:
-                case POWER_SUPPLY_TYPE_USB_ACA:
-                case POWER_SUPPLY_TYPE_CARDOCK:
-                case POWER_SUPPLY_TYPE_OTG:	/* These are USB connections, apply custom USB current for all of them */
-                    charger->charging_current_max = usb_charge_level;
-                    charger->charging_current     = usb_charge_level;
-                    break;
-                case POWER_SUPPLY_TYPE_MAINS:	/* These are AC connections, apply custom AC current for all of them */
-                    charger->charging_current_max = ac_charge_level;
-                    charger->charging_current     = min(ac_charge_level+300, MAX_CHARGE_LEVEL); /* Keep the 300mA/h delta, but never go above 2.1A/h */
-                    break;
-                default:			/* Don't do anything for any other kind of connections and don't touch when type is unknown */
-                    break;
-            }
-        }
-#endif // CONFIG_FORCE_FAST_CHARGE
 		if (charger->is_mdock) { /* if mdock was alread inserted, then check OTG, or NOTG state */
 			if (charger->cable_type == POWER_SUPPLY_TYPE_SMART_NOTG) {
 				charger->charging_current =
@@ -673,15 +640,15 @@ static void max77843_charger_function_control(
 		set_charging_current_max =
 			charger->charging_current_max;
 
-		if (charger->siop_level < 100) {
+		if (screen_on_current_limit && charger->siop_level < 100) {
 			if (charger->cable_type == POWER_SUPPLY_TYPE_WIRELESS) {
-				if (set_charging_current_max > SIOP_WIRELESS_INPUT_LIMIT_CURRENT) {
+				if (screen_on_current_limit && set_charging_current_max > SIOP_WIRELESS_INPUT_LIMIT_CURRENT) {
 					set_charging_current_max = SIOP_WIRELESS_INPUT_LIMIT_CURRENT;
 					if (set_charging_current > SIOP_WIRELESS_CHARGING_LIMIT_CURRENT)
 						set_charging_current = SIOP_WIRELESS_CHARGING_LIMIT_CURRENT;
 				}
 			} else {
-				if (set_charging_current_max > SIOP_INPUT_LIMIT_CURRENT) {
+				if (screen_on_current_limit && set_charging_current_max > SIOP_INPUT_LIMIT_CURRENT) {
 					set_charging_current_max = SIOP_INPUT_LIMIT_CURRENT;
 					if (set_charging_current > SIOP_CHARGING_LIMIT_CURRENT)
 						set_charging_current = SIOP_CHARGING_LIMIT_CURRENT;
@@ -952,6 +919,81 @@ static int max77843_chg_get_property(struct power_supply *psy,
 	return 0;
 }
 
+#ifdef CONFIG_FORCE_FAST_CHARGE
+static bool check_fastcharge(struct max77843_charger_data *charger)
+{
+	bool ret = false;
+	int charge_current = 0;
+	union power_supply_propval value;
+	psy_do_property("battery", get, POWER_SUPPLY_PROP_HEALTH, value);
+	
+	//Check for battery issues
+	if (value.intval == POWER_SUPPLY_HEALTH_UNSPEC_FAILURE || value.intval == POWER_SUPPLY_HEALTH_OVERHEATLIMIT)
+	{
+		max77843_set_input_current(charger, 0);
+		return ret;
+	}
+	
+	/* We are in basic Fast Charge mode, so we substitute AC to USB
+	   levels */
+	if (force_fast_charge == FAST_CHARGE_FORCE_AC) {
+		switch(charger->cable_type) {
+			/* These are low current USB connections,
+			   apply 1.A level to USB */
+			case POWER_SUPPLY_TYPE_USB:
+			case POWER_SUPPLY_TYPE_USB_ACA:
+			case POWER_SUPPLY_TYPE_CARDOCK:
+			case POWER_SUPPLY_TYPE_OTG:
+				charge_current = USB_CHARGE_1000;
+				ret = true;
+				break;
+
+		}
+	/* We are in advanced Fast Charge mode, so we apply custom charging
+	   levels for both AC and USB */
+	} else if (force_fast_charge == FAST_CHARGE_FORCE_CUSTOM_MA) {
+		switch(charger->cable_type) {
+			/* These are USB connections, apply custom USB current
+			   for all of them */
+			case POWER_SUPPLY_TYPE_USB:
+			case POWER_SUPPLY_TYPE_USB_DCP:
+			case POWER_SUPPLY_TYPE_USB_CDP:
+			case POWER_SUPPLY_TYPE_USB_ACA:
+			case POWER_SUPPLY_TYPE_CARDOCK:
+			case POWER_SUPPLY_TYPE_OTG:
+				charge_current = usb_charge_level;
+				ret = true;
+				break;
+			/* These are AC connections, apply custom AC current
+			   for all of them */
+			case POWER_SUPPLY_TYPE_MAINS:
+				/* but never go above 2.2A */
+				charge_current = min(ac_charge_level, MAX_CHARGE_LEVEL);
+				ret = true;
+				break;
+			/* Don't do anything for any other kind of connections
+			   and don't touch when type is unknown */
+			default:
+				break;
+		}
+	}
+	if (ret)
+	{
+		charger->is_charging = true;
+		charger->afc_detect = false;
+		charger->charging_current_max = charge_current;
+		charger->charging_current = charge_current;
+
+		max77843_set_charger_state(charger, charger->is_charging);
+		max77843_set_input_current(charger, charge_current);
+		max77843_set_charge_current(charger, charge_current);
+
+		max77843_test_read(charger);
+	}
+	return ret;
+}
+#endif
+
 static int max77843_chg_set_property(struct power_supply *psy,
 			  enum power_supply_property psp,
 			  const union power_supply_propval *val)
@@ -984,6 +1026,9 @@ static int max77843_chg_set_property(struct power_supply *psy,
 		}
 
 		charger->cable_type = val->intval;
+#ifdef CONFIG_FORCE_FAST_CHARGE
+		if (!check_fastcharge(charger))
+#endif
 		max77843_charger_function_control(charger);
 		break;
 	/* val->intval : input charging current */
@@ -1014,6 +1059,10 @@ static int max77843_chg_set_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN:
 		charger->siop_level = val->intval;
 		if (charger->is_charging) {
+#ifdef CONFIG_FORCE_FAST_CHARGE
+			if (check_fastcharge(charger))
+				goto got_override;
+#endif
 			/* decrease the charging current according to siop level */
 			int current_now =
 				charger->charging_current * val->intval / 100;
@@ -1059,9 +1108,9 @@ static int max77843_chg_set_property(struct power_supply *psy,
 				if (charger->siop_level < 100) {
 					set_charging_current_max =
 						charger->charging_current_max * val->intval / 100;
-					if (set_charging_current_max > SIOP_INPUT_LIMIT_CURRENT) {
+					if (screen_on_current_limit && set_charging_current_max > SIOP_INPUT_LIMIT_CURRENT) {
 						set_charging_current_max = SIOP_INPUT_LIMIT_CURRENT;
-						if (current_now > SIOP_CHARGING_LIMIT_CURRENT)
+						if (screen_on_current_limit && current_now > SIOP_CHARGING_LIMIT_CURRENT)
 							current_now = SIOP_CHARGING_LIMIT_CURRENT;
 					}
 				} else {
@@ -1075,6 +1124,7 @@ static int max77843_chg_set_property(struct power_supply *psy,
 			max77843_set_charge_current(charger, current_now);
 
 		}
+got_override:
 		break;
 	case POWER_SUPPLY_PROP_CHARGE_OTG_CONTROL:
 		if (val->intval) {
