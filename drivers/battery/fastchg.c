@@ -46,6 +46,10 @@
  *
  *   rate at which to charge when on USB (0.460A/h to 1.0A/h)
  *
+ * /sys/kernel/fast_charge/wireless_charge_level (r/w)
+ *
+ *   rate at which to charge when on WIRELESS (0.650A/h to 1.2A/h)
+ *
  * /sys/kernel/fast_charge/failsafe (rw)
  *
  *   0 - disabled - allow anything up to 2.1A/h to be used as AC / USB custom current
@@ -58,6 +62,11 @@
  * /sys/kernel/fast_charge/usb_levels (ro)
  *
  *   display available levels for USB (for failsafe enabled mode)
+ *
+ *
+ * /sys/kernel/fast_charge/wireless_levels (ro)
+ *
+ *   display available levels for WIRELESS (for failsafe enabled mode)
  *
  * /sys/kernel/fast_charge/version (ro)
  *
@@ -284,6 +293,51 @@ static struct kobj_attribute usb_charge_level_attribute =
 		usb_charge_level_show,
 		usb_charge_level_store);
 
+/* sysfs interface for "wireless_charge_level" */
+
+int wireless_charge_level;
+
+static ssize_t wireless_charge_level_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", wireless_charge_level);
+}
+
+static ssize_t wireless_charge_level_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+
+	int new_wireless_charge_level;
+
+	sscanf(buf, "%du", &new_wireless_charge_level);
+
+	if (failsafe == FAIL_SAFE_DISABLED && new_wireless_charge_level <= MAX_CHARGE_LEVEL) {
+
+		wireless_charge_level = new_wireless_charge_level;
+		return count;
+
+	}
+
+	else {
+
+		switch (new_wireless_charge_level) {
+			case WIRELESS_CHARGE_650:
+			case WIRELESS_CHARGE_800:
+			case WIRELESS_CHARGE_900:
+			case WIRELESS_CHARGE_1000:
+			case WIRELESS_CHARGE_1100:
+			case WIRELESS_CHARGE_1200:	wireless_charge_level = new_wireless_charge_level;
+							return count;
+			default:			return -EINVAL;
+		}
+
+	}
+
+	return -EINVAL;
+
+}
+
+static struct kobj_attribute wireless_charge_level_attribute =
+__ATTR(wireless_charge_level, 0666, wireless_charge_level_show, wireless_charge_level_store);
+
 /* sysfs interface for "failsafe" */
 
 int failsafe;
@@ -340,6 +394,15 @@ static ssize_t usb_levels_show(struct kobject *kobj,
 static struct kobj_attribute usb_levels_attribute =
 	__ATTR(usb_levels, 0444, usb_levels_show, NULL);
 
+/* sysfs interface for "wireless_levels" */
+static ssize_t wireless_levels_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%s\n", WIRELESS_LEVELS);
+}
+
+static struct kobj_attribute wireless_levels_attribute =
+__ATTR(wireless_levels, 0444, wireless_levels_show, NULL);
+
 /* sysfs interface for "info" */
 static ssize_t info_show(struct kobject *kobj,
 		struct kobj_attribute *attr, char *buf)
@@ -352,9 +415,11 @@ static ssize_t info_show(struct kobject *kobj,
 		"Screen on Current Limit mode : %s\n"
 		"Custom  AC level : %dmA/h\n"
 		"Custom USB level : %dmA/h\n"
+		"Custom Wireless level : %dmA/h\n"
 		"Failsafe mode    : %s\n"
 		"Valid AC  levels : %s\n"
-		"Valid USB levels : %s\n",
+		"Valid USB levels : %s\n"
+		"Valid Wireless levels : %s\n",
 		 FAST_CHARGE_VERSION,
 		 force_fast_charge == FAST_CHARGE_DISABLED 	   ? "0 - Disabled (default)" :
 		(force_fast_charge == FAST_CHARGE_FORCE_AC         ? "1 - Use stock AC level on USB" :
@@ -365,10 +430,12 @@ static ssize_t info_show(struct kobject *kobj,
 		(screen_on_current_limit          == SCREEN_ON_CURRENT_LIMIT_ENABLED            ? "1 - Enabled" : "Problem : value out of range"),
 		 ac_charge_level,
 		 usb_charge_level,
+		 wireless_charge_level,
 		 failsafe          == FAIL_SAFE_DISABLED           ? "0 - Failsafe disabled - please be careful !" :
 		(failsafe          == FAIL_SAFE_ENABLED            ? "1 - Failsafe active (default)" : "Problem : value out of range"),
 		 failsafe          == FAIL_SAFE_ENABLED            ? AC_LEVELS : ANY_LEVELS,
-		 failsafe          == FAIL_SAFE_ENABLED            ? USB_LEVELS : ANY_LEVELS
+		 failsafe          == FAIL_SAFE_ENABLED            ? USB_LEVELS : ANY_LEVELS,
+		 failsafe          == FAIL_SAFE_ENABLED            ? WIRELESS_LEVELS : ANY_LEVELS
 		);
 }
 
@@ -394,9 +461,11 @@ static struct attribute *force_fast_charge_attrs[] = {
 	&screen_on_current_limit_attribute.attr,
 	&ac_charge_level_attribute.attr,
 	&usb_charge_level_attribute.attr,
+	&wireless_charge_level_attribute.attr,
 	&failsafe_attribute.attr,
 	&ac_levels_attribute.attr,
 	&usb_levels_attribute.attr,
+	&wireless_levels_attribute.attr,
 	&info_attribute.attr,
 	&version_attribute.attr,
 	NULL,
@@ -420,6 +489,8 @@ int force_fast_charge_init(void)
 	ac_charge_level   = AC_CHARGE_2100;
 	/* Default USB charge level to 460mA/h    */
 	usb_charge_level  = USB_CHARGE_460;
+	/* Default Wireless charge level to 650mA/h    */
+	wireless_charge_level = WIRELESS_CHARGE_650;  
 	/* Allow only values in list by default   */
 	failsafe          = FAIL_SAFE_ENABLED;
 
