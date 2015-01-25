@@ -3219,6 +3219,7 @@ struct samsung_pll_rate_table pll_g3d_rate_table[] = {
 	{ 350000000U,	6,	350,	2,	0},
 	{ 266000000U,	6,	532,	3,	0},
 	{ 160000000U,	6,	320,	3,	0},
+        { 100000000U,   6,      400,    4,      0},
 };
 
 struct samsung_pll_rate_table pll_mem0_rate_table[] = {
