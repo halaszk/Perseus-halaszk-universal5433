@@ -1,0 +1,16 @@
+obj-$(CONFIG_CAMERA_SENSOR_6B2_OBJ) += fimc-is-device-6b2.o
+obj-$(CONFIG_CAMERA_SENSOR_8B1_OBJ) += fimc-is-device-8b1.o
+obj-$(CONFIG_CAMERA_SENSOR_6D1_OBJ) += fimc-is-device-6d1.o
+obj-$(CONFIG_CAMERA_SENSOR_IMX134_OBJ) += fimc-is-device-imx134.o
+obj-$(CONFIG_CAMERA_SENSOR_IMX135_OBJ) += fimc-is-device-imx135.o
+obj-$(CONFIG_CAMERA_SENSOR_3L2_OBJ) += fimc-is-device-3l2.o
+obj-$(CONFIG_CAMERA_SENSOR_2P2_OBJ) += fimc-is-device-2p2.o
+obj-$(CONFIG_CAMERA_SENSOR_2P2_12M_OBJ) += fimc-is-device-2p2_12m.o
+obj-$(CONFIG_CAMERA_SENSOR_3H5_OBJ) += fimc-is-device-3h5.o
+obj-$(CONFIG_CAMERA_SENSOR_3H7_OBJ) += fimc-is-device-3h7.o
+obj-$(CONFIG_CAMERA_SENSOR_3H7_SUNNY_OBJ) += fimc-is-device-3h7_sunny.o
+obj-$(CONFIG_CAMERA_SENSOR_4E5_OBJ) += fimc-is-device-4e5.o
+obj-$(CONFIG_CAMERA_SENSOR_6A3_OBJ) += fimc-is-device-6a3.o
+obj-$(CONFIG_CAMERA_SENSOR_IMX175_OBJ) += fimc-is-device-imx175.o
+obj-$(CONFIG_CAMERA_SENSOR_IMX240_OBJ) += fimc-is-device-imx240.o
+obj-$(CONFIG_CAMERA_SENSOR_4H5_OBJ) += fimc-is-device-4h5.o
