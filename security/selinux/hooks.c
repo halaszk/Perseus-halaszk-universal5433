@@ -3198,8 +3198,7 @@ error:
 
 static int selinux_mmap_addr(unsigned long addr)
 {
-	int rc = 0;
-	u32 sid = current_sid();
+	int rc;	
 
 	/*
 	 * notice that we are intentionally putting the SELinux check before
@@ -3207,15 +3206,18 @@ static int selinux_mmap_addr(unsigned long addr)
 	 * at bad behaviour/exploit that we always want to get the AVC, even
 	 * if DAC would have also denied the operation.
 	 */
+	/* do DAC check on address space usage */
+	rc = cap_mmap_addr(addr);
+	if (rc)
+		return rc;
+
 	if (addr < CONFIG_LSM_MMAP_MIN_ADDR) {
+		u32 sid = current_sid();
 		rc = avc_has_perm(sid, sid, SECCLASS_MEMPROTECT,
 				  MEMPROTECT__MMAP_ZERO, NULL);
-		if (rc)
-			return rc;
 	}
 
-	/* do DAC check on address space usage */
-	return cap_mmap_addr(addr);
+	return rc;
 }
 
 static int selinux_mmap_file(struct file *file, unsigned long reqprot,
