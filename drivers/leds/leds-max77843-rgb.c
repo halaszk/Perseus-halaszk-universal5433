@@ -471,6 +471,7 @@ static ssize_t store_max77843_rgb_pattern(struct device *dev,
 		max77843_rgb_set_state(&max77843_rgb->led[RED], led_dynamic_current, LED_ALWAYS_ON);
 		break;
 	case CHARGING_ERR:
+		max77843_rgb_ramp(dev, leds_control.noti_ramp_up, leds_control.noti_ramp_down);
 		max77843_rgb_blink(dev, 500, 500);
 		max77843_rgb_set_state(&max77843_rgb->led[RED], led_dynamic_current, LED_BLINK);
 		break;
@@ -542,7 +543,9 @@ static ssize_t store_max77843_rgb_blink(struct device *dev,
 		max77843_rgb_set_state(&max77843_rgb->led[BLUE], led_b_brightness, LED_BLINK);
 	}
 	/*Set LED blink mode*/
+	max77843_rgb_ramp(dev, leds_control.noti_ramp_up, leds_control.noti_ramp_down);
 	max77843_rgb_blink(dev, delay_on_time, delay_off_time);
+	
 
 	pr_info("leds-max77843-rgb: %s\n", __func__);
 	dev_dbg(dev, "led_blink is called, Color:0x%X Brightness:%i\n",
