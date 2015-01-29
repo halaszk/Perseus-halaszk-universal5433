@@ -1429,7 +1429,7 @@ static int max77843_muic_handle_detach(struct max77843_muic_data *muic_data)
 	if (muic_data->attached_dev == ATTACHED_DEV_NONE_MUIC) {
 		pr_info("%s:%s Duplicated(%d), just ignore\n", MUIC_DEV_NAME,
 				__func__, muic_data->attached_dev);
-		return ret;
+		goto out_without_noti;
 	}
 
 	/* Enable Factory Accessory Detection State Machine */

@@ -1147,28 +1147,7 @@ static int exynos_pcie_prepare(struct device *dev)
 
 static void exynos_pcie_complete(struct device *dev)
 {
-	struct pcie_port *pp = &g_pcie->pp;
-	void __iomem *ep_dbi_base = pp->va_cfg0_base;
-	u32 val=0;
-	if (!check_rev()) {
-		writel(0x0, g_pcie->elbi_base + PCIE_APP_REQ_EXIT_L1);
-		printk("+ %s\n", __func__);
-	}
-	else {
-		if(poweronoff_flag) {
-			val = readl(ep_dbi_base + 0xbc);
-			val &= ~0x3;
-			val |= 0x142;
-			writel(val, ep_dbi_base + 0xBC);
-			val = readl(ep_dbi_base + 0x248);
-			writel(val | 0xa0f, ep_dbi_base + 0x248);
-			writel(0x69, ep_dbi_base + 0x24C);
-			writel(0x10031003, ep_dbi_base + 0x1B4);
-			val = readl(ep_dbi_base + 0xD4);
-			writel(val | (1 << 10), ep_dbi_base + 0xD4);
-		}
-	}
-	printk("- %s\n", __func__);
+	return;
 }
 
 static int exynos_pcie_suspend_noirq(struct device *dev)

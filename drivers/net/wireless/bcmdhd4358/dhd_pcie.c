@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_pcie.c 501162 2014-09-08 03:52:30Z $
+ * $Id: dhd_pcie.c 505859 2014-10-01 11:22:53Z $
  */
 
 
@@ -1374,11 +1374,23 @@ int dhd_bus_rxctl(struct dhd_bus *bus, uchar *msg, uint msglen)
 	else
 		bus->dhd->rx_ctlerrs++;
 
-	if (bus->dhd->rxcnt_timeout >= MAX_CNTL_TX_TIMEOUT)
+	if (bus->dhd->rxcnt_timeout >= MAX_CNTL_RX_TIMEOUT) {
+#ifdef SUPPORT_LINKDOWN_RECOVERY
+#ifdef CONFIG_ARCH_MSM
+		bus->islinkdown = TRUE;
+#endif /* CONFIG_ARCH_MSM */
+#endif /* SUPPORT_LINKDOWN_RECOVERY */
 		return -ETIMEDOUT;
+	}
 
-	if (bus->dhd->dongle_trap_occured)
+	if (bus->dhd->dongle_trap_occured) {
+#ifdef SUPPORT_LINKDOWN_RECOVERY
+#ifdef CONFIG_ARCH_MSM
+		bus->islinkdown = TRUE;
+#endif /* CONFIG_ARCH_MSM */
+#endif /* SUPPORT_LINKDOWN_RECOVERY */
 		return -EREMOTEIO;
+	}
 
 	return rxlen ? (int)rxlen : -EIO;
 
@@ -3325,6 +3337,13 @@ dhdpcie_bus_suspend(struct  dhd_bus *bus, bool state)
 		bus->suspended = FALSE;
 		bus->dhd->busstate = DHD_BUS_DATA;
 		dhdpcie_bus_intr_enable(bus);
+#ifdef CUSTOMER_HW4
+		/* ASPM L1 substate setting for WiFi(EP) */
+		if (bus->osh) {
+			OSL_SLEEP(10);
+			dhdpcie_l1ss_set(bus->osh);
+		}
+#endif /* CUSTOMER_HW4 */
 	}
 	return rc;
 }
@@ -4177,6 +4196,36 @@ dhd_fillup_ring_sharedptr_info(dhd_bus_t *bus, ring_info_t *ring_info)
 		}
 	}
 }
+
+#ifdef CUSTOMER_HW4
+void dhdpcie_l1ss_set(osl_t *osh)
+{
+	if (osh == NULL) {
+		DHD_ERROR(("%s: osh is NULL\n", __FUNCTION__));
+		return;
+	}
+	/* XXX http://hwnbu-twiki.broadcom.com/bin/view/Mwgroup/CurrentPcieGen2ProgramGuide */
+#ifdef CONFIG_MACH_UNIVERSAL5433
+	/* old revision chip can't control L1ss */
+	if (check_rev()) {
+		OSL_PCI_WRITE_CONFIG(osh, PCI_LINK_CTRL, 4, 0x142);
+		OSL_PCI_WRITE_CONFIG(osh, PCI_L1SS_CTRL, 4, 0xa0f);
+		/* EXYNOS5433 needs 130us for power on time */
+		OSL_PCI_WRITE_CONFIG(osh, PCI_L1SS_CTRL2, 4, 0x69);
+		OSL_PCI_WRITE_CONFIG(osh, PCIE_LTR_MAX_SNOOP, 4, 0x10031003);
+		OSL_PCI_WRITE_CONFIG(osh, PCI_DEV_STAT_CTRL2, 4, 0x0);
+		OSL_PCI_WRITE_CONFIG(osh, PCI_DEV_STAT_CTRL2, 4, 0x400);
+	}
+#else
+	OSL_PCI_WRITE_CONFIG(osh, PCI_LINK_CTRL, 4, 0x142);
+	OSL_PCI_WRITE_CONFIG(osh, PCI_L1SS_CTRL, 4, 0xa0f);
+	OSL_PCI_WRITE_CONFIG(osh, PCI_L1SS_CTRL2, 4, 0x29);
+	OSL_PCI_WRITE_CONFIG(osh, PCIE_LTR_MAX_SNOOP, 4, 0x10031003);
+	OSL_PCI_WRITE_CONFIG(osh, PCI_DEV_STAT_CTRL2, 4, 0x0);
+	OSL_PCI_WRITE_CONFIG(osh, PCI_DEV_STAT_CTRL2, 4, 0x400);
+#endif /* CONFIG_MACH_UNIVERSAL5433 */
+}
+#endif /* CUSTOMER_HW4 */
 
 /* Initialize bus module: prepare for communication w/dongle */
 int dhd_bus_init(dhd_pub_t *dhdp, bool enforce_mutex)

@@ -22,7 +22,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_linux.c 501110 2014-09-07 07:14:01Z $
+ * $Id: dhd_linux.c 505854 2014-10-01 11:03:36Z $
  */
 
 #include <typedefs.h>
@@ -2977,12 +2977,7 @@ dhd_rx_frame(dhd_pub_t *dhdp, int ifidx, void *pktbuf, int numpkt, uint8 chan)
 		if (ifp == NULL) {
 			DHD_ERROR(("%s: ifp is NULL. drop packet\n",
 				__FUNCTION__));
-#if defined(BCMPCIE) && defined(CONFIG_DHD_USE_STATIC_BUF) && \
-	defined(DHD_USE_STATIC_EVENTBUF)
-			PKTCFREE_STATIC(dhdp->osh, pktbuf, FALSE);
-#else
 			PKTCFREE(dhdp->osh, pktbuf, FALSE);
-#endif /* BCMPCIE && CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_FLOWRING */
 			continue;
 		}
 
@@ -2998,12 +2993,7 @@ dhd_rx_frame(dhd_pub_t *dhdp, int ifidx, void *pktbuf, int numpkt, uint8 chan)
 #endif /* PROP_TXSTATUS_VSDB */
 			DHD_ERROR(("%s: net device is NOT registered yet. drop packet\n",
 			__FUNCTION__));
-#if defined(BCMPCIE) && defined(CONFIG_DHD_USE_STATIC_BUF) && \
-	defined(DHD_USE_STATIC_EVENTBUF)
-			PKTCFREE_STATIC(dhdp->osh, pktbuf, FALSE);
-#else
 			PKTCFREE(dhdp->osh, pktbuf, FALSE);
-#endif /* BCMPCIE && CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_FLOWRING */
 			continue;
 		}
 
@@ -3219,29 +3209,11 @@ dhd_rx_frame(dhd_pub_t *dhdp, int ifidx, void *pktbuf, int numpkt, uint8 chan)
 			}
 #endif /* PNO_SUPPORT */
 
-#if defined(BCMPCIE) && defined(CONFIG_DHD_USE_STATIC_BUF) && \
-	defined(DHD_USE_STATIC_EVENTBUF)
-			PKTFREE_STATIC(dhdp->osh, pktbuf, FALSE);
-			continue;
-#else
 #ifdef DHD_DONOT_FORWARD_BCMEVENT_AS_NETWORK_PKT
 			PKTFREE(dhdp->osh, pktbuf, FALSE);
 			continue;
 #endif /* DHD_DONOT_FORWARD_BCMEVENT_AS_NETWORK_PKT */
-#endif /* BCMPCIE && CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_EVENTBUF */
 		} else {
-#if defined(BCMPCIE)
-#if defined(CONFIG_DHD_USE_STATIC_BUF) && defined(DHD_USE_STATIC_EVENTBUF)
-			if (PKTVALID_STATIC(dhdp->osh, pktbuf)) {
-				DHD_ERROR(("%s: discard invalid event pktbuf, "
-					"ETHER_TYPE=%x, pktbuf=%x\n",
-					__FUNCTION__,
-					(unsigned int)(ntoh16(skb->protocol)),
-					(unsigned int)pktbuf));
-				continue;
-			}
-#endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_EVENTBUF */
-#endif /* BCMPCIE */
 			tout_rx = DHD_PACKET_TIMEOUT_MS;
 
 #ifdef PROP_TXSTATUS
@@ -4467,6 +4439,10 @@ dhd_stop(struct net_device *net)
 	DHD_OS_WAKE_LOCK(&dhd->pub);
 	DHD_PERIM_LOCK(&dhd->pub);
 	DHD_TRACE(("%s: Enter %p\n", __FUNCTION__, net));
+
+	dhd->pub.rxcnt_timeout = 0;
+	dhd->pub.txcnt_timeout = 0;
+
 	if (dhd->pub.up == 0) {
 		goto exit;
 	}
@@ -4497,14 +4473,19 @@ dhd_stop(struct net_device *net)
 			if ((dhd->dhd_state & DHD_ATTACH_STATE_ADD_IF) &&
 				(dhd->dhd_state & DHD_ATTACH_STATE_CFG80211)) {
 				int i;
-
+				dhd_if_t *ifp;
 #if defined(CUSTOMER_HW4) && defined(WL_CFG80211_P2P_DEV_IF)
 				wl_cfg80211_del_p2p_wdev();
 #endif /* CUSTOMER_HW4 && WL_CFG80211_P2P_DEV_IF */
-
 				dhd_net_if_lock_local(dhd);
 				for (i = 1; i < DHD_MAX_IFS; i++)
 					dhd_remove_if(&dhd->pub, i, FALSE);
+
+				ifp = dhd->iflist[0];
+				ASSERT(ifp && ifp->net);
+				if (ifp && ifp->net) {
+					dhd_if_del_sta_list(ifp);
+				}
 				dhd_net_if_unlock_local(dhd);
 			}
 		}
@@ -4535,8 +4516,6 @@ exit:
 	}
 #endif /* SUPPORT_DEEP_SLEEP */
 #endif 
-	dhd->pub.rxcnt_timeout = 0;
-	dhd->pub.txcnt_timeout = 0;
 
 	dhd->pub.hang_was_sent = 0;
 
@@ -7470,8 +7449,7 @@ void dhd_detach(dhd_pub_t *dhdp)
 
 		/*  delete primary interface 0 */
 		ifp = dhd->iflist[0];
-		ASSERT(ifp);
-		ASSERT(ifp->net);
+		ASSERT(ifp && ifp->net);
 		if (ifp && ifp->net) {
 
 
@@ -9993,8 +9971,12 @@ void dhd_schedule_memdump(dhd_pub_t *dhdp, uint8 *buf, uint32 size)
 	dump = MALLOC(dhdp->osh, sizeof(dhd_dump_t));
 	dump->buf = buf;
 	dump->bufsize = size;
-	DHD_TRACE_HW4(("%s: buf(va)=%x, buf(pa)=%x, bufsize=%d\n", __FUNCTION__,
+
+#if defined(CUSTOMER_HW4) && defined(__ARM_ARCH_7A__)
+	DHD_ERROR(("%s: buf(va)=%x, buf(pa)=%x, bufsize=%d\n", __FUNCTION__,
 		(uint32)buf, (uint32)__virt_to_phys((ulong)buf), size));
+#endif
+
 	dhd_deferred_schedule_work(dhdp->info->dhd_deferred_wq, (void *)dump,
 		DHD_WQ_WORK_SOC_RAM_DUMP, dhd_mem_dump, DHD_WORK_PRIORITY_HIGH);
 }

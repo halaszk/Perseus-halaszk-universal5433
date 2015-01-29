@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_pcie.h 500805 2014-09-05 04:54:06Z $
+ * $Id: dhd_pcie.h 505858 2014-10-01 11:17:10Z $
  */
 
 
@@ -201,7 +201,7 @@ extern void dhdpcie_oob_intr_set(dhd_bus_t *bus, bool enable);
 #endif /* BCMPCIE_OOB_HOST_WAKE */
 
 extern int dhd_buzzz_dump_dngl(dhd_bus_t *bus);
-#ifdef CUSTOMER_HW4
+#if defined(CUSTOMER_HW4) && defined(CONFIG_MACH_UNIVERSAL5433)
 void dhdpcie_l1ss_set(osl_t *osh);
-#endif /* CUSTOMER_HW4 */
+#endif /* defined(CUSTOMER_HW4) && defined(CONFIG_MACH_UNIVERSAL5433) */
 #endif /* dhd_pcie_h */

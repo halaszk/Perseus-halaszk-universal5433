@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: linux_osl.h 501098 2014-09-07 02:16:48Z $
+ * $Id: linux_osl.h 505854 2014-10-01 11:03:36Z $
  */
 
 #ifndef _linux_osl_h_
@@ -344,12 +344,10 @@ extern int osl_error(int bcmerror);
 #define	PKTGET_STATIC(osh, len, send)		osl_pktget_static((osh), (len))
 #define	PKTFREE_STATIC(osh, skb, send)		osl_pktfree_static((osh), (skb), (send))
 #define PKTCLEAR_STATIC(osh)		osl_pktclear_static((osh))
-#define PKTVALID_STATIC(osh, pkt)	osl_pktvalid_static((osh), (pkt))
 #else
 #define	PKTGET_STATIC	PKTGET
 #define	PKTFREE_STATIC	PKTFREE
 #define PKTCLEAR_STATIC(osh)
-#define PKTVALID_STATIC(osh, pkt)
 #endif /* CONFIG_DHD_USE_STATIC_BUF */
 #define	PKTDATA(osh, skb)		({BCM_REFERENCE(osh); (((struct sk_buff*)(skb))->data);})
 #define	PKTLEN(osh, skb)		({BCM_REFERENCE(osh); (((struct sk_buff*)(skb))->len);})
@@ -772,7 +770,6 @@ extern void osl_pktfree(osl_t *osh, void *skb, bool send);
 extern void *osl_pktget_static(osl_t *osh, uint len);
 extern void osl_pktfree_static(osl_t *osh, void *skb, bool send);
 extern void osl_pktclear_static(osl_t *osh);
-extern bool osl_pktvalid_static(osl_t *osh, void *pkt);
 extern void osl_pktclone(osl_t *osh, void **pkt);
 
 extern void *osl_pkt_frmnative(osl_t *osh, void *skb);

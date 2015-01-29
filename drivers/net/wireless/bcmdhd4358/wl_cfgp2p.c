@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wl_cfgp2p.c 501280 2014-09-08 14:06:22Z $
+ * $Id: wl_cfgp2p.c 502643 2014-09-15 14:55:45Z $
  *
  */
 #include <typedefs.h>
@@ -2606,7 +2606,7 @@ wl_cfgp2p_add_p2p_disc_if(struct bcm_cfg80211 *cfg)
 	struct wireless_dev *wdev = NULL;
 	struct ether_addr primary_mac;
 
-	if (!cfg)
+	if (!cfg || !cfg->p2p_supported)
 		return ERR_PTR(-EINVAL);
 
 	WL_TRACE(("Enter\n"));

@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: osl.h 498511 2014-08-24 09:17:44Z $
+ * $Id: osl.h 505854 2014-10-01 11:03:36Z $
  */
 
 #ifndef _osl_h_
@@ -91,12 +91,6 @@ typedef void  (*osl_wreg_fn_t)(void *ctx, volatile void *reg, unsigned int val, 
 #define FOREACH_CHAINED_PKT(skb, nskb) \
 	for ((nskb) = NULL; (skb) != NULL; (skb) = (nskb))
 #define	PKTCFREE		PKTFREE
-
-#ifdef BCMPCIE
-#if defined(CONFIG_DHD_USE_STATIC_BUF) && defined(DHD_USE_STATIC_EVENTBUF)
-#define	PKTCFREE_STATIC		PKTFREE_STATIC
-#endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_EVENTBUF */
-#endif /* BCMPCIE */
 
 #define PKTCENQTAIL(h, t, p) \
 do { \

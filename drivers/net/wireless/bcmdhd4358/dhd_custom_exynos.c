@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_custom_exynos.c 500926 2014-09-05 14:59:02Z $
+ * $Id: dhd_custom_exynos.c 505854 2014-10-01 11:03:36Z $
  */
 #include <linux/device.h>
 #include <linux/gpio.h>
@@ -73,23 +73,25 @@
 #define PREALLOC_WLAN_BUF_NUM		160
 #define PREALLOC_WLAN_SECTION_HEADER	24
 
-#define DHD_SKB_HDRSIZE			336
-#define DHD_SKB_1PAGE_BUFSIZE	((PAGE_SIZE*1)-DHD_SKB_HDRSIZE)
-#define DHD_SKB_2PAGE_BUFSIZE	((PAGE_SIZE*2)-DHD_SKB_HDRSIZE)
-#define DHD_SKB_4PAGE_BUFSIZE	((PAGE_SIZE*4)-DHD_SKB_HDRSIZE)
-
 #ifdef CONFIG_BCMDHD_PCIE
+#define DHD_SKB_1PAGE_BUFSIZE	(PAGE_SIZE*1)
+#define DHD_SKB_2PAGE_BUFSIZE	(PAGE_SIZE*2)
+#define DHD_SKB_4PAGE_BUFSIZE	(PAGE_SIZE*4)
+
 #define WLAN_SECTION_SIZE_0	(PREALLOC_WLAN_BUF_NUM * 128)
 #define WLAN_SECTION_SIZE_1	0
 #define WLAN_SECTION_SIZE_2	0
 #define WLAN_SECTION_SIZE_3	(PREALLOC_WLAN_BUF_NUM * 1024)
 
-#define DHD_SKB_1PAGE_RESERVED_BUF_NUM	4
-#define DHD_SKB_1PAGE_BUF_NUM	((32) + (DHD_SKB_1PAGE_RESERVED_BUF_NUM))
-#define DHD_SKB_2PAGE_BUF_NUM	0
+#define DHD_SKB_1PAGE_BUF_NUM	0
+#define DHD_SKB_2PAGE_BUF_NUM	16
 #define DHD_SKB_4PAGE_BUF_NUM	0
 
 #else
+#define DHD_SKB_HDRSIZE                  336
+#define DHD_SKB_1PAGE_BUFSIZE     ((PAGE_SIZE*1)-DHD_SKB_HDRSIZE)
+#define DHD_SKB_2PAGE_BUFSIZE     ((PAGE_SIZE*2)-DHD_SKB_HDRSIZE)
+#define DHD_SKB_4PAGE_BUFSIZE     ((PAGE_SIZE*4)-DHD_SKB_HDRSIZE)
 
 #define WLAN_SECTION_SIZE_0	(PREALLOC_WLAN_BUF_NUM * 128)
 #define WLAN_SECTION_SIZE_1	(PREALLOC_WLAN_BUF_NUM * 128)
@@ -229,13 +231,13 @@ static int dhd_init_wlan_mem(void)
 			goto err_skb_alloc;
 	}
 
-#if !defined(CONFIG_BCMDHD_PCIE)
 	for (i = DHD_SKB_1PAGE_BUF_NUM; i < WLAN_SKB_1_2PAGE_BUF_NUM; i++) {
 		wlan_static_skb[i] = dev_alloc_skb(DHD_SKB_2PAGE_BUFSIZE);
 		if (!wlan_static_skb[i])
 			goto err_skb_alloc;
 	}
 
+#if !defined(CONFIG_BCMDHD_PCIE)
 	wlan_static_skb[i] = dev_alloc_skb(DHD_SKB_4PAGE_BUFSIZE);
 	if (!wlan_static_skb[i])
 		goto err_skb_alloc;

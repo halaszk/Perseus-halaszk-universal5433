@@ -1865,7 +1865,7 @@ static void sec_bat_get_battery_info(
 	value.intval = 0;
 	psy_do_property(battery->pdata->fuelgauge_name, get,
 			POWER_SUPPLY_PROP_CAPACITY, value);
-#if defined(AFC_CHARGER_MODE)
+#if defined(CONFIG_AFC_CHARGER_MODE)
 	if (battery->status != POWER_SUPPLY_STATUS_FULL) {
 		battery->capacity = value.intval;
 	} else if (battery->capacity != 100) {

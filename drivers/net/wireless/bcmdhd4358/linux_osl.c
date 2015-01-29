@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: linux_osl.c 501098 2014-09-07 02:16:48Z $
+ * $Id: linux_osl.c 505854 2014-10-01 11:03:36Z $
  */
 
 #define LINUX_PORT
@@ -60,10 +60,9 @@
 #define DUMPBUFSZ 1024
 
 #ifdef CONFIG_DHD_USE_STATIC_BUF
-#define DHD_SKB_HDRSIZE		336
-#define DHD_SKB_1PAGE_BUFSIZE	((PAGE_SIZE*1)-DHD_SKB_HDRSIZE)
-#define DHD_SKB_2PAGE_BUFSIZE	((PAGE_SIZE*2)-DHD_SKB_HDRSIZE)
-#define DHD_SKB_4PAGE_BUFSIZE	((PAGE_SIZE*4)-DHD_SKB_HDRSIZE)
+#define DHD_SKB_1PAGE_BUFSIZE	(PAGE_SIZE*1)
+#define DHD_SKB_2PAGE_BUFSIZE	(PAGE_SIZE*2)
+#define DHD_SKB_4PAGE_BUFSIZE	(PAGE_SIZE*4)
 
 #define STATIC_BUF_MAX_NUM	16
 #define STATIC_BUF_SIZE	(PAGE_SIZE*2)
@@ -79,7 +78,7 @@ static bcm_static_buf_t *bcm_static_buf = 0;
 
 #if defined(BCMPCIE)
 #define STATIC_PKT_4PAGE_NUM	0
-#define DHD_SKB_MAX_BUFSIZE	DHD_SKB_1PAGE_BUFSIZE
+#define DHD_SKB_MAX_BUFSIZE	DHD_SKB_2PAGE_BUFSIZE
 #elif defined(ENHANCED_STATIC_BUF)
 #define STATIC_PKT_4PAGE_NUM	1
 #define DHD_SKB_MAX_BUFSIZE	DHD_SKB_4PAGE_BUFSIZE
@@ -89,9 +88,8 @@ static bcm_static_buf_t *bcm_static_buf = 0;
 #endif /* BCMPCIE */
 
 #ifdef BCMPCIE
-#define STATIC_PKT_1PAGE_RESERVED_NUM	4
-#define STATIC_PKT_1PAGE_NUM	((32) + (STATIC_PKT_1PAGE_RESERVED_NUM))
-#define STATIC_PKT_2PAGE_NUM	0
+#define STATIC_PKT_1PAGE_NUM	0
+#define STATIC_PKT_2PAGE_NUM	16
 #else
 #define STATIC_PKT_1PAGE_NUM	8
 #define STATIC_PKT_2PAGE_NUM	8
@@ -103,9 +101,9 @@ static bcm_static_buf_t *bcm_static_buf = 0;
 	((STATIC_PKT_1_2PAGE_NUM) + (STATIC_PKT_4PAGE_NUM))
 
 typedef struct bcm_static_pkt {
-	struct sk_buff *skb_4k[STATIC_PKT_1PAGE_NUM];
-#if !defined(BCMPCIE)
+	struct sk_buff *skb_4k[STATIC_PKT_1PAGE_NUM+1];
 	struct sk_buff *skb_8k[STATIC_PKT_2PAGE_NUM];
+#if !defined(BCMPCIE)
 #ifdef ENHANCED_STATIC_BUF
 	struct sk_buff *skb_16k;
 #endif /* ENHANCED_STATIC_BUF */
@@ -905,22 +903,14 @@ osl_pktget_static(osl_t *osh, uint len)
 #endif /* BCMPCIE */
 
 	if (len <= DHD_SKB_1PAGE_BUFSIZE) {
-#if defined(BCMPCIE)
-		for (i = 2; i < (STATIC_PKT_1PAGE_NUM - 2); i++)
-#else
 		for (i = 0; i < STATIC_PKT_1PAGE_NUM; i++)
-#endif /* BCMPCIE */
 		{
 			if (bcm_static_skb->pkt_use[i] == 0) {
 				break;
 			}
 		}
 
-#if defined(BCMPCIE)
-		if ((i >= 2) && (i < (STATIC_PKT_1PAGE_NUM - 2)))
-#else
 		if (i != STATIC_PKT_1PAGE_NUM)
-#endif /* BCMPCIE */
 		{
 			bcm_static_skb->pkt_use[i] = 1;
 
@@ -948,7 +938,6 @@ osl_pktget_static(osl_t *osh, uint len)
 		}
 	}
 
-#if !defined(BCMPCIE)
 	if (len <= DHD_SKB_2PAGE_BUFSIZE) {
 		for (i = STATIC_PKT_1PAGE_NUM; i < STATIC_PKT_1_2PAGE_NUM; i++) {
 			if (bcm_static_skb->pkt_use[i] == 0)
@@ -960,12 +949,16 @@ osl_pktget_static(osl_t *osh, uint len)
 			skb = bcm_static_skb->skb_8k[i - STATIC_PKT_1PAGE_NUM];
 			skb->tail = skb->data + len;
 			skb->len = len;
-
+#if defined(BCMPCIE)
+			spin_unlock_irqrestore(&bcm_static_skb->osl_pkt_lock, flags);
+#else
 			up(&bcm_static_skb->osl_pkt_sem);
+#endif /* BCMPCIE */
 			return skb;
 		}
 	}
 
+#if !defined(BCMPCIE)
 #if defined(ENHANCED_STATIC_BUF)
 	if (bcm_static_skb->pkt_use[STATIC_PKT_MAX_NUM - 1] == 0) {
 		bcm_static_skb->pkt_use[STATIC_PKT_MAX_NUM - 1] = 1;
@@ -1020,14 +1013,18 @@ osl_pktfree_static(osl_t *osh, void *p, bool send)
 		}
 	}
 
-#if !defined(BCMPCIE)
 	for (i = STATIC_PKT_1PAGE_NUM; i < STATIC_PKT_1_2PAGE_NUM; i++) {
 		if (p == bcm_static_skb->skb_8k[i - STATIC_PKT_1PAGE_NUM]) {
 			bcm_static_skb->pkt_use[i] = 0;
+#if defined(BCMPCIE)
+			spin_unlock_irqrestore(&bcm_static_skb->osl_pkt_lock, flags);
+#else
 			up(&bcm_static_skb->osl_pkt_sem);
+#endif /* BCMPCIE */
 			return;
 		}
 	}
+#if !defined(BCMPCIE)
 #ifdef ENHANCED_STATIC_BUF
 	if (p == bcm_static_skb->skb_16k) {
 		bcm_static_skb->pkt_use[STATIC_PKT_MAX_NUM - 1] = 0;
@@ -1074,61 +1071,6 @@ osl_pktclear_static(osl_t *osh)
 #else
 	up(&bcm_static_skb->osl_pkt_sem);
 #endif /* BCMPCIE */
-}
-
-bool
-osl_pktvalid_static(osl_t *osh, void *pkt)
-{
-	int i;
-#if defined(BCMPCIE)
-	unsigned long flags;
-#endif /* BCMPCIE */
-
-	if (!bcm_static_skb) {
-		printk("%s: bcm_static_skb is NULL\n", __FUNCTION__);
-		return FALSE;
-	}
-
-#if defined(BCMPCIE)
-	spin_lock_irqsave(&bcm_static_skb->osl_pkt_lock, flags);
-#else
-	down(&bcm_static_skb->osl_pkt_sem);
-#endif /* BCMPCIE */
-	if (bcm_static_skb) {
-		for (i = 0; i < STATIC_PKT_1PAGE_NUM; i++) {
-			if (pkt == bcm_static_skb->skb_4k[i]) {
-				bcm_static_skb->pkt_use[i] = 0;
-#if defined(BCMPCIE)
-				spin_unlock_irqrestore(&bcm_static_skb->osl_pkt_lock, flags);
-#else
-				up(&bcm_static_skb->osl_pkt_sem);
-#endif /* BCMPCIE */
-				return TRUE;
-			}
-		}
-#if !defined(BCMPCIE)
-		for (i = STATIC_PKT_1PAGE_NUM; i < STATIC_PKT_1_2PAGE_NUM; i++) {
-			if (pkt == bcm_static_skb->skb_8k[i - STATIC_PKT_1PAGE_NUM]) {
-				bcm_static_skb->pkt_use[i] = 0;
-				up(&bcm_static_skb->osl_pkt_sem);
-				return TRUE;
-			}
-		}
-
-		if (pkt == bcm_static_skb->skb_16k) {
-			bcm_static_skb->pkt_use[STATIC_PKT_MAX_NUM - 1] = 0;
-			up(&bcm_static_skb->osl_pkt_sem);
-			return TRUE;
-		}
-#endif /* !BCMPCIE */
-	}
-#if defined(BCMPCIE)
-	spin_unlock_irqrestore(&bcm_static_skb->osl_pkt_lock, flags);
-#else
-	up(&bcm_static_skb->osl_pkt_sem);
-#endif /* BCMPCIE */
-
-	return FALSE;
 }
 
 #if defined(BCMPCIE) && defined(DHD_USE_STATIC_FLOWRING)

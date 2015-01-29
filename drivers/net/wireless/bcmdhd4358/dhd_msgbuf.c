@@ -24,7 +24,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_msgbuf.c 501162 2014-09-08 03:52:30Z $
+ * $Id: dhd_msgbuf.c 505854 2014-10-01 11:03:36Z $
  */
 #include <typedefs.h>
 #include <osl.h>
@@ -137,6 +137,8 @@ typedef uint8 (* d2h_sync_cb_t)(dhd_pub_t *dhd, msgbuf_ring_t *ring,
                                 volatile cmn_msg_hdr_t *msg, int msglen);
 #endif /* PCIE_D2H_SYNC */
 
+#define CTRLRING_LOGGING_LIMIT 63
+
 typedef struct dhd_prot {
 	osl_t *osh;		/* OSL handle */
 	uint32 reqid;
@@ -193,7 +195,32 @@ typedef struct dhd_prot {
 	uint16		rx_metadata_offset;
 	uint16		tx_metadata_offset;
 	uint16          rx_cpln_early_upd_idx;
+#ifdef CTRLRING_LOGGING
+	atomic_t	event_post;
+	atomic_t	ioctlresp_post;
+	atomic_t	ioctl_post;
+	atomic_t	event_cmpl;
+	atomic_t	ioctlresp_cmpl;
+	atomic_t	ioctlack_cmpl;
+	dll_t		event_post_list;
+	dll_t		ioctlresp_post_list;
+	dll_t		ioctl_post_list;
+	dll_t		event_cmpl_list;
+	dll_t		ioctlresp_cmpl_list;
+	dll_t		ioctlack_cmpl_list;
+#endif
 } dhd_prot_t;
+
+typedef struct ioctl_buf_log {
+	uint32		pktid;
+	uint32		high_addr;
+	uint32		low_addr;
+	void*		mbuf;
+	void*		p;
+	uint8		msg_type;
+	struct timeval	tv;
+	dll_t		list;
+} ioctl_buf_log_t;
 
 static int dhdmsgbuf_query_ioctl(dhd_pub_t *dhd, int ifidx, uint cmd,
 	void *buf, uint len, uint8 action);
@@ -220,6 +247,10 @@ static void* dhd_alloc_ring_space(dhd_pub_t *dhd, msgbuf_ring_t *ring,
 static int dhd_fillup_ioct_reqst_ptrbased(dhd_pub_t *dhd, uint16 len, uint cmd, void* buf,
 	int ifidx);
 static INLINE void dhd_prot_packet_free(dhd_pub_t *dhd, uint32 pktid);
+#if defined(CONFIG_DHD_USE_STATIC_BUF) && defined(DHD_USE_STATIC_IOCTLBUF)
+static INLINE void dhd_prot_static_packet_free(dhd_pub_t *dhd, uint32 pktid);
+#endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_IOCTLBUF */
+
 static INLINE void *dhd_prot_packet_get(dhd_pub_t *dhd, uint32 pktid);
 static void dmaxfer_free_dmaaddr(dhd_pub_t *dhd, dhd_dmaxfer_t *dma);
 static int dmaxfer_prepare_dmaaddr(dhd_pub_t *dhd, uint len, uint srcdelay,
@@ -322,6 +353,10 @@ dhd_prot_d2h_sync_livelock(dhd_pub_t *dhd, uint32 seqnum, uint32 tries,
 		dhd, seqnum, seqnum% D2H_EPOCH_MODULO, tries,
 		dhd->prot->d2h_sync_wait_max, dhd->prot->d2h_sync_wait_tot));
 	prhex("D2H MsgBuf Failure", (uchar *)msg, msglen);
+#if defined(SUPPORT_LINKDOWN_RECOVERY) && defined(CONFIG_ARCH_MSM)
+	dhd->bus->islinkdown = TRUE;
+	dhd_os_check_hang(dhd, 0, -ETIMEDOUT);
+#endif /* SUPPORT_LINKDOWN_RECOVERY && CONFIG_ARCH_MSM */
 }
 
 /* Sync on a D2H DMA to complete using SEQNUM mode */
@@ -440,6 +475,15 @@ dhd_prot_d2h_sync_init(dhd_pub_t *dhd, dhd_prot_t * prot)
  * and the metadata may be retrieved using the previously allocated packet id.
  * +---------------------------------------------------------------------------+
  */
+
+/*
+ * Uses a FIFO dll with Nx more pktids instead of a LIFO stack.
+ * If you wish to enable pktidaudit in firmware with FIFO PktId allocator, then
+ * the total number of PktIds managed by the pktidaudit must be multiplied by
+ * this DHD_PKTIDMAP_FIFO factor.
+ */
+#define DHD_PKTIDMAP_FIFO  4
+
 #define MAX_PKTID_ITEMS     (8192) /* Maximum number of pktids supported */
 
 typedef void * dhd_pktid_map_handle_t; /* opaque handle to a pktid map */
@@ -467,6 +511,10 @@ static void *dhd_pktid_map_free(dhd_pktid_map_handle_t *map, uint32 id,
 
 /* Packet metadata saved in packet id mapper */
 typedef struct dhd_pktid_item {
+#if defined(DHD_PKTIDMAP_FIFO)
+	dll_t       list_node; /* MUST BE FIRST field */
+	uint32      nkey;
+#endif
 	bool        inuse;    /* tag an item to be in use */
 	uint8       dma;      /* map direction: flush or invalidate */
 	uint16      len;      /* length of mapped packet's buffer */
@@ -479,7 +527,13 @@ typedef struct dhd_pktid_map {
     int         items;    /* total items in map */
     int         avail;    /* total available items */
     int         failures; /* lockers unavailable count */
+	/* Unique PktId Allocator: FIFO dll, or LIFO:stack of keys */
+#if defined(DHD_PKTIDMAP_FIFO)
+	dll_t       list_free; /* allocate from head, free to tail */
+	dll_t       list_inuse;
+#else  /* ! DHD_PKTIDMAP_FIFO */
     uint32      keys[MAX_PKTID_ITEMS + 1]; /* stack of unique pkt ids */
+#endif /* ! DHD_PKTIDMAP_FIFO */
     dhd_pktid_item_t lockers[0];           /* metadata storage */
 } dhd_pktid_map_t;
 
@@ -494,8 +548,17 @@ typedef struct dhd_pktid_map {
 #define DHD_PKTID_INVALID               (0U)
 
 #define DHD_PKTID_ITEM_SZ               (sizeof(dhd_pktid_item_t))
+
+#if defined(DHD_PKTIDMAP_FIFO)
+/* A 4x pool of pktids are managed with FIFO allocation. */
+#define DHD_PKIDMAP_ITEMS(items)        (items * DHD_PKTIDMAP_FIFO)
+#define DHD_PKTID_MAP_SZ(items)         (sizeof(dhd_pktid_map_t) + \
+			(DHD_PKTID_ITEM_SZ * ((DHD_PKTIDMAP_FIFO * (items)) + 1)))
+#else /* ! DHD_PKTIDMAP_FIFO */
+#define DHD_PKIDMAP_ITEMS(items)        (items)
 #define DHD_PKTID_MAP_SZ(items)         (sizeof(dhd_pktid_map_t) + \
 	                                     (DHD_PKTID_ITEM_SZ * ((items) + 1)))
+#endif /* ! DHD_PKTIDMAP_FIFO */
 
 #define NATIVE_TO_PKTID_INIT(osh, items) dhd_pktid_map_init((osh), (items))
 #define NATIVE_TO_PKTID_FINI(map)        dhd_pktid_map_fini(map)
@@ -546,8 +609,9 @@ dhd_pktid_map_init(void *osh, uint32 num_items)
 	uint32 nkey;
 	dhd_pktid_map_t *map;
 	uint32 dhd_pktid_map_sz;
+	uint32 map_items;
 
-	ASSERT((num_items >= 1) && num_items <= MAX_PKTID_ITEMS);
+	ASSERT((num_items >= 1) && (num_items <= MAX_PKTID_ITEMS));
 	dhd_pktid_map_sz = DHD_PKTID_MAP_SZ(num_items);
 
 	if ((map = (dhd_pktid_map_t *)MALLOC(osh, dhd_pktid_map_sz)) == NULL) {
@@ -561,12 +625,42 @@ dhd_pktid_map_init(void *osh, uint32 num_items)
 	map->items = num_items;
 	map->avail = num_items;
 
+	map_items = DHD_PKIDMAP_ITEMS(map->items);
+
+#if defined(DHD_PKTIDMAP_FIFO)
+
+	/* Initialize all dll */
+	dll_init(&map->list_free);
+	dll_init(&map->list_inuse);
+
+	/* Initialize and place all 4 x items in map's list_free */
+	for (nkey = 0; nkey <= map_items; nkey++) {
+		dll_init(&map->lockers[nkey].list_node);
+		map->lockers[nkey].inuse = FALSE;
+		map->lockers[nkey].nkey  = nkey;
+		map->lockers[nkey].pkt   = NULL; /* bzero: redundant */
+		map->lockers[nkey].len   = 0;
+		/* Free at tail */
+		dll_append(&map->list_free, &map->lockers[nkey].list_node);
+	}
+
+	/* Reserve pktid #0, i.e. DHD_PKTID_INVALID to be inuse */
+	map->lockers[DHD_PKTID_INVALID].inuse = TRUE;
+	dll_delete(&map->lockers[DHD_PKTID_INVALID].list_node);
+	dll_append(&map->list_inuse, &map->lockers[DHD_PKTID_INVALID].list_node);
+
+#else /* ! DHD_PKTIDMAP_FIFO */
+
 	map->lockers[DHD_PKTID_INVALID].inuse = TRUE; /* tag locker #0 as inuse */
 
-	for (nkey = 1; nkey <= num_items; nkey++) { /* locker #0 is reserved */
+	for (nkey = 1; nkey <= map_items; nkey++) { /* locker #0 is reserved */
 		map->keys[nkey] = nkey; /* populate with unique keys */
 		map->lockers[nkey].inuse = FALSE;
+		map->lockers[nkey].pkt   = NULL; /* bzero: redundant */
+		map->lockers[nkey].len   = 0;
 	}
+
+#endif /* ! DHD_PKTIDMAP_FIFO */
 
 	return (dhd_pktid_map_handle_t *)map; /* opaque handle */
 }
@@ -584,6 +678,7 @@ dhd_pktid_map_fini(dhd_pktid_map_handle_t *handle)
 	dhd_pktid_map_t *map;
 	uint32 dhd_pktid_map_sz;
 	dhd_pktid_item_t *locker;
+	uint32 map_items;
 
 	if (handle == NULL)
 		return;
@@ -595,20 +690,26 @@ dhd_pktid_map_fini(dhd_pktid_map_handle_t *handle)
 	nkey = 1; /* skip reserved KEY #0, and start from 1 */
 	locker = &map->lockers[nkey];
 
-	for (; nkey <= map->items; nkey++, locker++) {
+	map_items = DHD_PKIDMAP_ITEMS(map->items);
+
+	for (; nkey <= map_items; nkey++, locker++) {
 		if (locker->inuse == TRUE) { /* numbered key still in use */
 			locker->inuse = FALSE; /* force open the locker */
 
 			{   /* This could be a callback registered with dhd_pktid_map */
 				DMA_UNMAP(osh, locker->physaddr, locker->len,
 				          locker->dma, 0, 0);
-#if defined(CONFIG_DHD_USE_STATIC_BUF) && defined(DHD_USE_STATIC_EVENTBUF)
+#if defined(CONFIG_DHD_USE_STATIC_BUF) && defined(DHD_USE_STATIC_IOCTLBUF)
 				PKTFREE_STATIC(osh, (ulong*)locker->pkt, FALSE);
 #else
 				PKTFREE(osh, (ulong*)locker->pkt, FALSE);
-#endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_EVENTBUF */
+#endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_IOCTLBUF */
+
 			}
 		}
+
+		locker->pkt = NULL; /* clear saved pkt */
+		locker->len = 0;
 	}
 
 	MFREE(osh, handle, dhd_pktid_map_sz);
@@ -621,6 +722,7 @@ dhd_pktid_map_clear(dhd_pktid_map_handle_t *handle)
 	int nkey;
 	dhd_pktid_map_t *map;
 	dhd_pktid_item_t *locker;
+	uint32 map_items;
 
 	DHD_TRACE(("%s\n", __FUNCTION__));
 
@@ -634,19 +736,37 @@ dhd_pktid_map_clear(dhd_pktid_map_handle_t *handle)
 	nkey = 1; /* skip reserved KEY #0, and start from 1 */
 	locker = &map->lockers[nkey];
 
-	for (; nkey <= map->items; nkey++, locker++) {
+	map_items = DHD_PKIDMAP_ITEMS(map->items);
+
+	for (; nkey <= map_items; nkey++, locker++) {
+
+#if !defined(DHD_PKTIDMAP_FIFO)
 		map->keys[nkey] = nkey; /* populate with unique keys */
+#endif /* ! DHD_PKTIDMAP_FIFO */
+
 		if (locker->inuse == TRUE) { /* numbered key still in use */
+
+#if defined(DHD_PKTIDMAP_FIFO)
+			ASSERT(locker->nkey == nkey);
+			dll_delete(&locker->list_node);
+			dll_append(&map->list_free, &locker->list_node);
+#endif /* DHD_PKTIDMAP_FIFO */
+
 			locker->inuse = FALSE; /* force open the locker */
 			DHD_TRACE(("%s free id%d\n", __FUNCTION__, nkey));
 			DMA_UNMAP(osh, (uint32)locker->physaddr, locker->len,
 				locker->dma, 0, 0);
-#if defined(CONFIG_DHD_USE_STATIC_BUF) && defined(DHD_USE_STATIC_EVENTBUF)
+#if defined(CONFIG_DHD_USE_STATIC_BUF) && defined(DHD_USE_STATIC_IOCTLBUF)
 			PKTFREE_STATIC(osh, (ulong*)locker->pkt, FALSE);
 #else
 			PKTFREE(osh, (ulong*)locker->pkt, FALSE);
-#endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_EVENTBUF */
+#endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_IOCTLBUF */
+
 		}
+
+		locker->pkt = NULL; /* clear saved pkt */
+		locker->len = 0;
+
 	}
 	map->avail = map->items;
 }
@@ -686,12 +806,28 @@ dhd_pktid_map_reserve(dhd_pktid_map_handle_t *handle, void *pkt)
 	}
 	ASSERT(map->avail <= map->items);
 
+#if defined(DHD_PKTIDMAP_FIFO)
+
+	ASSERT(!dll_empty(&map->list_free));
+
+	/* Move list_free head item to inuse list, fetch key in head node */
+	locker = (dhd_pktid_item_t *)dll_head_p(&map->list_free);
+	dll_delete(&locker->list_node);
+	nkey = locker->nkey;
+	dll_append(&map->list_inuse, &locker->list_node);
+
+#else /* ! DHD_PKTIDMAP_FIFO */
+
 	nkey = map->keys[map->avail]; /* fetch a free locker, pop stack */
+	locker = &map->lockers[nkey]; /* save packet metadata in locker */
+
+#endif /* ! DHD_PKTIDMAP_FIFO */
+
 	map->avail--;
 
-	locker = &map->lockers[nkey]; /* save packet metadata in locker */
 	locker->inuse = TRUE; /* reserve this locker */
-	locker->pkt = pkt;
+	locker->pkt = pkt; /* pkt is saved, other params not yet saved. */
+	locker->len = 0;
 
 	ASSERT(nkey != DHD_PKTID_INVALID);
 	return nkey; /* return locker's numbered key */
@@ -707,10 +843,10 @@ dhd_pktid_map_save(dhd_pktid_map_handle_t *handle, void *pkt, uint32 nkey,
 	ASSERT(handle != NULL);
 	map = (dhd_pktid_map_t *)handle;
 
-	ASSERT((nkey != DHD_PKTID_INVALID) && (nkey <= (uint32)map->items));
+	ASSERT((nkey != DHD_PKTID_INVALID) && (nkey <= DHD_PKIDMAP_ITEMS(map->items)));
 
 	locker = &map->lockers[nkey];
-	ASSERT(locker->pkt == pkt);
+	ASSERT((locker->pkt == pkt) && (locker->inuse == TRUE));
 
 	locker->dma = dma; /* store contents in locker */
 	locker->physaddr = physaddr;
@@ -728,6 +864,87 @@ dhd_pktid_map_alloc(dhd_pktid_map_handle_t *handle, void *pkt,
 	return nkey;
 }
 
+#ifdef CTRLRING_LOGGING
+void dhd_msgbuf_ctrlring_logging(dhd_prot_t *prot)
+{
+	dll_t *item, *next;
+	ioctl_buf_log_t *logentry = NULL;
+
+	DHD_ERROR(("%s:ioctl post:\n", __FUNCTION__));
+	for (item = dll_head_p(&prot->ioctl_post_list);
+		!dll_end(&prot->ioctl_post_list, item); item = next) {
+		next = dll_next_p(item);
+		logentry = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log, list);
+		DHD_ERROR(("pktid %08x,0x%p mbuf:0x%p la %08x, msg_type %02x, sec %lld, usec %lld\n",
+		           logentry->pktid, logentry->p, logentry->mbuf, logentry->low_addr, logentry->msg_type,
+		           (long long)logentry->tv.tv_sec, (long long)logentry->tv.tv_usec));
+	}
+	DHD_ERROR(("%s:ioctl ack:\n", __FUNCTION__));
+	for (item = dll_head_p(&prot->ioctlack_cmpl_list);
+		!dll_end(&prot->ioctlack_cmpl_list, item); item = next) {
+		next = dll_next_p(item);
+		logentry = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log, list);
+		DHD_ERROR(("msg_type %02x, sec %lld, usec %lld\n", logentry->msg_type,
+		           (long long)logentry->tv.tv_sec, (long long)logentry->tv.tv_usec));
+	}
+	DHD_ERROR(("%s:Event post:\n", __FUNCTION__));
+	for (item = dll_head_p(&prot->event_post_list);
+		!dll_end(&prot->event_post_list, item); item = next) {
+		next = dll_next_p(item);
+		logentry = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log, list);
+		DHD_ERROR(("pktid %04x,0x%p mbuf:0x%p la %08x, msg_type %02x, sec %lld, usec %lld\n",
+		           logentry->pktid, logentry->p, logentry->mbuf, logentry->low_addr, logentry->msg_type,
+		           (long long)logentry->tv.tv_sec, (long long)logentry->tv.tv_usec));
+	}
+	DHD_ERROR(("%s:Event complete:\n", __FUNCTION__));
+	for (item = dll_head_p(&prot->event_cmpl_list);
+		!dll_end(&prot->event_cmpl_list, item); item = next) {
+		next = dll_next_p(item);
+		logentry = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log, list);
+		DHD_ERROR(("pktid %08x,0x%p mbuf:0x%p la %08x, msg_type %02x, sec %lld, usec %lld\n",
+		           logentry->pktid, logentry->p, logentry->mbuf, logentry->low_addr, logentry->msg_type,
+		           (long long)logentry->tv.tv_sec, (long long)logentry->tv.tv_usec));
+	}
+	DHD_ERROR(("%s:ioctl response post:\n", __FUNCTION__));
+	for (item = dll_head_p(&prot->ioctlresp_post_list);
+		!dll_end(&prot->ioctlresp_post_list, item); item = next) {
+		next = dll_next_p(item);
+		logentry = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log, list);
+		DHD_ERROR(("pktid %08x,0x%p mbuf:0x%p la %08x, msg_type %02x, sec %lld, usec %lld\n",
+		           logentry->pktid, logentry->p, logentry->mbuf, logentry->low_addr, logentry->msg_type,
+		           (long long)logentry->tv.tv_sec, (long long)logentry->tv.tv_usec));
+	}
+	DHD_ERROR(("%s:ioctl response complete:\n", __FUNCTION__));
+	for (item = dll_head_p(&prot->ioctlresp_cmpl_list);
+		!dll_end(&prot->ioctlresp_cmpl_list, item); item = next) {
+		next = dll_next_p(item);
+		logentry = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log, list);
+		DHD_ERROR(("pktid %08x,0x%p mbuf:0x%p la %08x, msg_type %02x, sec %lld, usec %lld\n",
+		           logentry->pktid, logentry->p, logentry->mbuf, logentry->low_addr, logentry->msg_type,
+		           (long long)logentry->tv.tv_sec, (long long)logentry->tv.tv_usec));
+	}
+	DHD_ERROR(("%s:Event post:\n", __FUNCTION__));
+	for (item = dll_head_p(&prot->event_post_list);
+		!dll_end(&prot->event_post_list, item); item = next) {
+		next = dll_next_p(item);
+		logentry = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log, list);
+		DHD_ERROR(("pktid %04x,0x%p mbuf:0x%p la %08x, msg_type %02x, sec %lld, usec %lld\n",
+		           logentry->pktid, logentry->p, logentry->mbuf, logentry->low_addr, logentry->msg_type,
+		           (long long)logentry->tv.tv_sec, (long long)logentry->tv.tv_usec));
+	}
+	DHD_ERROR(("%s:Event complete:\n", __FUNCTION__));
+	for (item = dll_head_p(&prot->event_cmpl_list);
+		!dll_end(&prot->event_cmpl_list, item); item = next) {
+		next = dll_next_p(item);
+		logentry = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log, list);
+		DHD_ERROR(("pktid %08x,0x%p mbuf:0x%p la %08x, msg_type %02x, sec %lld, usec %lld\n",
+		           logentry->pktid, logentry->p, logentry->mbuf, logentry->low_addr, logentry->msg_type,
+		           (long long)logentry->tv.tv_sec, (long long)logentry->tv.tv_usec));
+	}
+}
+#endif /* CTRLRING_LOGGING */
+
+
 /*
  * Given a numbered key, return the locker contents.
  * dhd_pktid_map_free() is not reentrant, and is the caller's responsibility.
@@ -740,15 +957,24 @@ dhd_pktid_map_free(dhd_pktid_map_handle_t *handle, uint32 nkey,
 {
 	dhd_pktid_map_t *map;
 	dhd_pktid_item_t *locker;
+	void * pkt;
+#ifdef CTRLRING_LOGGING
+	dhd_prot_t *prot;
+#endif
 
 	ASSERT(handle != NULL);
 
 	map = (dhd_pktid_map_t *)handle;
-	ASSERT((nkey != DHD_PKTID_INVALID) && (nkey <= (uint32)map->items));
+
+	ASSERT((nkey != DHD_PKTID_INVALID) && (nkey <= DHD_PKIDMAP_ITEMS(map->items)));
 
 	locker = &map->lockers[nkey];
 
 	if (locker->inuse == FALSE) { /* Debug check for cloned numbered key */
+#ifdef CTRLRING_LOGGING
+		prot = (dhd_prot_t *)container_of(handle, dhd_prot_t, pktid_map_handle);
+		dhd_msgbuf_ctrlring_logging(prot);
+#endif
 		DHD_ERROR(("%s:%d: Error! freeing invalid pktid<%u>\n",
 		           __FUNCTION__, __LINE__, nkey));
 		ASSERT(locker->inuse != FALSE);
@@ -756,13 +982,26 @@ dhd_pktid_map_free(dhd_pktid_map_handle_t *handle, uint32 nkey,
 	}
 
 	map->avail++;
+
+#if defined(DHD_PKTIDMAP_FIFO)
+	ASSERT(locker->nkey == nkey);
+
+	dll_delete(&locker->list_node); /* Free locker to "tail" of free list */
+	dll_append(&map->list_free, &locker->list_node);
+#else /* ! DHD_PKTIDMAP_FIFO */
 	map->keys[map->avail] = nkey; /* make this numbered key available */
+#endif /* ! DHD_PKTIDMAP_FIFO */
+
 	locker->inuse = FALSE; /* open and free Locker */
 
 	*physaddr = locker->physaddr; /* return contents of locker */
 	*len = (uint32)locker->len;
 
-	return locker->pkt;
+	pkt = locker->pkt;
+	locker->pkt = NULL; /* Clear pkt */
+	locker->len = 0;
+
+	return pkt;
 }
 
 /* Linkage, sets prot link and updates hdrlen in pub */
@@ -771,6 +1010,9 @@ int dhd_prot_attach(dhd_pub_t *dhd)
 	uint alloced = 0;
 
 	dhd_prot_t *prot;
+#ifdef CTRLRING_LOGGING
+	unsigned long flags;
+#endif
 
 	/* Allocate prot structure */
 	if (!(prot = (dhd_prot_t *)DHD_OS_PREALLOC(dhd, DHD_PREALLOC_PROT,
@@ -843,6 +1085,22 @@ int dhd_prot_attach(dhd_pub_t *dhd)
 			__FUNCTION__));
 		goto fail;
 	}
+#ifdef CTRLRING_LOGGING
+	DHD_GENERAL_LOCK(dhd, flags);
+	atomic_set(&prot->event_post, 0);
+	atomic_set(&prot->ioctlresp_post, 0);
+	atomic_set(&prot->ioctl_post, 0);
+	atomic_set(&prot->event_cmpl, 0);
+	atomic_set(&prot->ioctlresp_cmpl, 0);
+	atomic_set(&prot->ioctlack_cmpl, 0);
+	dll_init(&prot->event_post_list);
+	dll_init(&prot->ioctlresp_post_list);
+	dll_init(&prot->ioctl_post_list);
+	dll_init(&prot->event_cmpl_list);
+	dll_init(&prot->ioctlresp_cmpl_list);
+	dll_init(&prot->ioctlack_cmpl_list);
+	DHD_GENERAL_UNLOCK(dhd, flags);
+#endif
 
 	/* Return buffer for ioctl */
 	prot->retbuf.va = DMA_ALLOC_CONSISTENT(dhd->osh, IOCT_RETBUF_SIZE, DMA_ALIGN_LEN,
@@ -1019,6 +1277,11 @@ dhd_prot_init_index_dma_block(dhd_pub_t *dhd, uint8 type, uint32 length)
 void dhd_prot_detach(dhd_pub_t *dhd)
 {
 	dhd_prot_t *prot = dhd->prot;
+#ifdef CTRLRING_LOGGING
+	dll_t *item, *next;
+	ioctl_buf_log_t *logentry = NULL;
+#endif
+
 	/* Stop the protocol module */
 	if (dhd->prot) {
 
@@ -1089,6 +1352,56 @@ void dhd_prot_detach(dhd_pub_t *dhd)
 		dhd_prot_ring_detach(dhd, prot->d2hring_rx_cpln);
 		/* 6.0	 D2H	CTRL_COMPLETION ring */
 		dhd_prot_ring_detach(dhd, prot->d2hring_ctrl_cpln);
+#ifdef CTRLRING_LOGGING
+		for (item = dll_head_p(&prot->event_post_list);
+			!dll_end(&prot->event_post_list, item); item = next) {
+			next = dll_next_p(item);
+			logentry = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log,
+			                                           list);
+			dll_delete(&prot->event_post_list);
+			kfree(logentry);
+		}
+		for (item = dll_head_p(&prot->ioctlresp_post_list);
+			!dll_end(&prot->ioctlresp_post_list, item); item = next) {
+			next = dll_next_p(item);
+			logentry = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log,
+			                                           list);
+			dll_delete(&prot->ioctlresp_post_list);
+			kfree(logentry);
+		}
+		for (item = dll_head_p(&prot->ioctl_post_list);
+			!dll_end(&prot->ioctl_post_list, item); item = next) {
+			next = dll_next_p(item);
+			logentry = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log,
+			                                           list);
+			dll_delete(&prot->ioctl_post_list);
+			kfree(logentry);
+		}
+		for (item = dll_head_p(&prot->event_cmpl_list);
+			!dll_end(&prot->event_cmpl_list, item); item = next) {
+			next = dll_next_p(item);
+			logentry = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log,
+			                                           list);
+			dll_delete(&prot->event_cmpl_list);
+			kfree(logentry);
+		}
+		for (item = dll_head_p(&prot->ioctlresp_cmpl_list);
+			!dll_end(&prot->ioctlresp_cmpl_list, item); item = next) {
+			next = dll_next_p(item);
+			logentry = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log,
+			                                           list);
+			dll_delete(&prot->ioctlresp_cmpl_list);
+			kfree(logentry);
+		}
+		for (item = dll_head_p(&prot->ioctlack_cmpl_list);
+			!dll_end(&prot->ioctlack_cmpl_list, item); item = next) {
+			next = dll_next_p(item);
+			logentry = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log,
+			                                           list);
+			dll_delete(&prot->ioctlack_cmpl_list);
+			kfree(logentry);
+		}
+#endif /* CTRLRING_LOGGING */
 
 		NATIVE_TO_PKTID_FINI(dhd->prot->pktid_map_handle);
 
@@ -1321,6 +1634,22 @@ dhd_prot_packet_free(dhd_pub_t *dhd, uint32 pktid)
 	}
 	return;
 }
+#if defined(CONFIG_DHD_USE_STATIC_BUF) && defined(DHD_USE_STATIC_IOCTLBUF)
+static INLINE void BCMFASTPATH
+dhd_prot_static_packet_free(dhd_pub_t *dhd, uint32 pktid)
+{
+	void *PKTBUF;
+	dmaaddr_t pa;
+	uint32 pa_len;
+	PKTBUF = PKTID_TO_NATIVE(dhd->prot->pktid_map_handle, pktid, pa, pa_len);
+
+	if (PKTBUF) {
+		DMA_UNMAP(dhd->osh, pa, (uint) pa_len, DMA_TX, 0, 0);
+		PKTFREE_STATIC(dhd->osh, PKTBUF, FALSE);
+	}
+	return;
+}
+#endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_IOCTLBUF */
 
 static INLINE void * BCMFASTPATH
 dhd_prot_packet_get(dhd_pub_t *dhd, uint32 pktid)
@@ -1494,6 +1823,10 @@ dhd_prot_rxbufpost_ctrl(dhd_pub_t *dhd, bool event_buf)
 	dhd_prot_t *prot = dhd->prot;
 	uint16 alloced = 0;
 	unsigned long flags;
+#ifdef CTRLRING_LOGGING
+	ioctl_buf_log_t *logentry = NULL, *logentrytemp = NULL;
+	dll_t *item;
+#endif
 
 	if (dhd->busstate == DHD_BUS_DOWN) {
 		DHD_ERROR(("%s: bus is already down.\n", __FUNCTION__));
@@ -1508,11 +1841,11 @@ dhd_prot_rxbufpost_ctrl(dhd_pub_t *dhd, bool event_buf)
 		pktsz = DHD_FLOWRING_IOCTL_BUFPOST_PKTSZ;
 	}
 
-#if defined(CONFIG_DHD_USE_STATIC_BUF) && defined(DHD_USE_STATIC_EVENTBUF)
-	if (event_buf)
+#if defined(CONFIG_DHD_USE_STATIC_BUF) && defined(DHD_USE_STATIC_IOCTLBUF)
+	if (!event_buf)
 		p = PKTGET_STATIC(dhd->osh, pktsz, FALSE);
 	else
-#endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_EVENTBUF */
+#endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_IOCTLBUF */
 		p = PKTGET(dhd->osh, pktsz, FALSE);
 	if (p == NULL) {
 		DHD_ERROR(("%s:%d: PKTGET for %s rxbuf failed\n",
@@ -1568,6 +1901,43 @@ dhd_prot_rxbufpost_ctrl(dhd_pub_t *dhd, bool event_buf)
 	rxbuf_post->host_buf_addr.high_addr = htol32(PHYSADDRHI(physaddr));
 	rxbuf_post->host_buf_addr.low_addr  = htol32(PHYSADDRLO(physaddr));
 
+#ifdef CTRLRING_LOGGING
+	logentry = kzalloc(sizeof(*logentry), GFP_ATOMIC);
+	if (logentry == NULL)
+		goto skip_logging;
+	logentry->pktid = rxbuf_post->cmn_hdr.request_id;
+	logentry->msg_type = rxbuf_post->cmn_hdr.msg_type;
+	logentry->high_addr = rxbuf_post->host_buf_addr.high_addr;
+	logentry->low_addr = rxbuf_post->host_buf_addr.low_addr;
+	logentry->mbuf = rxbuf_post;
+	logentry->p = PKTDATA(dhd->osh, p);
+	do_gettimeofday(&logentry->tv);
+	if (event_buf) {
+		if (atomic_read(&prot->event_post) > CTRLRING_LOGGING_LIMIT) {
+			item = dll_head_p(&prot->event_post_list);
+			logentrytemp = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log,
+			                                               list);
+			atomic_dec(&prot->event_post);
+			dll_delete(&logentrytemp->list);
+			kfree(logentrytemp);
+		}
+		atomic_inc(&prot->event_post);
+		dll_prepend(&prot->event_post_list, &logentry->list);
+	} else {
+		if (atomic_read(&prot->ioctlresp_post) > CTRLRING_LOGGING_LIMIT) {
+			item = dll_head_p(&prot->ioctlresp_post_list);
+			logentrytemp = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log,
+			                                               list);
+			atomic_dec(&prot->ioctlresp_post);
+			dll_delete(&logentrytemp->list);
+			kfree(logentrytemp);
+		}
+		atomic_inc(&prot->ioctlresp_post);
+		dll_prepend(&prot->ioctlresp_post_list, &logentry->list);
+	}
+skip_logging:
+#endif /* CTRLRING_LOGGING */
+
 	/* Update the write pointer in TCM & ring bell */
 	prot_ring_write_complete(dhd, prot->h2dring_ctrl_subn, rxbuf_post,
 		DHD_FLOWRING_DEFAULT_NITEMS_POSTED_H2D);
@@ -1576,11 +1946,11 @@ dhd_prot_rxbufpost_ctrl(dhd_pub_t *dhd, bool event_buf)
 	return 1;
 
 free_pkt_return:
-#if defined(CONFIG_DHD_USE_STATIC_BUF) && defined(DHD_USE_STATIC_EVENTBUF)
-	if (event_buf)
+#if defined(CONFIG_DHD_USE_STATIC_BUF) && defined(DHD_USE_STATIC_IOCTLBUF)
+	if (!event_buf)
 		PKTFREE_STATIC(dhd->osh, p, FALSE);
 	else
-#endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_EVENTBUF */
+#endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_IOCTLBUF */
 		PKTFREE(dhd->osh, p, FALSE);
 
 	return -1;
@@ -1918,6 +2288,12 @@ static void
 dhd_prot_ioctack_process(dhd_pub_t *dhd, void * buf, uint16 msglen)
 {
 	ioctl_req_ack_msg_t * ioct_ack = (ioctl_req_ack_msg_t *)buf;
+#ifdef CTRLRING_LOGGING
+	ioctl_buf_log_t *logentry = NULL, *logentrytemp = NULL;
+	unsigned long flags;
+	dhd_prot_t *prot = dhd->prot;
+	dll_t *item;
+#endif
 
 	DHD_CTL(("ioctl req ack: request_id %d, status 0x%04x, flow ring %d \n",
 		ioct_ack->cmn_hdr.request_id, ioct_ack->compl_hdr.status,
@@ -1925,6 +2301,26 @@ dhd_prot_ioctack_process(dhd_pub_t *dhd, void * buf, uint16 msglen)
 	if (ioct_ack->compl_hdr.status != 0)  {
 		DHD_ERROR(("got an error status for the ioctl request...need to handle that\n"));
 	}
+#ifdef CTRLRING_LOGGING
+	DHD_GENERAL_LOCK(dhd, flags);
+	logentry = kzalloc(sizeof(*logentry), GFP_ATOMIC);
+	if (logentry == NULL)
+		goto skip_logging;
+	logentry->pktid = ioct_ack->cmn_hdr.request_id;
+	logentry->msg_type = ioct_ack->cmn_hdr.msg_type;
+	do_gettimeofday(&logentry->tv);
+	if (atomic_read(&prot->ioctlack_cmpl) > CTRLRING_LOGGING_LIMIT) {
+		item = dll_head_p(&prot->ioctlack_cmpl_list);
+		logentrytemp = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log, list);
+		atomic_dec(&prot->ioctlack_cmpl);
+		dll_delete(&logentrytemp->list);
+		kfree(logentrytemp);
+	}
+	atomic_inc(&prot->ioctlack_cmpl);
+	dll_prepend(&prot->ioctlack_cmpl_list, &logentry->list);
+skip_logging:
+	DHD_GENERAL_UNLOCK(dhd, flags);
+#endif /* CTRLRING_LOGGING */
 
 #if defined(PCIE_D2H_SYNC_BZERO)
 	memset(buf, 0, msglen);
@@ -1938,11 +2334,41 @@ dhd_prot_ioctcmplt_process(dhd_pub_t *dhd, void * buf, uint16 msglen)
 	uint32 resp_len = 0;
 	uint32 pkt_id, xt_id;
 	ioctl_comp_resp_msg_t * ioct_resp = (ioctl_comp_resp_msg_t *)buf;
+#ifdef CTRLRING_LOGGING
+	ioctl_buf_log_t *logentry = NULL, *logentrytemp = NULL;
+	unsigned long flags;
+	dhd_pktid_map_t *map = dhd->prot->pktid_map_handle;
+	dll_t *item;
+#endif
 
 	resp_len = ltoh16(ioct_resp->resp_len);
 	xt_id = ltoh16(ioct_resp->trans_id);
 	pkt_id = ltoh32(ioct_resp->cmn_hdr.request_id);
 	status = ioct_resp->compl_hdr.status;
+#ifdef CTRLRING_LOGGING
+	DHD_GENERAL_LOCK(dhd, flags);
+	logentry = kzalloc(sizeof(*logentry), GFP_ATOMIC);
+	if (logentry == NULL)
+		goto skip_logging;
+	logentry->pktid = ioct_resp->cmn_hdr.request_id;
+	logentry->msg_type = ioct_resp->cmn_hdr.msg_type;
+	logentry->high_addr = PHYSADDRHI(map->lockers[pkt_id].physaddr);
+	logentry->low_addr = PHYSADDRLO(map->lockers[pkt_id].physaddr);
+	logentry->mbuf = buf;
+	logentry->p = buf;
+	do_gettimeofday(&logentry->tv);
+	if (atomic_read(&dhd->prot->ioctlresp_cmpl) > CTRLRING_LOGGING_LIMIT) {
+		item = dll_head_p(&dhd->prot->ioctlresp_cmpl_list);
+		logentrytemp = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log, list);
+		atomic_dec(&dhd->prot->ioctlresp_cmpl);
+		dll_delete(&logentrytemp->list);
+		kfree(logentrytemp);
+	}
+	atomic_inc(&dhd->prot->ioctlresp_cmpl);
+	dll_prepend(&dhd->prot->ioctlresp_cmpl_list, &logentry->list);
+skip_logging:
+	DHD_GENERAL_UNLOCK(dhd, flags);
+#endif /* CTRLRING_LOGGING */
 
 #if defined(PCIE_D2H_SYNC_BZERO)
 	memset(buf, 0, msglen);
@@ -2019,6 +2445,11 @@ dhd_prot_event_process(dhd_pub_t *dhd, void* buf, uint16 len)
 	dhd_prot_t *prot = dhd->prot;
 	int post_cnt = 0;
 	bool zero_posted = FALSE;
+#ifdef CTRLRING_LOGGING
+	ioctl_buf_log_t *logentry = NULL, *logentrytemp = NULL;
+	dhd_pktid_map_t *map = dhd->prot->pktid_map_handle;
+	dll_t *item;
+#endif
 
 	/* Event complete header */
 	evnt = (wlevent_req_msg_t *)buf;
@@ -2046,6 +2477,29 @@ dhd_prot_event_process(dhd_pub_t *dhd, void* buf, uint16 len)
 	/* locks required to protect pktid_map */
 	DHD_GENERAL_LOCK(dhd, flags);
 	pkt = dhd_prot_packet_get(dhd, ltoh32(bufid));
+
+#ifdef CTRLRING_LOGGING
+	logentry = kzalloc(sizeof(*logentry), GFP_ATOMIC);
+	if (logentry == NULL)
+		goto skip_logging;
+	logentry->pktid = bufid;
+	logentry->msg_type = evnt->cmn_hdr.msg_type;
+	logentry->high_addr = PHYSADDRHI(map->lockers[bufid].physaddr);
+	logentry->low_addr = PHYSADDRLO(map->lockers[bufid].physaddr);
+	logentry->mbuf = buf;
+	logentry->p = pkt;
+	do_gettimeofday(&logentry->tv);
+	if (atomic_read(&prot->event_cmpl) > CTRLRING_LOGGING_LIMIT) {
+		item = dll_head_p(&prot->event_cmpl_list);
+		logentrytemp = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log, list);
+		atomic_dec(&prot->event_cmpl);
+		dll_delete(&logentrytemp->list);
+		kfree(logentrytemp);
+	}
+	atomic_inc(&prot->event_cmpl);
+	dll_prepend(&prot->event_cmpl_list, &logentry->list);
+skip_logging:
+#endif /* CTRLRING_LOGGING */
 	DHD_GENERAL_UNLOCK(dhd, flags);
 
 	if (!pkt) {
@@ -2057,6 +2511,7 @@ dhd_prot_event_process(dhd_pub_t *dhd, void* buf, uint16 len)
 	if (dhd->prot->rx_dataoffset)
 		PKTPULL(dhd->osh, pkt, dhd->prot->rx_dataoffset);
 
+	ASSERT(buflen <= DHD_FLOWRING_RX_BUFPOST_PKTSZ);
 	PKTSETLEN(dhd->osh, pkt, buflen);
 
 	dhd_bus_rx_frame(dhd->bus, pkt, ifidx, 1);
@@ -2771,11 +3226,19 @@ dhdmsgbuf_cmplt(dhd_pub_t *dhd, uint32 id, uint32 len, void* buf, void* retbuf)
 			bcopy(PKTDATA(dhd->osh, pkt), buf, len);
 		}
 		if (pkt) {
+#if defined(CONFIG_DHD_USE_STATIC_BUF) && defined(DHD_USE_STATIC_IOCTLBUF)
+			PKTFREE_STATIC(dhd->osh, pkt, FALSE);
+#else
 			PKTFREE(dhd->osh, pkt, FALSE);
+#endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_IOCTLBUF */
 		}
 	} else {
 		DHD_GENERAL_LOCK(dhd, flags);
+#if defined(CONFIG_DHD_USE_STATIC_BUF) && defined(DHD_USE_STATIC_IOCTLBUF)
+		dhd_prot_static_packet_free(dhd, ioct_resp.cmn_hdr.request_id);
+#else
 		dhd_prot_packet_free(dhd, ioct_resp.cmn_hdr.request_id);
+#endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_IOCTLBUF */
 		DHD_GENERAL_UNLOCK(dhd, flags);
 	}
 
@@ -3043,6 +3506,10 @@ dhd_fillup_ioct_reqst_ptrbased(dhd_pub_t *dhd, uint16 len, uint cmd, void* buf, 
 	uint16  rqstlen, resplen;
 	unsigned long flags;
 	uint16 alloced = 0;
+#ifdef CTRLRING_LOGGING
+	ioctl_buf_log_t *logentry = NULL, *logentrytemp = NULL;
+	dll_t *item;
+#endif
 
 	rqstlen = len;
 	resplen = len;
@@ -3077,6 +3544,29 @@ dhd_fillup_ioct_reqst_ptrbased(dhd_pub_t *dhd, uint16 len, uint cmd, void* buf, 
 	ioct_rqst->input_buf_len = htol16(rqstlen);
 	ioct_rqst->host_input_buf_addr.high = htol32(PHYSADDRHI(prot->ioctbuf.pa));
 	ioct_rqst->host_input_buf_addr.low = htol32(PHYSADDRLO(prot->ioctbuf.pa));
+
+#ifdef CTRLRING_LOGGING
+	logentry = kzalloc(sizeof(*logentry), GFP_ATOMIC);
+	if (logentry == NULL)
+		goto skip_logging;
+	logentry->pktid = ioct_rqst->cmn_hdr.request_id;
+	logentry->msg_type = MSG_TYPE_IOCTLPTR_REQ;
+	logentry->high_addr = ioct_rqst->host_input_buf_addr.high_addr;
+	logentry->low_addr = ioct_rqst->host_input_buf_addr.low_addr;
+	logentry->mbuf = ioct_rqst;
+	logentry->p = ioct_rqst;
+	do_gettimeofday(&logentry->tv);
+	if (atomic_read(&prot->ioctl_post) > CTRLRING_LOGGING_LIMIT) {
+		item = dll_head_p(&prot->ioctl_post_list);
+		logentrytemp = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log, list);
+		atomic_dec(&prot->ioctl_post);
+		dll_delete(&logentrytemp->list);
+		kfree(logentrytemp);
+	}
+	atomic_inc(&prot->ioctl_post);
+	dll_prepend(&prot->ioctl_post_list, &logentry->list);
+skip_logging:
+#endif /* CTRLRING_LOGGING */
 	/* copy ioct payload */
 	ioct_buf = (void *) prot->ioctbuf.va;
 
@@ -3703,6 +4193,10 @@ dhd_prot_flow_ring_create(dhd_pub_t *dhd, flow_ring_node_t *flow_ring_node)
 	unsigned long flags;
 	char eabuf[ETHER_ADDR_STR_LEN];
 	uint16 alloced = 0;
+#ifdef CTRLRING_LOGGING
+	ioctl_buf_log_t *logentry = NULL, *logentrytemp = NULL;
+	dll_t *item;
+#endif
 
 	if (!(msgbuf_flow_info = prot_ring_attach(prot, "h2dflr",
 		H2DRING_TXPOST_MAX_ITEM, H2DRING_TXPOST_ITEMSIZE,
@@ -3745,6 +4239,24 @@ dhd_prot_flow_ring_create(dhd_pub_t *dhd, flow_ring_node_t *flow_ring_node)
 	flow_create_rqst->max_items = htol16(H2DRING_TXPOST_MAX_ITEM);
 	flow_create_rqst->len_item = htol16(H2DRING_TXPOST_ITEMSIZE);
 	bcm_ether_ntoa((struct ether_addr *)flow_ring_node->flow_info.da, eabuf);
+#ifdef CTRLRING_LOGGING
+	logentry = kzalloc(sizeof(*logentry), GFP_ATOMIC);
+	if (logentry == NULL)
+		goto skip_logging;
+	logentry->msg_type = MSG_TYPE_FLOW_RING_CREATE;
+	do_gettimeofday(&logentry->tv);
+	if (atomic_read(&prot->ioctl_post) > CTRLRING_LOGGING_LIMIT) {
+		item = dll_head_p(&prot->ioctl_post_list);
+		logentrytemp = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log, list);
+		atomic_dec(&prot->ioctl_post);
+		dll_delete(&logentrytemp->list);
+		kfree(logentrytemp);
+	}
+	atomic_inc(&prot->ioctl_post);
+	dll_prepend(&prot->ioctl_post_list, &logentry->list);
+skip_logging:
+#endif /* CTRLRING_LOGGING */
+
 	DHD_ERROR(("%s Send Flow create Req msglen flow ID %d for peer %s prio %d ifindex %d\n",
 		__FUNCTION__, flow_ring_node->flowid, eabuf, flow_ring_node->flow_info.tid,
 		flow_ring_node->flow_info.ifindex));
@@ -3827,6 +4339,10 @@ dhd_prot_flow_ring_delete(dhd_pub_t *dhd, flow_ring_node_t *flow_ring_node)
 	unsigned long flags;
 	char eabuf[ETHER_ADDR_STR_LEN];
 	uint16 alloced = 0;
+#ifdef CTRLRING_LOGGING
+	ioctl_buf_log_t *logentry = NULL, *logentrytemp = NULL;
+	dll_t *item;
+#endif
 
 	/* align it to 4 bytes, so that all start addr form cbuf is 4 byte aligned */
 	msglen = align(msglen, DMA_ALIGN_LEN);
@@ -3852,6 +4368,24 @@ dhd_prot_flow_ring_delete(dhd_pub_t *dhd, flow_ring_node_t *flow_ring_node)
 	flow_delete_rqst->reason = htol16(BCME_OK);
 
 	bcm_ether_ntoa((struct ether_addr *)flow_ring_node->flow_info.da, eabuf);
+#ifdef CTRLRING_LOGGING
+	logentry = kzalloc(sizeof(*logentry), GFP_ATOMIC);
+	if (logentry == NULL)
+		goto skip_logging;
+	logentry->msg_type = MSG_TYPE_FLOW_RING_DELETE;
+	do_gettimeofday(&logentry->tv);
+	if (atomic_read(&prot->ioctl_post) > CTRLRING_LOGGING_LIMIT) {
+		item = dll_head_p(&prot->ioctl_post_list);
+		logentrytemp = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log, list);
+		atomic_dec(&prot->ioctl_post);
+		dll_delete(&logentrytemp->list);
+		kfree(logentrytemp);
+	}
+	atomic_inc(&prot->ioctl_post);
+	dll_prepend(&prot->ioctl_post_list, &logentry->list);
+skip_logging:
+#endif /* CTRLRING_LOGGING */
+
 	DHD_ERROR(("%s sending FLOW RING ID %d for peer %s prio %d ifindex %d"
 		" Delete req msglen %d\n", __FUNCTION__,
 		flow_ring_node->flowid, eabuf, flow_ring_node->flow_info.tid,
@@ -3885,6 +4419,10 @@ dhd_prot_flow_ring_flush(dhd_pub_t *dhd, flow_ring_node_t *flow_ring_node)
 	uint16 msglen = sizeof(tx_flowring_flush_request_t);
 	unsigned long flags;
 	uint16 alloced = 0;
+#ifdef CTRLRING_LOGGING
+	ioctl_buf_log_t *logentry = NULL, *logentrytemp = NULL;
+	dll_t *item;
+#endif
 
 	/* align it to 4 bytes, so that all start addr form cbuf is 4 byte aligned */
 	msglen = align(msglen, DMA_ALIGN_LEN);
@@ -3907,6 +4445,23 @@ dhd_prot_flow_ring_flush(dhd_pub_t *dhd, flow_ring_node_t *flow_ring_node)
 	flow_flush_rqst->flow_ring_id = htol16((uint16)flow_ring_node->flowid);
 	flow_flush_rqst->reason = htol16(BCME_OK);
 
+#ifdef CTRLRING_LOGGING
+	logentry = kzalloc(sizeof(*logentry), GFP_ATOMIC);
+	if (logentry == NULL)
+		goto skip_logging;
+	logentry->msg_type = MSG_TYPE_FLOW_RING_FLUSH;
+	do_gettimeofday(&logentry->tv);
+	if (atomic_read(&prot->ioctl_post) > CTRLRING_LOGGING_LIMIT) {
+		item = dll_head_p(&prot->ioctl_post_list);
+		logentrytemp = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log, list);
+		atomic_dec(&prot->ioctl_post);
+		dll_delete(&logentrytemp->list);
+		kfree(logentrytemp);
+	}
+	atomic_inc(&prot->ioctl_post);
+	dll_prepend(&prot->ioctl_post_list, &logentry->list);
+skip_logging:
+#endif /* CTRLRING_LOGGING */
 	DHD_INFO(("%s sending FLOW RING Flush req msglen %d \n", __FUNCTION__, msglen));
 
 	/* upd wrt ptr and raise interrupt */
