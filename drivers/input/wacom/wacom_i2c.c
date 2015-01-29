@@ -51,6 +51,7 @@ extern unsigned int system_rev;
 struct i2c_client *g_client_boot;
 
 extern int wacom_i2c_flash(struct wacom_i2c *wac_i2c);
+extern int wacom_i2c_usermode(struct wacom_i2c *wac_i2c);
 
 #ifdef CONFIG_OF
 char *gpios_name[] = {
@@ -349,6 +350,9 @@ static void wacom_power_on(struct wacom_i2c *wac_i2c)
 	/* power on */
 	wac_i2c->pdata->resume_platform_hw();
 	wac_i2c->power_enable = true;
+
+	wac_i2c->pdata->compulsory_flash_mode(false); /* compensation to protect from flash mode  */
+
 	cancel_delayed_work_sync(&wac_i2c->resume_work);
 	schedule_delayed_work(&wac_i2c->resume_work, msecs_to_jiffies(EPEN_RESUME_DELAY));
 
@@ -396,6 +400,8 @@ static void wacom_power_off(struct wacom_i2c *wac_i2c)
 	/* power off */
 	wac_i2c->power_enable = false;
 	wac_i2c->pdata->suspend_platform_hw();
+
+	wac_i2c->pdata->compulsory_flash_mode(false); /* compensation to protect from flash mode  */
 
 	printk(KERN_DEBUG"epen:%s\n", __func__);
  out_power_off:
@@ -624,6 +630,10 @@ static void wacom_i2c_resume_work(struct work_struct *work)
 				__LINE__);
 		}
 	}
+
+	ret = wacom_i2c_modecheck(wac_i2c);
+	if(ret) wacom_i2c_usermode(wac_i2c);
+
 #if defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
 	printk(KERN_DEBUG "epen:%s\n", __func__);
 #else

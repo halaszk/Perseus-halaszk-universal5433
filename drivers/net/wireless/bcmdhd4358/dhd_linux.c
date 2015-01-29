@@ -2660,6 +2660,17 @@ dhd_start_xmit(struct sk_buff *skb, struct net_device *net)
 
 	DHD_TRACE(("%s: Enter\n", __FUNCTION__));
 
+#ifdef PCIE_FULL_DONGLE
+       if (dhd->pub.busstate == DHD_BUS_SUSPEND) {
+              DHD_ERROR(("%s : pcie is still in suspend state!!\n", __FUNCTION__));
+              dev_kfree_skb(skb);
+       ifp = DHD_DEV_IFP(net);
+       ifp->stats.tx_dropped++;
+       dhd->pub.tx_dropped++;
+              return -EBUSY;
+       }
+#endif /* PCIE_FULL_DONGLE */ 
+
 	DHD_OS_WAKE_LOCK(&dhd->pub);
 	DHD_PERIM_LOCK_TRY(DHD_FWDER_UNIT(dhd), TRUE);
 
@@ -4089,8 +4100,14 @@ static bool dhd_check_hang(struct net_device *net, dhd_pub_t *dhdp, int error)
 	if ((error == -ETIMEDOUT) || (error == -EREMOTEIO) ||
 #endif /* CONFIG_MACH_UNIVERSAL5433 */
 		((dhdp->busstate == DHD_BUS_DOWN) && (!dhdp->dongle_reset))) {
+#ifdef BCMPCIE
+		DHD_ERROR(("%s: Event HANG send up due to  re=%d te=%d d3acke=%d e=%d s=%d\n",
+			__FUNCTION__, dhdp->rxcnt_timeout, dhdp->txcnt_timeout,
+			dhdp->d3ackcnt_timeout, error, dhdp->busstate));
+#else
 		DHD_ERROR(("%s: Event HANG send up due to  re=%d te=%d e=%d s=%d\n", __FUNCTION__,
 			dhdp->rxcnt_timeout, dhdp->txcnt_timeout, error, dhdp->busstate));
+#endif /* BCMPCIE */
 		net_os_send_hang_message(net);
 		return TRUE;
 	}
@@ -4442,6 +4459,9 @@ dhd_stop(struct net_device *net)
 
 	dhd->pub.rxcnt_timeout = 0;
 	dhd->pub.txcnt_timeout = 0;
+#ifdef BCMPCIE
+	dhd->pub.d3ackcnt_timeout = 0;
+#endif /* BCMPCIE */
 
 	if (dhd->pub.up == 0) {
 		goto exit;
@@ -6590,6 +6610,7 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	setbit(eventmask, WLC_E_ASSOC);
 	setbit(eventmask, WLC_E_REASSOC);
 	setbit(eventmask, WLC_E_REASSOC_IND);
+	if (!(dhd->op_mode & DHD_FLAG_IBSS_MODE))
 	setbit(eventmask, WLC_E_DEAUTH);
 	setbit(eventmask, WLC_E_DEAUTH_IND);
 	setbit(eventmask, WLC_E_DISASSOC_IND);

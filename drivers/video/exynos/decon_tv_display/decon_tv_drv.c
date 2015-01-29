@@ -49,6 +49,7 @@ struct pm_qos_request exynos5_decon_tv_int_qos;
 static int prev_overlap_bw = 0;
 #endif
 
+static bool dex_streaming;
 int dex_log_level = 6;
 module_param(dex_log_level, int, 0644);
 
@@ -186,6 +187,7 @@ static int dex_enable(struct dex_device *dex)
 	}
 
 	dex->n_streamer++;
+	dex_streaming = true;
 	mutex_unlock(&dex->s_mutex);
 	dex_info("enabled decon_tv successfully\n");
 	return 0;
@@ -246,6 +248,7 @@ static int dex_disable(struct dex_device *dex)
 	}
 
 	dex->n_streamer--;
+	dex_streaming = false;
 	mutex_unlock(&dex->s_mutex);
 	dex_info("diabled decon_tv successfully\n");
 
@@ -1930,6 +1933,7 @@ static int dex_probe(struct platform_device *pdev)
 
 	/* setup pointer to master device */
 	dex->dev = dev;
+	dex_streaming = false;
 
 	/* store platform data ptr to decon_tv context */
 	of_property_read_u32(dev->of_node, "ip_ver", &dex->ip_ver);
@@ -2167,6 +2171,12 @@ static int dex_remove(struct platform_device *pdev)
 	dev_info(dev, "remove sucessful\n");
 	return 0;
 }
+
+int check_decon_tv_op(void)
+{
+	return dex_streaming;
+}
+EXPORT_SYMBOL(check_decon_tv_op);
 
 static struct platform_driver dex_driver __refdata = {
 	.probe		= dex_probe,

@@ -1891,6 +1891,7 @@ static bool muic_check_vps_chgtyp
 		switch (chgtyp) {
 		case CHGTYP_500MA:
 		case CHGTYP_1A:
+		case CHGTYP_SPECIAL_3_3V_CHARGER:
 			ret = true;
 			goto out;
 		default:

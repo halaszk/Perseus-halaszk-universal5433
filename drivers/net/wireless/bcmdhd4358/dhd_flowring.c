@@ -528,6 +528,7 @@ dhd_flowid_lookup(dhd_pub_t *dhdp, uint8 ifindex,
 	flow_ring_node->flow_info.tid = prio;
 	flow_ring_node->flow_info.ifindex = ifindex;
 	flow_ring_node->active = TRUE;
+	flow_ring_node->pending_cnt = 0;
 	if (flow_ring_node->status != 0)
 		DHD_ERROR(("setting flowring status to pending from %d\n", flow_ring_node->status));
 

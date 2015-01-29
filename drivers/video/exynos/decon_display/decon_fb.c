@@ -122,6 +122,10 @@ int decon_hibernation_power_on(struct display_driver *dispdrv);
 int decon_hibernation_power_off(struct display_driver *dispdrv);
 #endif
 
+#ifdef CONFIG_FB_WINDOW_UPDATE
+static void decon_set_win_update_full(struct s3c_fb *sfb);
+#endif
+
 #define UNDERRUN_FILTER_INTERVAL_MS	100
 #define UNDERRUN_FILTER_INIT		0
 #define UNDERRUN_FILTER_IDLE		1
@@ -1007,6 +1011,7 @@ static int s3c_fb_blank(int blank_mode, struct fb_info *info)
 				disp_pm_gate_lock(dispdrv, true);
 #endif
 				ret = s3c_fb_disable(sfb);
+				decon_set_win_update_full(sfb);
 			}
 		}
 #endif
@@ -2225,6 +2230,12 @@ static int s3c_fb_set_win_config(struct s3c_fb *sfb,
 			regs->h[i] = config->h;
 			enabled = 1;
 			color_map = 0;
+			if (config->fence_fd >= 0) {
+				regs->fence = sync_fence_fdget(win_config->fence_fd);
+				if (!regs->fence) {
+					dev_err(sfb->dev, "failed to import OTF fence fd\n");
+				}
+			}
 		}
 		if (enabled)
 			regs->wincon[i] |= WINCONx_ENWIN;
@@ -2468,6 +2479,29 @@ static void s3c_fb_vidout_start(struct decon_psr_info *psr)
 }
 
 #ifdef CONFIG_FB_WINDOW_UPDATE
+static void decon_set_win_update_full(struct s3c_fb *sfb)
+{
+	int dsim_mpkt;
+	struct decon_lcd *lcd_info_org = decon_get_lcd_info();
+
+	dsim_mpkt = dsim_reg_get_pkt_go_status();
+#ifdef CONFIG_DECON_MIPI_DSI_PKTGO
+	if (dsim_mpkt)
+		dsim_reg_set_pkt_go_enable(false);
+#endif
+	s5p_mipi_dsi_partial_area_command(dsim_for_decon,
+			0, 0, lcd_info_org->xres, lcd_info_org->yres);
+#ifdef CONFIG_DECON_MIPI_DSI_PKTGO
+	if (dsim_mpkt)
+		dsim_reg_set_pkt_go_enable(true);
+#endif
+	dsim_reg_set_win_update_conf(lcd_info_org->xres,
+			lcd_info_org->yres, lcd_info_org);
+#ifdef CONFIG_DECON_MIC
+	mic_reg_set_win_update_conf(lcd_info_org->xres, lcd_info_org->yres, mic_for_decon);
+#endif
+}
+
 static void decon_reg_set_win_update_config(struct s3c_fb *sfb, struct s3c_reg_data *regs)
 {
 	int dsim_mpkt;
@@ -2710,8 +2744,15 @@ static void s3c_fb_update_regs(struct s3c_fb *sfb, struct s3c_reg_data *regs)
 			if (regs->dma_buf_data[i].fence)
 				s3c_fd_fence_wait(sfb,
 			regs->dma_buf_data[i].fence);
-		} else
+		} else {
+			if (regs->fence) {
+				s3c_fd_fence_wait(sfb, regs->fence);
+				sync_fence_put(regs->fence);
+				regs->fence = NULL;
+			}
+
 			local_cnt++;
+		}
 	}
 #if defined(CONFIG_DECON_DEVFREQ)
 	if (prev_overlap_cnt < regs->win_overlap_cnt)

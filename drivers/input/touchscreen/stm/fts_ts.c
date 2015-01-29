@@ -108,6 +108,7 @@ static int fts_stop_device(struct fts_ts_info *info);
 static int fts_start_device(struct fts_ts_info *info);
 static int fts_irq_enable(struct fts_ts_info *info, bool enable);
 static void fts_reset_work(struct work_struct *work);
+void fts_release_all_finger(struct fts_ts_info *info);
 
 
 #if (!defined(CONFIG_HAS_EARLYSUSPEND)) && (!defined(CONFIG_PM)) && !defined(USE_OPEN_CLOSE)
@@ -355,6 +356,33 @@ void fts_enable_feature(struct fts_ts_info *info, unsigned char cmd, int enable)
 	regAdd[1] = cmd;
 	ret = fts_write_reg(info, &regAdd[0], 2);
 	tsp_debug_info(true, &info->client->dev, "FTS %s Feature (%02X %02X) , ret = %d \n", (enable)?"Enable":"Disable", regAdd[0], regAdd[1], ret);
+}
+
+static void fts_set_cover_type(struct fts_ts_info *info, bool enable)
+{
+	tsp_debug_info(true, &info->client->dev, "%s: %d\n", __func__, info->cover_type);
+
+	switch (info->cover_type) {
+	case FTS_VIEW_WIRELESS:
+	case FTS_VIEW_COVER:
+		fts_enable_feature(info, FTS_FEATURE_COVER_GLASS, enable);
+		break;
+	case FTS_VIEW_WALLET:
+		fts_enable_feature(info, FTS_FEATURE_COVER_WALLET, enable);
+		break;
+	case FTS_FLIP_WALLET:
+	case FTS_LED_COVER:
+	case FTS_MONTBLANC_COVER:
+		fts_enable_feature(info, FTS_FEATURE_COVER_LED, enable);
+		break;
+	case FTS_CHARGER_COVER:
+	case FTS_COVER_NOTHING1:
+	case FTS_COVER_NOTHING2:
+	default:
+		tsp_debug_err(true, &info->client->dev, "%s: not change touch state, %d\n",
+				__func__, info->cover_type);
+		break;
+	}
 }
 
 void fts_change_scan_rate(struct fts_ts_info *info, unsigned char cmd)
@@ -958,6 +986,24 @@ static unsigned char fts_event_handler_type_b(struct fts_ts_info *info,
 			booster_restart = true;
 #endif
 		case EVENTID_MOTION_POINTER:
+			if (info->fts_power_state == FTS_POWER_STATE_LOWPOWER) {
+				tsp_debug_info(true, &info->client->dev, "%s: low power mode\n", __func__);
+				fts_release_all_finger(info);
+				break;
+			}
+
+			if (info->touch_count == 0) {
+				tsp_debug_info(true, &info->client->dev, "%s: count 0\n", __func__);
+				fts_release_all_finger(info);
+				break;
+			}
+
+			if ((EventID == EVENTID_MOTION_POINTER) &&
+				(info->finger[TouchID].state == EVENTID_LEAVE_POINTER)) {
+				tsp_debug_info(true, &info->client->dev, "%s: state leave but point is moved.\n", __func__);
+				break;
+			}
+
 			if (info->fts_power_state == FTS_POWER_STATE_LOWPOWER)
 				break;
 
@@ -1025,6 +1071,12 @@ static unsigned char fts_event_handler_type_b(struct fts_ts_info *info,
 		case EVENTID_LEAVE_POINTER:
 			if (info->fts_power_state == FTS_POWER_STATE_LOWPOWER)
 				break;
+
+			if (info->touch_count <= 0) {
+				tsp_debug_info(true, &info->client->dev, "%s: count 0\n", __func__);
+				fts_release_all_finger(info);
+				break;
+			}
 
 			info->touch_count--;
 
@@ -1691,6 +1743,10 @@ static int fts_setup_drv_data(struct i2c_client *client)
 	info->delay_time = 300;
 	INIT_DELAYED_WORK(&info->reset_work, fts_reset_work);
 
+#ifdef SEC_TSP_FACTORY_TEST
+	INIT_DELAYED_WORK(&info->cover_cmd_work, clear_cover_cmd_work);
+#endif
+
 	if (info->board->support_hover)
 		tsp_debug_info(true, &info->client->dev, "FTS Support Hover Event \n");
 	else
@@ -2155,7 +2211,7 @@ static void fts_reinit_fac(struct fts_ts_info *info)
 #endif
 
 	if (info->flip_enable)
-		fts_enable_feature(info, FTS_FEATURE_COVER_GLASS, true);
+		fts_set_cover_type(info, true);
 	else if (info->fast_mshover_enabled)
 		fts_command(info, FTS_CMD_SET_FAST_GLOVE_MODE);
 	else if (info->mshover_enabled)
@@ -2236,7 +2292,7 @@ static void fts_reinit(struct fts_ts_info *info)
 #endif
 
 	if (info->flip_enable)
-		fts_enable_feature(info, FTS_FEATURE_COVER_GLASS, true);
+		fts_set_cover_type(info, true);
 	else if (info->fast_mshover_enabled)
 		fts_command(info, FTS_CMD_SET_FAST_GLOVE_MODE);
 	else if (info->mshover_enabled)
@@ -2357,6 +2413,8 @@ static int fts_stop_device(struct fts_ts_info *info)
 	if (info->lowpower_mode) {
 		tsp_debug_info(true, &info->client->dev, "%s lowpower flag:%d\n", __func__, info->lowpower_flag);
 
+		info->fts_power_state = FTS_POWER_STATE_LOWPOWER;
+
 		fts_command(info, FLUSHBUFFER);
 
 #ifdef FTS_SUPPORT_SIDE_GESTURE
@@ -2370,7 +2428,7 @@ static int fts_stop_device(struct fts_ts_info *info)
 		if (device_may_wakeup(&info->client->dev))
 			enable_irq_wake(info->irq);
 
-		info->fts_power_state = FTS_POWER_STATE_LOWPOWER;
+		fts_command(info, FLUSHBUFFER);
 
 		fts_release_all_finger(info);
 #ifdef FTS_SUPPORT_TOUCH_KEY

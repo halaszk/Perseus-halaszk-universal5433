@@ -231,6 +231,9 @@ void bbd_mcu_ready_work_func(struct work_struct *work)
 	int ret = 0;
 	int retries = 0;
 
+	//to hold wakelock until initialize MCU
+        wake_lock_timeout(&data->ssp_wake_lock, 4 * HZ);
+
 	msleep(1000);
 	dprint("MCU is ready.(work_queue)\n");
 

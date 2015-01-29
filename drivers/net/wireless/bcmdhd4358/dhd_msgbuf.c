@@ -69,7 +69,7 @@
  * memory location for the dongle to read.
  */
 #define PCIE_D2H_SYNC
-#define PCIE_D2H_SYNC_WAIT_TRIES    1024
+#define PCIE_D2H_SYNC_WAIT_TRIES    256
 
 #define RETRIES 2		/* # of retries to retrieve matching ioctl response */
 #define IOCTL_HDR_LEN	12
@@ -209,6 +209,7 @@ typedef struct dhd_prot {
 	dll_t		ioctlresp_cmpl_list;
 	dll_t		ioctlack_cmpl_list;
 #endif
+	struct mutex	ioctl_mutex;	/* Make IOCTL singleton in Prot Layer */
 } dhd_prot_t;
 
 typedef struct ioctl_buf_log {
@@ -1494,6 +1495,7 @@ int dhd_prot_init(dhd_pub_t *dhd)
 	prot->txp_threshold = TXP_FLUSH_MAX_ITEMS_FLUSH_CNT;
 
 	prot->ioctl_trans_id = 1;
+	mutex_init(&prot->ioctl_mutex);
 
 	/* Register the interrupt function upfront */
 	/* remove corerev checks in data path */
@@ -2890,6 +2892,7 @@ int dhd_prot_ioctl(dhd_pub_t *dhd, int ifidx, wl_ioctl_t * ioc, void * buf, int 
 	if (len > WLC_IOCTL_MAXLEN)
 		goto done;
 
+	mutex_lock(&prot->ioctl_mutex);
 	if (prot->pending == TRUE) {
 		DHD_ERROR(("packet is pending!!!! cmd=0x%x (%lu) lastcmd=0x%x (%lu)\n",
 			ioc->cmd, (unsigned long)ioc->cmd, prot->lastcmd,
@@ -2897,6 +2900,7 @@ int dhd_prot_ioctl(dhd_pub_t *dhd, int ifidx, wl_ioctl_t * ioc, void * buf, int 
 		if ((ioc->cmd == WLC_SET_VAR) || (ioc->cmd == WLC_GET_VAR)) {
 			DHD_TRACE(("iovar cmd=%s\n", (char*)buf));
 		}
+		mutex_unlock(&prot->ioctl_mutex);
 		goto done;
 	}
 
@@ -2933,6 +2937,7 @@ int dhd_prot_ioctl(dhd_pub_t *dhd, int ifidx, wl_ioctl_t * ioc, void * buf, int 
 
 	prot->pending = FALSE;
 
+	mutex_unlock(&prot->ioctl_mutex);
 done:
 	return ret;
 

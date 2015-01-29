@@ -336,6 +336,19 @@ static DEVICE_ATTR(rear_sensorid, S_IRUGO, camera_rear_sensorid_show, NULL);
 static ssize_t camera_front_camtype_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
+	char type_unknown[] = "UNKNOWN_UNKNOWN_FIMC_IS";
+	struct exynos_platform_fimc_is_sensor *sensor = dev_get_drvdata(dev);
+
+	if (sensor->sensor_id == SENSOR_NAME_S5K8B1) {
+		return sprintf(buf, "%s\n", "SLSI_S5K8B1YX_FIMC_IS");
+	} else if (sensor->sensor_id == SENSOR_NAME_S5K6B2) {
+		return sprintf(buf, "%s\n", "SLSI_S5K6B2YX_FIMC_IS");
+	}  else if (sensor->sensor_id == SENSOR_NAME_S5K6D1) {
+		return sprintf(buf, "%s\n", "SLSI_S5K6D1YX_FIMC_IS");
+	} else {
+		return sprintf(buf, "%s\n", type_unknown);
+	}
+#if 0
 	char type[50] = "SLSI_S5K6B2YX_FIMC_IS";
 #if defined(CONFIG_CAMERA_SENSOR_8B1)
 	strcpy(type, "SLSI_S5K8B1YX_FIMC_IS");
@@ -343,6 +356,7 @@ static ssize_t camera_front_camtype_show(struct device *dev,
 	strcpy(type, "SLSI_S5K6D1YX_FIMC_IS");
 #endif
 	return sprintf(buf, "%s\n", type);
+#endif
 }
 
 static ssize_t camera_front_camfw_show(struct device *dev,
@@ -411,7 +425,17 @@ int read_from_firmware_version(void)
 static ssize_t camera_rear_camtype_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
-	char type[] = "SLSI_S5K2P2_FIMC_IS";
+	char type_unknown[] = "UNKNOWN_UNKNOWN_FIMC_IS";
+	struct exynos_platform_fimc_is_sensor *sensor = dev_get_drvdata(dev);
+
+	if (sensor->sensor_id == SENSOR_NAME_S5K2P2 ||
+		sensor->sensor_id == SENSOR_NAME_S5K2P2_12M) {
+		return sprintf(buf, "%s\n", "SLSI_S5K2P2_FIMC_IS");
+	} else if (sensor->sensor_id == SENSOR_NAME_IMX240) {
+		return sprintf(buf, "%s\n", "SONY_IMX240_FIMC_IS");
+	} else {
+		return sprintf(buf, "%s\n", type_unknown);
+	}
 #if 0
 	char type_unknown[] = "UNKNOWN_UNKNOWN_FIMC_IS";
 
@@ -421,7 +445,6 @@ static ssize_t camera_rear_camtype_show(struct device *dev,
 	else
 		return sprintf(buf, "%s\n", type_unknown);
 #endif
-	return sprintf(buf, "%s\n", type);
 }
 
 static ssize_t camera_rear_camfw_show(struct device *dev,

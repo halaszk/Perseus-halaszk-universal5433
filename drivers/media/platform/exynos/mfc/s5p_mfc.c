@@ -40,6 +40,9 @@
 #elif defined(CONFIG_SOC_EXYNOS5430)
 #include <mach/regs-clock-exynos5430.h>
 #include <mach/regs-pmu.h>
+#elif defined(CONFIG_SOC_EXYNOS5433)
+#include <mach/regs-clock-exynos5433.h>
+#include <mach/regs-pmu.h>
 #endif
 
 #include "s5p_mfc_common.h"
@@ -386,6 +389,73 @@ static int mfc_check_clock_state(struct s5p_mfc_dev *dev)
 	return ref_val;
 }
 
+static int s5p_mfc_check_hw_state(struct s5p_mfc_dev *dev)
+{
+	int ret;
+
+	if (mfc_check_power_state(dev)) {
+		ret = mfc_check_clock_state(dev);
+		if (ret)
+			s5p_mfc_dump_regs(dev);
+	}
+	mfc_disp_dev_state(dev);
+
+	return 0;
+}
+#elif defined(CONFIG_SOC_EXYNOS5433)
+static int mfc_check_power_state(struct s5p_mfc_dev *dev)
+{
+	int reg_val, ref_val;
+
+	ref_val = s5p_mfc_get_power_ref_cnt(dev);
+	reg_val = readl(EXYNOS5433_MFC_CONFIGURATION);
+	mfc_err("* MFC power state = 0x%x, ref cnt = %d\n", reg_val, ref_val);
+
+	if (reg_val)
+		return 1;
+
+	return 0;
+}
+
+#define MFC_CMU_INFO_CNT	6
+static int mfc_check_clock_state(struct s5p_mfc_dev *dev)
+{
+	int i, ref_val, is_enabled = 0;
+	int reg_val[MFC_CMU_INFO_CNT];
+	char *reg_desc[MFC_CMU_INFO_CNT] = {
+		"CLK_SRC_TOP1",
+		"CLK_SRC_TOP4",
+		"CLK_DIV_TOP1",
+		"CLK_SRC_SEL_MFC",
+		"CLK_ENABLE_ACLK_MFC",
+		"CLK_ENABLE_IP_MFC0",
+	};
+	int reg_offset[MFC_CMU_INFO_CNT] = {
+		(int)EXYNOS5430_SRC_SEL_TOP1,
+		(int)EXYNOS5430_SRC_SEL_TOP4,
+		(int)EXYNOS5430_DIV_TOP1,
+		(int)EXYNOS5430_SRC_SEL_MFC0,
+		(int)EXYNOS5430_ENABLE_ACLK_MFC0,
+		(int)EXYNOS5430_ENABLE_IP_MFC00,
+	};
+
+
+	ref_val = s5p_mfc_get_clk_ref_cnt(dev);
+	mfc_err("** CMU ref cnt = %d\n", ref_val);
+
+	for (i = 0; i < MFC_CMU_INFO_CNT; i++) {
+		reg_val[i] = readl((int *)reg_offset[i]);
+		mfc_err("** CMU %s = 0x%x\n", reg_desc[i], reg_val[i]);
+		if (reg_offset[i] == (int)EXYNOS5430_ENABLE_ACLK_MFC0) {
+			is_enabled = (reg_val[i] >> 0) & 0x1;
+		}
+	}
+
+	if (is_enabled)
+		return 1;
+
+	return 0;
+}
 static int s5p_mfc_check_hw_state(struct s5p_mfc_dev *dev)
 {
 	int ret;

@@ -36,6 +36,11 @@
 #include "dynamic_aid_s6e3ha2.h"
 #include <linux/syscalls.h>
 
+#if defined(CONFIG_LCD_HMT) && defined(CONFIG_DECON_MIPI_DSI_PKTGO)
+#include "../decon_display/decon_reg.h"
+#include "../decon_display/dsim_reg.h"
+#endif
+
 #if defined(CONFIG_DECON_MDNIE_LITE)
 #include "mdnie.h"
 #endif
@@ -2000,13 +2005,23 @@ static int hmt_set_selected_gamma(struct lcd_info *lcd, int ibrightness_index)
 
 static int s6e3ha2_hmt_update(struct lcd_info *lcd, u8 forced)
 {
+#ifdef CONFIG_DECON_MIPI_DSI_PKTGO
+	int dsim_mpkt;
+#endif
+	mutex_lock(&lcd->bl_lock);
+
 	s6e3ha2_write(lcd, SEQ_TEST_KEY_ON_F0, ARRAY_SIZE(SEQ_TEST_KEY_ON_F0));
 	s6e3ha2_write(lcd, SEQ_TEST_KEY_ON_FC, ARRAY_SIZE(SEQ_TEST_KEY_ON_FC));
+
 	s6e3ha2_write(lcd, SEQ_TE_OFF, ARRAY_SIZE(SEQ_TE_OFF));
 
-	msleep(20);
+	usleep_range(17000, 20000);
 
-	mutex_lock(&lcd->bl_lock);
+#ifdef CONFIG_DECON_MIPI_DSI_PKTGO
+	dsim_mpkt = dsim_reg_get_pkt_go_status();
+	if (dsim_mpkt)
+		dsim_reg_set_pkt_go_enable(false);
+#endif
 
 	hmt_on_set(lcd, forced);
 
@@ -2021,18 +2036,24 @@ static int s6e3ha2_hmt_update(struct lcd_info *lcd, u8 forced)
 
 		dev_info(&lcd->ld->dev, "brightness=%d, bl=%d, candela=%d\n",
 			lcd->hmt_brightness, lcd->hmt_bl, hmt_index_brightness_table[lcd->hmt_bl]);
+		s6e3ha2_write(lcd, SEQ_TE_ON, ARRAY_SIZE(SEQ_TE_ON));
+		s6e3ha2_write(lcd, SEQ_GAMMA_UPDATE, ARRAY_SIZE(SEQ_GAMMA_UPDATE));
+		s6e3ha2_write(lcd, SEQ_GAMMA_UPDATE_L, ARRAY_SIZE(SEQ_GAMMA_UPDATE_L));
+		s6e3ha2_write(lcd, SEQ_TEST_KEY_OFF_FC, ARRAY_SIZE(SEQ_TEST_KEY_OFF_FC));
+		s6e3ha2_write(lcd, SEQ_TEST_KEY_OFF_F0, ARRAY_SIZE(SEQ_TEST_KEY_OFF_F0));
 
 		mutex_unlock(&lcd->bl_lock);
 	} else {
+		s6e3ha2_write(lcd, SEQ_TE_ON, ARRAY_SIZE(SEQ_TE_ON));
+		s6e3ha2_write(lcd, SEQ_TEST_KEY_OFF_FC, ARRAY_SIZE(SEQ_TEST_KEY_OFF_FC));
+		s6e3ha2_write(lcd, SEQ_TEST_KEY_OFF_F0, ARRAY_SIZE(SEQ_TEST_KEY_OFF_F0));
 		mutex_unlock(&lcd->bl_lock);
 		update_brightness(lcd, 1);
 	}
-
-	s6e3ha2_write(lcd, SEQ_TE_ON, ARRAY_SIZE(SEQ_TE_ON));
-	s6e3ha2_write(lcd, SEQ_GAMMA_UPDATE, ARRAY_SIZE(SEQ_GAMMA_UPDATE));
-	s6e3ha2_write(lcd, SEQ_GAMMA_UPDATE_L, ARRAY_SIZE(SEQ_GAMMA_UPDATE_L));
-	s6e3ha2_write(lcd, SEQ_TEST_KEY_OFF_FC, ARRAY_SIZE(SEQ_TEST_KEY_OFF_FC));
-	s6e3ha2_write(lcd, SEQ_TEST_KEY_OFF_F0, ARRAY_SIZE(SEQ_TEST_KEY_OFF_F0));
+#ifdef CONFIG_DECON_MIPI_DSI_PKTGO
+	if (dsim_mpkt)
+		dsim_reg_set_pkt_go_enable(true);
+#endif
 
 	return 0;
 }

@@ -251,6 +251,7 @@ tbelteskt_00="CONFIG_DECON_LCD_S6E3HF2=y \
           CONFIG_VNSWAP=y \
           CONFIG_SWAP_ENABLE_READAHEAD=n \
           CONFIG_USB_LOCK_SUPPORT_FOR_MDM=y \
+          CONFIG_TB_DS28EL35=y \
           CONFIG_IRLED_WATCHON=y"
 tbelteskt_00_undef="NFC_PN547 \
           NFC_PN547_CLOCK_REQUEST \
@@ -297,6 +298,7 @@ tbeltektt_00="CONFIG_DECON_LCD_S6E3HF2=y \
           CONFIG_VNSWAP=y \
           CONFIG_SWAP_ENABLE_READAHEAD=n \
           CONFIG_USB_LOCK_SUPPORT_FOR_MDM=y \
+          CONFIG_TB_DS28EL35=y \
           CONFIG_IRLED_WATCHON=y"
 tbeltektt_00_undef="NFC_PN547 \
           NFC_PN547_CLOCK_REQUEST \
@@ -347,6 +349,7 @@ tbeltelgt_00="CONFIG_DECON_LCD_S6E3HF2=y \
           CONFIG_VNSWAP=y \
           CONFIG_SWAP_ENABLE_READAHEAD=n \
           CONFIG_USB_LOCK_SUPPORT_FOR_MDM=y \
+          CONFIG_TB_DS28EL35=y \
           CONFIG_IRLED_WATCHON=y"
 tbeltelgt_00_undef="NFC_PN547 \
           NFC_PN547_CLOCK_REQUEST \

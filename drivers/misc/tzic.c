@@ -180,15 +180,18 @@ static long tzic_ioctl(struct file *file, unsigned cmd, unsigned long arg)
 			ret=copy_from_user( (void *)&param, (void *)arg, sizeof(param) );
 			if(ret) {
 				LOG(KERN_INFO "[oemflag]ERROR copy from user\n");
+				gotoAllCpu();
 				return ret;
 			}
 			if ((OEMFLAG_MIN_FLAG < param.name) && (param.name < OEMFLAG_NUM_OF_FLAG)){
 				LOG(KERN_INFO "[oemflag]set_fuse_name : %d\n", param.name);
 				exynos_smc_new(0x83000004, 0, param.name, 0);
+				gotoAllCpu();
 				return copy_to_user( (void *)arg, &param, sizeof(param) );
 			} else {
 				LOG(KERN_INFO "[oemflag]command error\n");
 				param.value = -1;
+				gotoAllCpu();
 				return copy_to_user( (void *)arg, &param, sizeof(param) );
 			}
 		break;
@@ -198,16 +201,19 @@ static long tzic_ioctl(struct file *file, unsigned cmd, unsigned long arg)
 			ret=copy_from_user( &param, (void *)arg, sizeof(param) );
 			if(ret) {
 				LOG(KERN_INFO "[oemflag]ERROR copy from user\n");
+				gotoAllCpu();
 				 return ret;
 			}
 			if ((OEMFLAG_MIN_FLAG < param.name) && (param.name < OEMFLAG_NUM_OF_FLAG)){
 				LOG(KERN_INFO "[oemflag]get_fuse_name : %d\n", param.name);
 				exynos_smc_read_oemflag_new(param.name, &param.value) ;
 				LOG(KERN_INFO "[oemflag]get_oemflag_value : %d\n", param.value);
+				gotoAllCpu();
 				return copy_to_user( (void *)arg, &param, sizeof(param) );
 			} else {
 				LOG(KERN_INFO "[oemflag]command error\n");
 				param.value = -1;
+				gotoAllCpu();
 				return copy_to_user( (void *)arg, &param, sizeof(param) );
 			}
 		break;
@@ -215,6 +221,7 @@ static long tzic_ioctl(struct file *file, unsigned cmd, unsigned long arg)
 		default:
 			LOG(KERN_INFO "[oemflag]command error\n");
 			param.value = -1;
+			gotoAllCpu();
 			return copy_to_user( (void *)arg, &param, sizeof(param) );
 	}
 

@@ -32,6 +32,11 @@
 #include "dynamic_aid_s6e3hf2.h"
 #include <linux/syscalls.h>
 
+#if defined(CONFIG_LCD_HMT) && defined(CONFIG_DECON_MIPI_DSI_PKTGO)
+#include "../decon_display/decon_reg.h"
+#include "../decon_display/dsim_reg.h"
+#endif
+
 #define CONFIG_ESD_FG
 
 #if defined(CONFIG_DECON_MDNIE_LITE)
@@ -168,6 +173,12 @@ struct lcd_info {
 		unsigned int			esd_fg_count;
 		spinlock_t			esd_fg_lock;
 #endif
+
+		unsigned int			mcd_on;
+		unsigned char			mcd_buf1bb[2];
+		unsigned char			mcd_buf2cb[59];
+		unsigned char			mcd_buf3f6[2];
+
 #if defined(CONFIG_OLED_DET)
 		unsigned int			oled_det_irq;
 		unsigned int			oled_det_gpio;
@@ -1730,6 +1741,97 @@ static ssize_t alpm_store(struct device *dev,
 static DEVICE_ATTR(alpm, 0664, alpm_show, alpm_store);
 #endif
 
+static int s6e3hf2_read_mcd(struct lcd_info *lcd)
+{
+	int ret;
+	unsigned char buf1, buf3;
+	unsigned char buf2[58];
+
+	s6e3hf2_write(lcd, SEQ_MCD_ON1, ARRAY_SIZE(SEQ_MCD_ON1));
+	ret = s6e3hf2_read(lcd, 0xBB, &(buf1), sizeof(unsigned char));
+	lcd->mcd_buf1bb[0] = 0xBB;
+	lcd->mcd_buf1bb[1] = buf1;
+	if (ret < 1)
+		dev_info(&lcd->ld->dev, "%s failed\n", __func__);
+
+	ret += s6e3hf2_read(lcd, 0xCB, buf2, ARRAY_SIZE(buf2));
+	lcd->mcd_buf2cb[0] = 0xCB;
+	memcpy(&lcd->mcd_buf2cb[1], buf2, sizeof(buf2));
+	if (ret < 58)
+		dev_info(&lcd->ld->dev, "%s failed\n", __func__);
+
+	s6e3hf2_write(lcd, SEQ_MCD_ON29, ARRAY_SIZE(SEQ_MCD_ON29));
+	ret += s6e3hf2_read(lcd, 0xF6, &(buf3), sizeof(unsigned char));
+	lcd->mcd_buf3f6[0] = 0xF6;
+	lcd->mcd_buf3f6[1] = buf3;
+	if (ret < 1)
+		dev_info(&lcd->ld->dev, "%s failed\n", __func__);
+
+	return ret;
+}
+
+static int mcd_on(struct lcd_info *lcd)
+{
+	dev_info(&lcd->ld->dev, "mcd_on\n");
+
+	s6e3hf2_write(lcd, SEQ_TEST_KEY_ON_F0, ARRAY_SIZE(SEQ_TEST_KEY_ON_F0));
+	s6e3hf2_write_set(lcd, SEQ_MCD_ON_SET, ARRAY_SIZE(SEQ_MCD_ON_SET));
+	s6e3hf2_write(lcd, SEQ_GAMMA_UPDATE, ARRAY_SIZE(SEQ_GAMMA_UPDATE));
+	s6e3hf2_write(lcd, SEQ_TEST_KEY_OFF_F0, ARRAY_SIZE(SEQ_TEST_KEY_OFF_F0));
+	return 0;
+}
+
+static int mcd_off(struct lcd_info *lcd)
+{
+	dev_info(&lcd->ld->dev, "mcd_off\n");
+
+	s6e3hf2_write(lcd, SEQ_TEST_KEY_ON_F0, ARRAY_SIZE(SEQ_TEST_KEY_ON_F0));
+	s6e3hf2_write(lcd, SEQ_MCD_ON1, ARRAY_SIZE(SEQ_MCD_ON1));
+	s6e3hf2_write(lcd, lcd->mcd_buf1bb, ARRAY_SIZE(lcd->mcd_buf1bb));
+	s6e3hf2_write(lcd, lcd->mcd_buf2cb, ARRAY_SIZE(lcd->mcd_buf2cb));
+	s6e3hf2_write(lcd, SEQ_MCD_ON29, ARRAY_SIZE(SEQ_MCD_ON29));
+	s6e3hf2_write(lcd, lcd->mcd_buf3f6, ARRAY_SIZE(lcd->mcd_buf3f6));
+	s6e3hf2_write(lcd, SEQ_GAMMA_UPDATE, ARRAY_SIZE(SEQ_GAMMA_UPDATE));
+	s6e3hf2_write(lcd, SEQ_TEST_KEY_OFF_F0, ARRAY_SIZE(SEQ_TEST_KEY_OFF_F0));
+
+	return 0;
+}
+
+static ssize_t mcd_mode_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct lcd_info *lcd = dev_get_drvdata(dev);
+
+	sprintf(buf, "%d\n", lcd->mcd_on);
+
+	dev_info(dev, "%s: %d\n", __func__, lcd->mcd_on);
+
+	return strlen(buf);
+}
+
+static ssize_t mcd_mode_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t size)
+{
+	struct lcd_info *lcd = dev_get_drvdata(dev);
+	int value;
+
+	sscanf(buf, "%9d", &value);
+	dev_info(dev, "%s: %d \n", __func__, value);
+
+	if (lcd->ldi_enable && (lcd->mcd_on != value)) {
+		if(value)
+			mcd_on(lcd);
+		else
+			mcd_off(lcd);
+		lcd->mcd_on = value;
+	}
+
+	dev_info(dev, "%s: %d\n", __func__, lcd->mcd_on);
+
+	return size;
+}
+static DEVICE_ATTR(mcd_mode, 0664, mcd_mode_show, mcd_mode_store);
+
 #ifdef CONFIG_LCD_HMT
 static const unsigned int HMT_DIM_TABLE[HMT_IBRIGHTNESS_MAX] = {
 	20,	21,	22,	23,	25,	27,	29,	31,	33,	35,
@@ -1915,13 +2017,23 @@ static int hmt_set_selected_gamma(struct lcd_info *lcd, int ibrightness_index)
 
 static int s6e3hf2_hmt_update(struct lcd_info *lcd, u8 forced)
 {
+#ifdef CONFIG_DECON_MIPI_DSI_PKTGO
+	int dsim_mpkt;
+#endif
+
+	mutex_lock(&lcd->bl_lock);
+
 	s6e3hf2_write(lcd, SEQ_TEST_KEY_ON_F0, ARRAY_SIZE(SEQ_TEST_KEY_ON_F0));
 	s6e3hf2_write(lcd, SEQ_TEST_KEY_ON_FC, ARRAY_SIZE(SEQ_TEST_KEY_ON_FC));
 	s6e3hf2_write(lcd, SEQ_TE_OFF, ARRAY_SIZE(SEQ_TE_OFF));
 
-	msleep(20);
+	usleep_range(17000, 20000);
 
-	mutex_lock(&lcd->bl_lock);
+#ifdef CONFIG_DECON_MIPI_DSI_PKTGO
+	dsim_mpkt = dsim_reg_get_pkt_go_status();
+	if (dsim_mpkt)
+		dsim_reg_set_pkt_go_enable(false);
+#endif
 
 	hmt_on_set(lcd, forced);
 
@@ -1935,18 +2047,24 @@ static int s6e3hf2_hmt_update(struct lcd_info *lcd, u8 forced)
 
 		dev_info(&lcd->ld->dev, "brightness=%d, bl=%d, candela=%d\n",
 			lcd->hmt_brightness, lcd->hmt_bl, hmt_index_brightness_table[lcd->hmt_bl]);
+		s6e3hf2_write(lcd, SEQ_TE_ON, ARRAY_SIZE(SEQ_TE_ON));
+		s6e3hf2_write(lcd, SEQ_GAMMA_UPDATE, ARRAY_SIZE(SEQ_GAMMA_UPDATE));
+		s6e3hf2_write(lcd, SEQ_GAMMA_UPDATE_L, ARRAY_SIZE(SEQ_GAMMA_UPDATE_L));
+		s6e3hf2_write(lcd, SEQ_TEST_KEY_OFF_FC, ARRAY_SIZE(SEQ_TEST_KEY_OFF_FC));
+		s6e3hf2_write(lcd, SEQ_TEST_KEY_OFF_F0, ARRAY_SIZE(SEQ_TEST_KEY_OFF_F0));
 
 		mutex_unlock(&lcd->bl_lock);
 	} else {
+		s6e3hf2_write(lcd, SEQ_TE_ON, ARRAY_SIZE(SEQ_TE_ON));
+		s6e3hf2_write(lcd, SEQ_TEST_KEY_OFF_FC, ARRAY_SIZE(SEQ_TEST_KEY_OFF_FC));
+		s6e3hf2_write(lcd, SEQ_TEST_KEY_OFF_F0, ARRAY_SIZE(SEQ_TEST_KEY_OFF_F0));
 		mutex_unlock(&lcd->bl_lock);
 		update_brightness(lcd, 1);
 	}
-
-	s6e3hf2_write(lcd, SEQ_TE_ON, ARRAY_SIZE(SEQ_TE_ON));
-	s6e3hf2_write(lcd, SEQ_GAMMA_UPDATE, ARRAY_SIZE(SEQ_GAMMA_UPDATE));
-	s6e3hf2_write(lcd, SEQ_GAMMA_UPDATE_L, ARRAY_SIZE(SEQ_GAMMA_UPDATE_L));
-	s6e3hf2_write(lcd, SEQ_TEST_KEY_OFF_FC, ARRAY_SIZE(SEQ_TEST_KEY_OFF_FC));
-	s6e3hf2_write(lcd, SEQ_TEST_KEY_OFF_F0, ARRAY_SIZE(SEQ_TEST_KEY_OFF_F0));
+#ifdef CONFIG_DECON_MIPI_DSI_PKTGO
+	if (dsim_mpkt)
+		dsim_reg_set_pkt_go_enable(true);
+#endif
 
 	return 0;
 }
@@ -2219,6 +2337,8 @@ static int s6e3hf2_probe(struct mipi_dsim_device *dsim)
 	lcd->current_alpm = 0;
 #endif
 
+	lcd->mcd_on = 0;
+
 	ret = device_create_file(&lcd->ld->dev, &dev_attr_power_reduce);
 	if (ret < 0)
 		dev_err(&lcd->ld->dev, "failed to add sysfs entries, %d\n", __LINE__);
@@ -2283,6 +2403,9 @@ static int s6e3hf2_probe(struct mipi_dsim_device *dsim)
 		dev_err(&lcd->ld->dev, "failed to add sysfs entries, %d\n", __LINE__);
 #endif
 
+	ret = device_create_file(&lcd->ld->dev, &dev_attr_mcd_mode);
+	if (ret < 0)
+		dev_err(&lcd->ld->dev, "failed to add sysfs entries, %d\n", __LINE__);
 
 	mutex_init(&lcd->lock);
 	mutex_init(&lcd->bl_lock);
@@ -2294,6 +2417,8 @@ static int s6e3hf2_probe(struct mipi_dsim_device *dsim)
 	s6e3hf2_read_mtp(lcd, mtp_data);
 	s6e3hf2_read_elvss(lcd, elvss_data);
 	s6e3hf2_read_tset(lcd);
+	s6e3hf2_read_mcd(lcd);
+
 	s6e3hf2_write(lcd, SEQ_TEST_KEY_OFF_F0, ARRAY_SIZE(SEQ_TEST_KEY_OFF_F0));
 
 	dev_info(&lcd->ld->dev, "ID: %x, %x, %x\n", lcd->id[0], lcd->id[1], lcd->id[2]);

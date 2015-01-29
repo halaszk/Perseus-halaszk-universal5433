@@ -266,6 +266,29 @@ static ssize_t fts_edge_x_position(struct device *dev,
 
 }
 
+static void clear_cover_cmd_work(struct work_struct *work)
+{
+	struct fts_ts_info *info = container_of(work, struct fts_ts_info,
+						cover_cmd_work.work);
+
+	if (info->cmd_is_running) {
+		schedule_delayed_work(&info->cover_cmd_work, msecs_to_jiffies(5));
+	} else {
+		/* check lock   */
+		mutex_lock(&info->cmd_lock);
+		info->cmd_is_running = true;
+		mutex_unlock(&info->cmd_lock);
+
+		info->cmd_state = CMD_STATUS_RUNNING;
+		tsp_debug_err(true, &info->client->dev,
+			"%s param = %d\n", __func__, info->delayed_cmd_param);
+
+		info->cmd_param[0] = info->delayed_cmd_param;
+		strcpy(info->cmd, "clear_cover_mode");
+		clear_cover_mode(info);
+	}
+}
+
 static ssize_t store_cmd(struct device *dev, struct device_attribute *devattr,
 			   const char *buf, size_t count)
 {
@@ -292,7 +315,14 @@ static ssize_t store_cmd(struct device *dev, struct device_attribute *devattr,
 
 	if (info->cmd_is_running == true) {
 		tsp_debug_err(true, &info->client->dev, "ft_cmd: other cmd is running.\n");
-		goto err_out;
+		if (strncmp("clear_cover_mode", buf, 16) == 0) {
+			cancel_delayed_work(&info->cover_cmd_work);
+			tsp_debug_err(true, &info->client->dev,
+				"[cmd is delayed] %d, param = %d\n", __LINE__, buf[17]-'0');
+			info->delayed_cmd_param = buf[17]-'0';
+			schedule_delayed_work(&info->cover_cmd_work, msecs_to_jiffies(10));
+		}
+		return -EBUSY;
 	}
 
 	/* check lock   */
@@ -882,7 +912,7 @@ static int fts_panel_ito_test(struct fts_ts_info *info)
 		fts_command(info, FTS_CMD_HOVER_ON);
 
 	if (info->flip_enable) {
-		fts_enable_feature(info, FTS_FEATURE_COVER_GLASS, true);
+		fts_set_cover_type(info, true);
 	} else {
 		if (info->mshover_enabled)
 			fts_command(info, FTS_CMD_MSHOVER_ON);
@@ -1819,19 +1849,21 @@ static void clear_cover_mode(void *device_data)
 		snprintf(buff, sizeof(buff), "%s", "NG");
 		info->cmd_state = CMD_STATUS_FAIL;
 	} else {
-		if (info->cmd_param[0] > 1)
+		if (info->cmd_param[0] > 1) {
 			info->flip_enable = true;
-		else
+			info->cover_type = info->cmd_param[1];
+		} else {
 			info->flip_enable = false;
+		}
 
 		if (!info->touch_stopped && info->reinit_done) {
 			if (info->flip_enable) {
 				if (info->mshover_enabled)
 					fts_command(info, FTS_CMD_MSHOVER_OFF);
 
-				fts_enable_feature(info, FTS_FEATURE_COVER_GLASS, true);
+				fts_set_cover_type(info, true);
 			} else {
-				fts_enable_feature(info, FTS_FEATURE_COVER_GLASS, false);
+				fts_set_cover_type(info, false);
 
 				if (info->fast_mshover_enabled)
 					fts_command(info, FTS_CMD_SET_FAST_GLOVE_MODE);

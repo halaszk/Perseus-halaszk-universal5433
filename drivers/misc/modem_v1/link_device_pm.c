@@ -484,7 +484,7 @@ static void run_pm_fsm(struct modem_link_pm *pm, enum pm_event event)
 		} else if (event == PM_EVENT_WDOG_TIMEOUT) {
 			n_state = PM_STATE_WDOG_TIMEOUT;
 		} else if (event == PM_EVENT_CP2AP_WAKEUP_LOW) {
-#if 0
+#ifdef CONFIG_SAMSUNG_PRODUCT_SHIP
 			n_state = PM_STATE_CP_FAIL;
 #else
 			n_state = PM_STATE_AP_FAIL;

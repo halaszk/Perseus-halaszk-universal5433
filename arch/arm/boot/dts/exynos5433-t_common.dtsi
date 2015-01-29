@@ -373,8 +373,8 @@
 	haptic {
 		status = "okay";
 		haptic,max_timeout = <10000>;
-		haptic,duty = <30500>;
-		haptic,period = <33670>;
+		haptic,duty = <32448>;
+		haptic,period = <33814>;
 		haptic,reg2 = <0x82>;
 		haptic,pwm_id = <0>;
 		haptic,regulator_name = "VCC_3.0V_MOTOR_AP";
@@ -413,18 +413,8 @@
 		w1,gpio = <&gpd2 5 0>;
 	};
 
-	pinctrl@14CC0000 {
-		cover_en: cover-en {
-			samsung,pins = "gpd4-1";
-			samsung,pin-function = <0x0>;
-		};
-	};
-
 	led_cover {
-		status = "okay";
 		compatible = "led_cover";
-		pinctrl-names = "default";
-		pinctrl-0 = <&cover_en>;
 		ledcover_en,gpio = <&gpd4 1 0>;
 	};
 
@@ -448,6 +438,8 @@
 
 	hsi2c@14DA0000 {
 		status = "okay";
+		samsung,scl-clk-stretching;
+		samsung,transfer_delay = <10>;
 		pinctrl-names = "default","on_i2c","off_i2c";
 		pinctrl-0 = <&hs_i2c9_bus>;
 		pinctrl-1 = <&cfg_i2c>;
@@ -1399,6 +1391,7 @@
 		dwc3 {
 			maximum-speed = "high-speed";
 			dr_mode = "otg";
+			adj-sof-accuracy;
 		};
 	};
 

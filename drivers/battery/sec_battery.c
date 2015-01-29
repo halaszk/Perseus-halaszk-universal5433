@@ -734,6 +734,8 @@ check_recharge_check_count:
 
 static bool sec_bat_voltage_check(struct sec_battery_info *battery)
 {
+	union power_supply_propval value;
+
 	if (battery->status == POWER_SUPPLY_STATUS_DISCHARGING) {
 		dev_dbg(battery->dev,
 			"%s: Charging Disabled\n", __func__);
@@ -748,6 +750,23 @@ static bool sec_bat_voltage_check(struct sec_battery_info *battery)
 		return false;
 	}
 
+	if ((battery->status == POWER_SUPPLY_STATUS_FULL) && \
+		battery->is_recharging) {
+		psy_do_property(battery->pdata->fuelgauge_name, get,
+			POWER_SUPPLY_PROP_CAPACITY, value);
+		if (value.intval <
+			battery->pdata->full_condition_soc &&
+				battery->voltage_now <
+				(battery->pdata->recharge_condition_vcell - 50)) {
+			battery->status = POWER_SUPPLY_STATUS_CHARGING;
+			battery->voltage_now = 1080;
+			battery->voltage_avg = 1080;
+			power_supply_changed(&battery->psy_bat);
+			dev_info(battery->dev,
+				"%s: battery status full -> charging, RepSOC(%d)\n", __func__, value.intval);
+		}
+	}
+
 	/* Re-Charging check */
 	if (sec_bat_check_recharge(battery)) {
 		if (battery->pdata->full_check_type !=
@@ -757,19 +776,6 @@ static bool sec_bat_voltage_check(struct sec_battery_info *battery)
 			battery->charging_mode = SEC_BATTERY_CHARGING_2ND;
 		battery->is_recharging = true;
 		sec_bat_set_charge(battery, true);
-		if (battery->status == POWER_SUPPLY_STATUS_FULL) {
-			if (battery->capacity <
-				battery->pdata->full_condition_soc &&
-					battery->voltage_now <
-					(battery->pdata->recharge_condition_vcell - 50)) {
-				battery->status = POWER_SUPPLY_STATUS_CHARGING;
-				battery->voltage_now = 1080;
-				battery->voltage_avg = 1080;
-				power_supply_changed(&battery->psy_bat);
-				dev_info(battery->dev,
-					"%s: battery status full -> charging\n", __func__);
-			}
-		}
 		return false;
 	}
 
@@ -1776,6 +1782,15 @@ static void sec_bat_get_battery_info(
 				struct sec_battery_info *battery)
 {
 	union power_supply_propval value;
+#if defined(CONFIG_AFC_CHARGER_MODE)
+	static struct timespec old_ts;
+	struct timespec c_ts;
+#if defined(ANDROID_ALARM_ACTIVATED)
+	c_ts = ktime_to_timespec(alarm_get_elapsed_realtime());
+#else
+	c_ts = ktime_to_timespec(ktime_get_boottime());
+#endif
+#endif
 
 	psy_do_property(battery->pdata->fuelgauge_name, get,
 		POWER_SUPPLY_PROP_VOLTAGE_NOW, value);
@@ -1868,10 +1883,12 @@ static void sec_bat_get_battery_info(
 #if defined(CONFIG_AFC_CHARGER_MODE)
 	if (battery->status != POWER_SUPPLY_STATUS_FULL) {
 		battery->capacity = value.intval;
-	} else if (battery->capacity != 100) {
+	} else if ((battery->capacity != 100) &&
+		   ((c_ts.tv_sec - old_ts.tv_sec) >= 30)) {
 		battery->capacity++;
 		pr_info("%s : forced full-charged sequence for the capacity(%d)\n",
 				__func__, battery->capacity);
+		old_ts = c_ts;
 	}
 #else
 	battery->capacity = value.intval;
@@ -2298,9 +2315,17 @@ static void sec_bat_cable_work(struct work_struct *work)
 		SEC_BATTERY_CABLE_CHECK_NOINCOMPATIBLECHARGE) &&
 		battery->cable_type == POWER_SUPPLY_TYPE_UNKNOWN)) {
 		if (battery->status == POWER_SUPPLY_STATUS_FULL) {
+			/* To prevent soc jumping to 100 when cable is removed on progressing
+			   forced full-charged sequence */
+#if defined(CONFIG_AFC_CHARGER_MODE)
+			val.intval = battery->capacity;
+			psy_do_property(battery->pdata->fuelgauge_name, set,
+					POWER_SUPPLY_PROP_CHARGE_FULL, val);
+#else
 			val.intval = POWER_SUPPLY_TYPE_BATTERY;
 			psy_do_property(battery->pdata->fuelgauge_name, set,
 					POWER_SUPPLY_PROP_CHARGE_FULL, val);
+#endif
 			/* To get SOC value (NOT raw SOC), need to reset value */
 			val.intval = 0;
 			psy_do_property(battery->pdata->fuelgauge_name, get,
@@ -2317,6 +2342,11 @@ static void sec_bat_cable_work(struct work_struct *work)
 		if (sec_bat_set_charge(battery, false))
 			goto end_of_cable_work;
 	} else {
+#if defined(CONFIG_EN_OOPS)
+		val.intval = battery->cable_type;
+		psy_do_property(battery->pdata->fuelgauge_name, set,
+				POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN, val);
+#endif
 		/* Do NOT display the charging icon when OTG is enabled */
 		if (battery->cable_type == POWER_SUPPLY_TYPE_OTG) {
 			battery->charging_mode = SEC_BATTERY_CHARGING_NONE;

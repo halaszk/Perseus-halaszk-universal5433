@@ -5663,6 +5663,7 @@ static s32
 wl_cfg80211_cancel_remain_on_channel(struct wiphy *wiphy,
 	bcm_struct_cfgdev *cfgdev, u64 cookie)
 {
+	struct bcm_cfg80211 *cfg = wiphy_priv(wiphy);
 	s32 err = 0;
 
 #if defined(WL_CFG80211_P2P_DEV_IF)
@@ -5672,6 +5673,13 @@ wl_cfg80211_cancel_remain_on_channel(struct wiphy *wiphy,
 #else
 	WL_DBG((" enter ) netdev_ifidx: %d \n", cfgdev->ifindex));
 #endif /* WL_CFG80211_P2P_DEV_IF */
+	if (cfg->last_roc_id == cookie) {
+		wl_cfgp2p_set_p2p_mode(cfg, WL_P2P_DISC_ST_SCAN, 0, 0,
+			wl_to_p2p_bss_bssidx(cfg, P2PAPI_BSSCFG_DEVICE));
+	} else {
+		WL_ERR(("%s : ignore, request cookie(%llu) is not matched. (cur : %llu)\n",
+			__FUNCTION__, cookie, cfg->last_roc_id));
+	}
 	return err;
 }
 
@@ -12464,11 +12472,23 @@ s32 wl_cfg80211_up(void *para)
 int wl_cfg80211_hang(struct net_device *dev, u16 reason)
 {
 	struct bcm_cfg80211 *cfg;
+#if defined(SOFTAP_SEND_HANGEVT)
+	uint8 hang_mac[ETHER_ADDR_LEN] = {0x11, 0x11, 0x11, 0x11, 0x11, 0x11};
+	dhd_pub_t *dhd;
+#endif /* SOFTAP_SEND_HANGEVT */
 	cfg = g_bcm_cfg;
 
 	WL_ERR(("In : chip crash eventing\n"));
 	wl_add_remove_pm_enable_work(cfg, FALSE, WL_HANDLER_DEL);
+#if defined(SOFTAP_SEND_HANGEVT)
+	dhd = (dhd_pub_t *)(cfg->pub);
+	if (dhd->op_mode & DHD_FLAG_HOSTAP_MODE) {
+		cfg80211_del_sta(dev, hang_mac, GFP_ATOMIC);
+	} else
+#endif /* SOFTAP_SEND_HANGEVT */
+	{
 	cfg80211_disconnected(dev, reason, NULL, 0, GFP_KERNEL);
+	}
 	if (cfg != NULL) {
 		wl_link_down(cfg);
 	}

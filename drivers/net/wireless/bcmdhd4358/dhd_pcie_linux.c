@@ -161,20 +161,6 @@ static struct pci_driver dhdpcie_driver = {
 
 int dhdpcie_init_succeeded = FALSE;
 
-#ifndef BCMPCIE_OOB_HOST_WAKE
-static void dhdpcie_pme_active(struct pci_dev *pdev, bool enable)
-{
-	uint16 pmcsr;
-
-	pci_read_config_word(pdev, pdev->pm_cap + PCI_PM_CTRL, &pmcsr);
-	/* Clear PME Status by writing 1 to it and enable PME# */
-	pmcsr |= PCI_PM_CTRL_PME_STATUS | PCI_PM_CTRL_PME_ENABLE;
-	if (!enable)
-		pmcsr &= ~PCI_PM_CTRL_PME_ENABLE;
-
-	pci_write_config_word(pdev, pdev->pm_cap + PCI_PM_CTRL, pmcsr);
-}
-#endif /* BCMPCIE_OOB_HOST_WAKE */
 
 static int dhdpcie_set_suspend_resume(struct pci_dev *pdev, bool state)
 {
@@ -195,7 +181,7 @@ static int dhdpcie_set_suspend_resume(struct pci_dev *pdev, bool state)
 #else
 		!bus->dhd->dongle_reset) {
 #endif /* CONFIG_MACH_UNIVERSAL5433 */
-			ret = dhdpcie_pci_suspend_resume(bus->dev, state);
+			ret = dhdpcie_pci_suspend_resume(bus, state);
 			return ret;
 		}
 
@@ -223,9 +209,6 @@ static int dhdpcie_suspend_dev(struct pci_dev *dev)
 {
 	int ret;
 	DHD_TRACE_HW4(("%s: Enter\n", __FUNCTION__));
-#ifndef BCMPCIE_OOB_HOST_WAKE
-	dhdpcie_pme_active(dev, TRUE);
-#endif /* BCMPCIE_OOB_HOST_WAKE */
 	pci_save_state(dev);
 	pci_enable_wake(dev, PCI_D0, TRUE);
 	pci_disable_device(dev);
@@ -253,20 +236,25 @@ static int dhdpcie_resume_dev(struct pci_dev *dev)
 		printf("%s:pci_set_power_state error %d \n", __FUNCTION__, err);
 		return err;
 	}
-#ifndef BCMPCIE_OOB_HOST_WAKE
-	dhdpcie_pme_active(dev, FALSE);
-#endif /* BCMPCIE_OOB_HOST_WAKE */
 	return err;
 }
 
-int dhdpcie_pci_suspend_resume(struct pci_dev *dev, bool state)
+int dhdpcie_pci_suspend_resume(dhd_bus_t *bus, bool state)
 {
 	int rc;
+	struct pci_dev *dev = bus->dev;
 
-	if (state)
+	if (state) {
+#ifndef BCMPCIE_OOB_HOST_WAKE
+		dhdpcie_pme_active(bus->osh, state);
+#endif /* BCMPCIE_OOB_HOST_WAKE */
 		rc = dhdpcie_suspend_dev(dev);
-	else
+	} else {
 		rc = dhdpcie_resume_dev(dev);
+#ifndef BCMPCIE_OOB_HOST_WAKE
+		dhdpcie_pme_active(bus->osh, state);
+#endif /* BCMPCIE_OOB_HOST_WAKE */
+	}
 	return rc;
 }
 
