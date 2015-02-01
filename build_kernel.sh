@@ -133,6 +133,7 @@ if [ -e $KERNELDIR/arch/arm/boot/zImage ]; then
 		sleep 1;
 	done
 	if [ "$push_ok" == "y" ] || [ "$push_ok" == "Y" ]; then
+	read -p "push kernel verion update to ftp and synapse (y/n)?"
         if [ "$REPLY" == "y" ]; then
                 echo "${GETVER}" > ${KERNELDIR}/N910C/latest_version.txt;
         fi;
@@ -141,7 +142,6 @@ if [ -e $KERNELDIR/arch/arm/boot/zImage ]; then
 		ncftpput -f /home/dev/login.cfg -V -R / ${KERNELDIR}/N910C/
 #		rm ${KERNELDIR}/N910C/Kernel_*
 		echo "Uploading kernel to FTP server DONE";
-		read -p "push kernel verion update to ftp and synapse (y/n)?"
 	fi;
 	exit 0;
 else
