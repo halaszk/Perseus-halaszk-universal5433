@@ -25,6 +25,7 @@
 
 #include <plat/fb.h>
 
+#include <mach/smc.h>
 #include <mach/videonode-exynos5.h>
 #include <media/exynos_mc.h>
 
@@ -726,6 +727,22 @@ static bool dex_validate_x_alignment(struct dex_device *dex, int x, u32 w,
 	return 1;
 }
 
+static void dex_set_protected_content(struct dex_device *dex, bool enable)
+{
+	int  ret;
+
+	if (dex->protected_content == enable)
+		return;
+
+	ret = exynos_smc(SMC_PROTECTION_SET, 0, DEV_DECON_TV, enable);
+	if (ret)
+		WARN(1, "decon-tv protection Enable failed. ret(%d)\n", ret);
+	else
+		dex_dbg("DRM %s\n", enable ? "enabled" : "disabled");
+
+	dex->protected_content = enable;
+}
+
 #if defined(CONFIG_DECONTV_USE_BUS_DEVFREQ)
 static int dex_get_overlap_bw(struct dex_device *dex,
 			struct s3c_fb_win_config *win_config)
@@ -831,16 +848,19 @@ static void dex_update(struct dex_device *dex, struct dex_reg_data *regs)
 	bool wait_for_vsync;
 	int count = 100;
 	int i, ret = 0;
+	int protection = 0;
 
 	memset(&old_dma_bufs, 0, sizeof(old_dma_bufs));
 
 	for (i = 1; i < DEX_MAX_WINDOWS; i++) {
 		if (!dex->windows[i]->local) {
+			protection += regs->protection[i];
 			old_dma_bufs[i] = dex->windows[i]->dma_buf_data;
 			if (regs->dma_buf_data[i].fence)
 				dex_fence_wait(regs->dma_buf_data[i].fence);
 		}
 	}
+	dex_set_protected_content(dex, !!protection);
 
 #if defined(CONFIG_DECONTV_USE_BUS_DEVFREQ)
 	if (prev_overlap_bw < regs->win_overlap_bw) {
@@ -1105,6 +1125,7 @@ static int dex_set_win_buffer(struct dex_device *dex, struct dex_win *win,
 	regs->buf_end[idx] = regs->buf_start[idx] + window_size;
 	regs->buf_size[idx] = VIDW_BUF_SIZE_OFFSET(win_config->stride - pagewidth) |
 				VIDW_BUF_SIZE_PAGEWIDTH(pagewidth);
+	regs->protection[idx] = win_config->protection;
 
 	if (idx > 1) {
 		if ((win_config->plane_alpha > 0) && (win_config->plane_alpha < 0xFF)) {

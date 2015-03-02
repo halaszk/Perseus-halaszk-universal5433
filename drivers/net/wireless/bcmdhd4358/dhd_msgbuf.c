@@ -24,7 +24,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_msgbuf.c 505854 2014-10-01 11:03:36Z $
+ * $Id: dhd_msgbuf.c 503126 2014-09-17 11:58:42Z $
  */
 #include <typedefs.h>
 #include <osl.h>
@@ -44,15 +44,10 @@
 
 #include <dhd_flowring.h>
 
-#ifdef PROP_TXSTATUS
-#include <wlfc_proto.h>
-#include <dhd_wlfc.h>
-#endif
 
 #include <pcie_core.h>
 #include <bcmpcie.h>
 #include <dhd_pcie.h>
-
 
 /*
  * PCIE D2H DMA Complete Sync Modes
@@ -137,7 +132,6 @@ typedef uint8 (* d2h_sync_cb_t)(dhd_pub_t *dhd, msgbuf_ring_t *ring,
                                 volatile cmn_msg_hdr_t *msg, int msglen);
 #endif /* PCIE_D2H_SYNC */
 
-#define CTRLRING_LOGGING_LIMIT 63
 
 typedef struct dhd_prot {
 	osl_t *osh;		/* OSL handle */
@@ -195,33 +189,9 @@ typedef struct dhd_prot {
 	uint16		rx_metadata_offset;
 	uint16		tx_metadata_offset;
 	uint16          rx_cpln_early_upd_idx;
-#ifdef CTRLRING_LOGGING
-	atomic_t	event_post;
-	atomic_t	ioctlresp_post;
-	atomic_t	ioctl_post;
-	atomic_t	event_cmpl;
-	atomic_t	ioctlresp_cmpl;
-	atomic_t	ioctlack_cmpl;
-	dll_t		event_post_list;
-	dll_t		ioctlresp_post_list;
-	dll_t		ioctl_post_list;
-	dll_t		event_cmpl_list;
-	dll_t		ioctlresp_cmpl_list;
-	dll_t		ioctlack_cmpl_list;
-#endif
 	struct mutex	ioctl_mutex;	/* Make IOCTL singleton in Prot Layer */
 } dhd_prot_t;
 
-typedef struct ioctl_buf_log {
-	uint32		pktid;
-	uint32		high_addr;
-	uint32		low_addr;
-	void*		mbuf;
-	void*		p;
-	uint8		msg_type;
-	struct timeval	tv;
-	dll_t		list;
-} ioctl_buf_log_t;
 
 static int dhdmsgbuf_query_ioctl(dhd_pub_t *dhd, int ifidx, uint cmd,
 	void *buf, uint len, uint8 action);
@@ -247,12 +217,12 @@ static void* dhd_alloc_ring_space(dhd_pub_t *dhd, msgbuf_ring_t *ring,
 	uint16 msglen, uint16 *alloced);
 static int dhd_fillup_ioct_reqst_ptrbased(dhd_pub_t *dhd, uint16 len, uint cmd, void* buf,
 	int ifidx);
-static INLINE void dhd_prot_packet_free(dhd_pub_t *dhd, uint32 pktid);
+static INLINE void dhd_prot_packet_free(dhd_pub_t *dhd, uint32 pktid, uint8 buf_type);
 #if defined(CONFIG_DHD_USE_STATIC_BUF) && defined(DHD_USE_STATIC_IOCTLBUF)
-static INLINE void dhd_prot_static_packet_free(dhd_pub_t *dhd, uint32 pktid);
+static INLINE void dhd_prot_static_packet_free(dhd_pub_t *dhd, uint32 pktid,
+	uint8 buf_type);
 #endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_IOCTLBUF */
-
-static INLINE void *dhd_prot_packet_get(dhd_pub_t *dhd, uint32 pktid);
+static INLINE void *dhd_prot_packet_get(dhd_pub_t *dhd, uint32 pktid, uint8 buf_type);
 static void dmaxfer_free_dmaaddr(dhd_pub_t *dhd, dhd_dmaxfer_t *dma);
 static int dmaxfer_prepare_dmaaddr(dhd_pub_t *dhd, uint len, uint srcdelay,
 	uint destdelay, dhd_dmaxfer_t *dma);
@@ -502,15 +472,25 @@ static INLINE uint32 dhd_pktid_map_avail_cnt(dhd_pktid_map_handle_t *map);
 static INLINE uint32 dhd_pktid_map_reserve(dhd_pktid_map_handle_t *handle,
                                            void *pkt);
 static INLINE void dhd_pktid_map_save(dhd_pktid_map_handle_t *handle, void *pkt,
-                       uint32 nkey, dmaaddr_t physaddr, uint32 len, uint8 dma);
+                       uint32 nkey, dmaaddr_t physaddr, uint32 len, uint8 dma,
+                       uint8 buf_type);
 static uint32 dhd_pktid_map_alloc(dhd_pktid_map_handle_t *map, void *pkt,
-                                  dmaaddr_t physaddr, uint32 len, uint8 dma);
+                                  dmaaddr_t physaddr, uint32 len, uint8 dma,
+                                  uint8 buf_type);
 
 /* Return an allocated pktid, retrieving previously saved pkt and metadata */
 static void *dhd_pktid_map_free(dhd_pktid_map_handle_t *map, uint32 id,
-                                dmaaddr_t *physaddr, uint32 *len);
+                                dmaaddr_t *physaddr, uint32 *len,
+                                uint8 buf_type);
 
 /* Packet metadata saved in packet id mapper */
+typedef enum pkt_buf_type {
+	BUFF_TYPE_DATA_TX = 0,
+	BUFF_TYPE_DATA_RX,
+	BUFF_TYPE_IOCTL_RX,
+	BUFF_TYPE_EVENT_RX,
+	 BUFF_TYPE_NO_CHECK
+} pkt_buf_type_t;
 typedef struct dhd_pktid_item {
 #if defined(DHD_PKTIDMAP_FIFO)
 	dll_t       list_node; /* MUST BE FIRST field */
@@ -518,6 +498,7 @@ typedef struct dhd_pktid_item {
 #endif
 	bool        inuse;    /* tag an item to be in use */
 	uint8       dma;      /* map direction: flush or invalidate */
+	uint8       buf_type;
 	uint16      len;      /* length of mapped packet's buffer */
 	void        *pkt;     /* opaque native pointer to a packet */
 	dmaaddr_t   physaddr; /* physical address of mapped packet's buffer */
@@ -566,22 +547,19 @@ typedef struct dhd_pktid_map {
 #define NATIVE_TO_PKTID_CLEAR(map)       dhd_pktid_map_clear(map)
 
 #define NATIVE_TO_PKTID_RSV(map, pkt)    dhd_pktid_map_reserve((map), (pkt))
-#define NATIVE_TO_PKTID_SAVE(map, pkt, nkey, pa, len, dma) \
-	dhd_pktid_map_save((map), (void *)(pkt), (nkey), (pa), (uint32)(len), (uint8)dma)
-#define NATIVE_TO_PKTID(map, pkt, pa, len, dma) \
-	dhd_pktid_map_alloc((map), (void *)(pkt), (pa), (uint32)(len), (uint8)dma)
+#define NATIVE_TO_PKTID_SAVE(map, pkt, nkey, pa, len, dma, buf_type) \
+	dhd_pktid_map_save((map), (void *)(pkt), (nkey), (pa), (uint32)(len), \
+	(uint8)dma, (uint8)buf_type)
+#define NATIVE_TO_PKTID(map, pkt, pa, len, dma, buf_type) \
+	dhd_pktid_map_alloc((map), (void *)(pkt), (pa), (uint32)(len), \
+	(uint8)dma, (uint8)buf_type)
 
-#define PKTID_TO_NATIVE(map, pktid, pa, len) \
+#define PKTID_TO_NATIVE(map, pktid, pa, len, buf_type) \
 	dhd_pktid_map_free((map), (uint32)(pktid), \
-	                   (dmaaddr_t *)&(pa), (uint32 *)&(len))
+	                   (dmaaddr_t *)&(pa), (uint32 *)&(len), (uint8)buf_type)
 
 #define PKTID_AVAIL(map)                 dhd_pktid_map_avail_cnt(map)
 
-#if defined(CONFIG_DHD_USE_STATIC_BUF) && defined(DHD_USE_STATIC_FLOWRING)
-#define FLOWRING_NAME	"h2dflr"
-#define RING_IS_FLOWRING(ring) \
-	((strncmp(ring->name, FLOWRING_NAME, sizeof(FLOWRING_NAME))) == (0))
-#endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_FLOWRING */
 
 /*
  * +---------------------------------------------------------------------------+
@@ -704,7 +682,7 @@ dhd_pktid_map_fini(dhd_pktid_map_handle_t *handle)
 				PKTFREE_STATIC(osh, (ulong*)locker->pkt, FALSE);
 #else
 				PKTFREE(osh, (ulong*)locker->pkt, FALSE);
-#endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_IOCTLBUF */
+#endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_EVENTBUF */
 
 			}
 		}
@@ -761,7 +739,7 @@ dhd_pktid_map_clear(dhd_pktid_map_handle_t *handle)
 			PKTFREE_STATIC(osh, (ulong*)locker->pkt, FALSE);
 #else
 			PKTFREE(osh, (ulong*)locker->pkt, FALSE);
-#endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_IOCTLBUF */
+#endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_EVENTBUF */
 
 		}
 
@@ -836,7 +814,7 @@ dhd_pktid_map_reserve(dhd_pktid_map_handle_t *handle, void *pkt)
 
 static INLINE void
 dhd_pktid_map_save(dhd_pktid_map_handle_t *handle, void *pkt, uint32 nkey,
-                   dmaaddr_t physaddr, uint32 len, uint8 dma)
+                   dmaaddr_t physaddr, uint32 len, uint8 dma, uint8 buf_type)
 {
 	dhd_pktid_map_t *map;
 	dhd_pktid_item_t *locker;
@@ -850,100 +828,23 @@ dhd_pktid_map_save(dhd_pktid_map_handle_t *handle, void *pkt, uint32 nkey,
 	ASSERT((locker->pkt == pkt) && (locker->inuse == TRUE));
 
 	locker->dma = dma; /* store contents in locker */
+	locker->buf_type = buf_type;
 	locker->physaddr = physaddr;
 	locker->len = (uint16)len; /* 16bit len */
 }
 
 static uint32 BCMFASTPATH
 dhd_pktid_map_alloc(dhd_pktid_map_handle_t *handle, void *pkt,
-                    dmaaddr_t physaddr, uint32 len, uint8 dma)
+                    dmaaddr_t physaddr, uint32 len, uint8 dma, uint8 buf_type)
 {
 	uint32 nkey = dhd_pktid_map_reserve(handle, pkt);
 	if (nkey != DHD_PKTID_INVALID) {
-		dhd_pktid_map_save(handle, pkt, nkey, physaddr, len, dma);
+		dhd_pktid_map_save(handle, pkt, nkey, physaddr, len, dma, buf_type);
 	}
 	return nkey;
 }
 
-#ifdef CTRLRING_LOGGING
-void dhd_msgbuf_ctrlring_logging(dhd_prot_t *prot)
-{
-	dll_t *item, *next;
-	ioctl_buf_log_t *logentry = NULL;
 
-	DHD_ERROR(("%s:ioctl post:\n", __FUNCTION__));
-	for (item = dll_head_p(&prot->ioctl_post_list);
-		!dll_end(&prot->ioctl_post_list, item); item = next) {
-		next = dll_next_p(item);
-		logentry = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log, list);
-		DHD_ERROR(("pktid %08x,0x%p mbuf:0x%p la %08x, msg_type %02x, sec %lld, usec %lld\n",
-		           logentry->pktid, logentry->p, logentry->mbuf, logentry->low_addr, logentry->msg_type,
-		           (long long)logentry->tv.tv_sec, (long long)logentry->tv.tv_usec));
-	}
-	DHD_ERROR(("%s:ioctl ack:\n", __FUNCTION__));
-	for (item = dll_head_p(&prot->ioctlack_cmpl_list);
-		!dll_end(&prot->ioctlack_cmpl_list, item); item = next) {
-		next = dll_next_p(item);
-		logentry = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log, list);
-		DHD_ERROR(("msg_type %02x, sec %lld, usec %lld\n", logentry->msg_type,
-		           (long long)logentry->tv.tv_sec, (long long)logentry->tv.tv_usec));
-	}
-	DHD_ERROR(("%s:Event post:\n", __FUNCTION__));
-	for (item = dll_head_p(&prot->event_post_list);
-		!dll_end(&prot->event_post_list, item); item = next) {
-		next = dll_next_p(item);
-		logentry = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log, list);
-		DHD_ERROR(("pktid %04x,0x%p mbuf:0x%p la %08x, msg_type %02x, sec %lld, usec %lld\n",
-		           logentry->pktid, logentry->p, logentry->mbuf, logentry->low_addr, logentry->msg_type,
-		           (long long)logentry->tv.tv_sec, (long long)logentry->tv.tv_usec));
-	}
-	DHD_ERROR(("%s:Event complete:\n", __FUNCTION__));
-	for (item = dll_head_p(&prot->event_cmpl_list);
-		!dll_end(&prot->event_cmpl_list, item); item = next) {
-		next = dll_next_p(item);
-		logentry = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log, list);
-		DHD_ERROR(("pktid %08x,0x%p mbuf:0x%p la %08x, msg_type %02x, sec %lld, usec %lld\n",
-		           logentry->pktid, logentry->p, logentry->mbuf, logentry->low_addr, logentry->msg_type,
-		           (long long)logentry->tv.tv_sec, (long long)logentry->tv.tv_usec));
-	}
-	DHD_ERROR(("%s:ioctl response post:\n", __FUNCTION__));
-	for (item = dll_head_p(&prot->ioctlresp_post_list);
-		!dll_end(&prot->ioctlresp_post_list, item); item = next) {
-		next = dll_next_p(item);
-		logentry = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log, list);
-		DHD_ERROR(("pktid %08x,0x%p mbuf:0x%p la %08x, msg_type %02x, sec %lld, usec %lld\n",
-		           logentry->pktid, logentry->p, logentry->mbuf, logentry->low_addr, logentry->msg_type,
-		           (long long)logentry->tv.tv_sec, (long long)logentry->tv.tv_usec));
-	}
-	DHD_ERROR(("%s:ioctl response complete:\n", __FUNCTION__));
-	for (item = dll_head_p(&prot->ioctlresp_cmpl_list);
-		!dll_end(&prot->ioctlresp_cmpl_list, item); item = next) {
-		next = dll_next_p(item);
-		logentry = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log, list);
-		DHD_ERROR(("pktid %08x,0x%p mbuf:0x%p la %08x, msg_type %02x, sec %lld, usec %lld\n",
-		           logentry->pktid, logentry->p, logentry->mbuf, logentry->low_addr, logentry->msg_type,
-		           (long long)logentry->tv.tv_sec, (long long)logentry->tv.tv_usec));
-	}
-	DHD_ERROR(("%s:Event post:\n", __FUNCTION__));
-	for (item = dll_head_p(&prot->event_post_list);
-		!dll_end(&prot->event_post_list, item); item = next) {
-		next = dll_next_p(item);
-		logentry = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log, list);
-		DHD_ERROR(("pktid %04x,0x%p mbuf:0x%p la %08x, msg_type %02x, sec %lld, usec %lld\n",
-		           logentry->pktid, logentry->p, logentry->mbuf, logentry->low_addr, logentry->msg_type,
-		           (long long)logentry->tv.tv_sec, (long long)logentry->tv.tv_usec));
-	}
-	DHD_ERROR(("%s:Event complete:\n", __FUNCTION__));
-	for (item = dll_head_p(&prot->event_cmpl_list);
-		!dll_end(&prot->event_cmpl_list, item); item = next) {
-		next = dll_next_p(item);
-		logentry = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log, list);
-		DHD_ERROR(("pktid %08x,0x%p mbuf:0x%p la %08x, msg_type %02x, sec %lld, usec %lld\n",
-		           logentry->pktid, logentry->p, logentry->mbuf, logentry->low_addr, logentry->msg_type,
-		           (long long)logentry->tv.tv_sec, (long long)logentry->tv.tv_usec));
-	}
-}
-#endif /* CTRLRING_LOGGING */
 
 
 /*
@@ -954,14 +855,11 @@ void dhd_msgbuf_ctrlring_logging(dhd_prot_t *prot)
  */
 static void * BCMFASTPATH
 dhd_pktid_map_free(dhd_pktid_map_handle_t *handle, uint32 nkey,
-                   dmaaddr_t *physaddr, uint32 *len)
+                   dmaaddr_t *physaddr, uint32 *len, uint8 buf_type)
 {
 	dhd_pktid_map_t *map;
 	dhd_pktid_item_t *locker;
 	void * pkt;
-#ifdef CTRLRING_LOGGING
-	dhd_prot_t *prot;
-#endif
 
 	ASSERT(handle != NULL);
 
@@ -972,13 +870,15 @@ dhd_pktid_map_free(dhd_pktid_map_handle_t *handle, uint32 nkey,
 	locker = &map->lockers[nkey];
 
 	if (locker->inuse == FALSE) { /* Debug check for cloned numbered key */
-#ifdef CTRLRING_LOGGING
-		prot = (dhd_prot_t *)container_of(handle, dhd_prot_t, pktid_map_handle);
-		dhd_msgbuf_ctrlring_logging(prot);
-#endif
 		DHD_ERROR(("%s:%d: Error! freeing invalid pktid<%u>\n",
 		           __FUNCTION__, __LINE__, nkey));
 		ASSERT(locker->inuse != FALSE);
+		return NULL;
+	}
+	if ((buf_type != BUFF_TYPE_NO_CHECK) && (locker->buf_type != buf_type)) {
+		DHD_ERROR(("%s:%d: Error! Invalid Buffer Free for pktid<%u> \n",
+		           __FUNCTION__, __LINE__, nkey));
+		ASSERT(locker->buf_type == buf_type);
 		return NULL;
 	}
 
@@ -1011,9 +911,6 @@ int dhd_prot_attach(dhd_pub_t *dhd)
 	uint alloced = 0;
 
 	dhd_prot_t *prot;
-#ifdef CTRLRING_LOGGING
-	unsigned long flags;
-#endif
 
 	/* Allocate prot structure */
 	if (!(prot = (dhd_prot_t *)DHD_OS_PREALLOC(dhd, DHD_PREALLOC_PROT,
@@ -1086,22 +983,6 @@ int dhd_prot_attach(dhd_pub_t *dhd)
 			__FUNCTION__));
 		goto fail;
 	}
-#ifdef CTRLRING_LOGGING
-	DHD_GENERAL_LOCK(dhd, flags);
-	atomic_set(&prot->event_post, 0);
-	atomic_set(&prot->ioctlresp_post, 0);
-	atomic_set(&prot->ioctl_post, 0);
-	atomic_set(&prot->event_cmpl, 0);
-	atomic_set(&prot->ioctlresp_cmpl, 0);
-	atomic_set(&prot->ioctlack_cmpl, 0);
-	dll_init(&prot->event_post_list);
-	dll_init(&prot->ioctlresp_post_list);
-	dll_init(&prot->ioctl_post_list);
-	dll_init(&prot->event_cmpl_list);
-	dll_init(&prot->ioctlresp_cmpl_list);
-	dll_init(&prot->ioctlack_cmpl_list);
-	DHD_GENERAL_UNLOCK(dhd, flags);
-#endif
 
 	/* Return buffer for ioctl */
 	prot->retbuf.va = DMA_ALLOC_CONSISTENT(dhd->osh, IOCT_RETBUF_SIZE, DMA_ALIGN_LEN,
@@ -1278,10 +1159,6 @@ dhd_prot_init_index_dma_block(dhd_pub_t *dhd, uint8 type, uint32 length)
 void dhd_prot_detach(dhd_pub_t *dhd)
 {
 	dhd_prot_t *prot = dhd->prot;
-#ifdef CTRLRING_LOGGING
-	dll_t *item, *next;
-	ioctl_buf_log_t *logentry = NULL;
-#endif
 
 	/* Stop the protocol module */
 	if (dhd->prot) {
@@ -1353,56 +1230,6 @@ void dhd_prot_detach(dhd_pub_t *dhd)
 		dhd_prot_ring_detach(dhd, prot->d2hring_rx_cpln);
 		/* 6.0	 D2H	CTRL_COMPLETION ring */
 		dhd_prot_ring_detach(dhd, prot->d2hring_ctrl_cpln);
-#ifdef CTRLRING_LOGGING
-		for (item = dll_head_p(&prot->event_post_list);
-			!dll_end(&prot->event_post_list, item); item = next) {
-			next = dll_next_p(item);
-			logentry = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log,
-			                                           list);
-			dll_delete(&prot->event_post_list);
-			kfree(logentry);
-		}
-		for (item = dll_head_p(&prot->ioctlresp_post_list);
-			!dll_end(&prot->ioctlresp_post_list, item); item = next) {
-			next = dll_next_p(item);
-			logentry = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log,
-			                                           list);
-			dll_delete(&prot->ioctlresp_post_list);
-			kfree(logentry);
-		}
-		for (item = dll_head_p(&prot->ioctl_post_list);
-			!dll_end(&prot->ioctl_post_list, item); item = next) {
-			next = dll_next_p(item);
-			logentry = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log,
-			                                           list);
-			dll_delete(&prot->ioctl_post_list);
-			kfree(logentry);
-		}
-		for (item = dll_head_p(&prot->event_cmpl_list);
-			!dll_end(&prot->event_cmpl_list, item); item = next) {
-			next = dll_next_p(item);
-			logentry = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log,
-			                                           list);
-			dll_delete(&prot->event_cmpl_list);
-			kfree(logentry);
-		}
-		for (item = dll_head_p(&prot->ioctlresp_cmpl_list);
-			!dll_end(&prot->ioctlresp_cmpl_list, item); item = next) {
-			next = dll_next_p(item);
-			logentry = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log,
-			                                           list);
-			dll_delete(&prot->ioctlresp_cmpl_list);
-			kfree(logentry);
-		}
-		for (item = dll_head_p(&prot->ioctlack_cmpl_list);
-			!dll_end(&prot->ioctlack_cmpl_list, item); item = next) {
-			next = dll_next_p(item);
-			logentry = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log,
-			                                           list);
-			dll_delete(&prot->ioctlack_cmpl_list);
-			kfree(logentry);
-		}
-#endif /* CTRLRING_LOGGING */
 
 		NATIVE_TO_PKTID_FINI(dhd->prot->pktid_map_handle);
 
@@ -1438,6 +1265,7 @@ int dhd_sync_with_dongle(dhd_pub_t *dhd)
 		DHD_ERROR(("%s : Post event buffer fail. ret = %d\n", __FUNCTION__, ret));
 		return ret;
 	}
+	dhd_os_set_ioctl_resp_timeout(IOCTL_RESP_TIMEOUT);
 
 
 #ifdef CUSTOMER_HW4
@@ -1623,12 +1451,13 @@ dhd_prot_print_metadata(dhd_pub_t *dhd, void *ptr, int len)
 #endif /* DHD_DBG_SHOW_METADATA */
 
 static INLINE void BCMFASTPATH
-dhd_prot_packet_free(dhd_pub_t *dhd, uint32 pktid)
+dhd_prot_packet_free(dhd_pub_t *dhd, uint32 pktid, uint8 buf_type)
 {
 	void *PKTBUF;
 	dmaaddr_t pa;
 	uint32 pa_len;
-	PKTBUF = PKTID_TO_NATIVE(dhd->prot->pktid_map_handle, pktid, pa, pa_len);
+	PKTBUF = PKTID_TO_NATIVE(dhd->prot->pktid_map_handle, pktid, pa,
+		pa_len, buf_type);
 
 	if (PKTBUF) {
 		DMA_UNMAP(dhd->osh, pa, (uint) pa_len, DMA_TX, 0, 0);
@@ -1638,12 +1467,13 @@ dhd_prot_packet_free(dhd_pub_t *dhd, uint32 pktid)
 }
 #if defined(CONFIG_DHD_USE_STATIC_BUF) && defined(DHD_USE_STATIC_IOCTLBUF)
 static INLINE void BCMFASTPATH
-dhd_prot_static_packet_free(dhd_pub_t *dhd, uint32 pktid)
+dhd_prot_static_packet_free(dhd_pub_t *dhd, uint32 pktid, uint8 buf_type)
 {
 	void *PKTBUF;
 	dmaaddr_t pa;
 	uint32 pa_len;
-	PKTBUF = PKTID_TO_NATIVE(dhd->prot->pktid_map_handle, pktid, pa, pa_len);
+	PKTBUF = PKTID_TO_NATIVE(dhd->prot->pktid_map_handle, pktid, pa,
+		pa_len, buf_type);
 
 	if (PKTBUF) {
 		DMA_UNMAP(dhd->osh, pa, (uint) pa_len, DMA_TX, 0, 0);
@@ -1652,14 +1482,13 @@ dhd_prot_static_packet_free(dhd_pub_t *dhd, uint32 pktid)
 	return;
 }
 #endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_IOCTLBUF */
-
 static INLINE void * BCMFASTPATH
-dhd_prot_packet_get(dhd_pub_t *dhd, uint32 pktid)
+dhd_prot_packet_get(dhd_pub_t *dhd, uint32 pktid, uint8 buf_type)
 {
 	void *PKTBUF;
 	dmaaddr_t pa;
 	uint32 pa_len;
-	PKTBUF = PKTID_TO_NATIVE(dhd->prot->pktid_map_handle, pktid, pa, pa_len);
+	PKTBUF = PKTID_TO_NATIVE(dhd->prot->pktid_map_handle, pktid, pa, pa_len, buf_type);
 	if (PKTBUF) {
 		DMA_UNMAP(dhd->osh, pa, (uint) pa_len, DMA_RX, 0, 0);
 	}
@@ -1767,7 +1596,7 @@ dhd_prot_rxbufpost(dhd_pub_t *dhd, uint16 count)
 
 		rxbuf_post->cmn_hdr.request_id =
 			htol32(NATIVE_TO_PKTID(dhd->prot->pktid_map_handle, p, physaddr,
-			pktlen, DMA_RX));
+			pktlen, DMA_RX, BUFF_TYPE_DATA_RX));
 
 		/* free lock */
 		DHD_GENERAL_UNLOCK(dhd, flags);
@@ -1825,10 +1654,7 @@ dhd_prot_rxbufpost_ctrl(dhd_pub_t *dhd, bool event_buf)
 	dhd_prot_t *prot = dhd->prot;
 	uint16 alloced = 0;
 	unsigned long flags;
-#ifdef CTRLRING_LOGGING
-	ioctl_buf_log_t *logentry = NULL, *logentrytemp = NULL;
-	dll_t *item;
-#endif
+	uint8 buf_type;
 
 	if (dhd->busstate == DHD_BUS_DOWN) {
 		DHD_ERROR(("%s: bus is already down.\n", __FUNCTION__));
@@ -1847,7 +1673,7 @@ dhd_prot_rxbufpost_ctrl(dhd_pub_t *dhd, bool event_buf)
 	if (!event_buf)
 		p = PKTGET_STATIC(dhd->osh, pktsz, FALSE);
 	else
-#endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_IOCTLBUF */
+#endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_EVENTBUF */
 		p = PKTGET(dhd->osh, pktsz, FALSE);
 	if (p == NULL) {
 		DHD_ERROR(("%s:%d: PKTGET for %s rxbuf failed\n",
@@ -1884,8 +1710,11 @@ dhd_prot_rxbufpost_ctrl(dhd_pub_t *dhd, bool event_buf)
 		rxbuf_post->cmn_hdr.msg_type = MSG_TYPE_IOCTLRESP_BUF_POST;
 	rxbuf_post->cmn_hdr.if_id = 0;
 
+	buf_type = ((event_buf == 1) ? BUFF_TYPE_EVENT_RX :
+		BUFF_TYPE_IOCTL_RX);
 	rxbuf_post->cmn_hdr.request_id =
-		htol32(NATIVE_TO_PKTID(dhd->prot->pktid_map_handle, p, physaddr, pktlen, DMA_RX));
+		htol32(NATIVE_TO_PKTID(dhd->prot->pktid_map_handle, p, physaddr,
+		pktlen, DMA_RX, buf_type));
 
 	if (rxbuf_post->cmn_hdr.request_id == DHD_PKTID_INVALID) {
 		if (RING_WRITE_PTR(prot->h2dring_ctrl_subn) == 0)
@@ -1903,42 +1732,6 @@ dhd_prot_rxbufpost_ctrl(dhd_pub_t *dhd, bool event_buf)
 	rxbuf_post->host_buf_addr.high_addr = htol32(PHYSADDRHI(physaddr));
 	rxbuf_post->host_buf_addr.low_addr  = htol32(PHYSADDRLO(physaddr));
 
-#ifdef CTRLRING_LOGGING
-	logentry = kzalloc(sizeof(*logentry), GFP_ATOMIC);
-	if (logentry == NULL)
-		goto skip_logging;
-	logentry->pktid = rxbuf_post->cmn_hdr.request_id;
-	logentry->msg_type = rxbuf_post->cmn_hdr.msg_type;
-	logentry->high_addr = rxbuf_post->host_buf_addr.high_addr;
-	logentry->low_addr = rxbuf_post->host_buf_addr.low_addr;
-	logentry->mbuf = rxbuf_post;
-	logentry->p = PKTDATA(dhd->osh, p);
-	do_gettimeofday(&logentry->tv);
-	if (event_buf) {
-		if (atomic_read(&prot->event_post) > CTRLRING_LOGGING_LIMIT) {
-			item = dll_head_p(&prot->event_post_list);
-			logentrytemp = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log,
-			                                               list);
-			atomic_dec(&prot->event_post);
-			dll_delete(&logentrytemp->list);
-			kfree(logentrytemp);
-		}
-		atomic_inc(&prot->event_post);
-		dll_prepend(&prot->event_post_list, &logentry->list);
-	} else {
-		if (atomic_read(&prot->ioctlresp_post) > CTRLRING_LOGGING_LIMIT) {
-			item = dll_head_p(&prot->ioctlresp_post_list);
-			logentrytemp = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log,
-			                                               list);
-			atomic_dec(&prot->ioctlresp_post);
-			dll_delete(&logentrytemp->list);
-			kfree(logentrytemp);
-		}
-		atomic_inc(&prot->ioctlresp_post);
-		dll_prepend(&prot->ioctlresp_post_list, &logentry->list);
-	}
-skip_logging:
-#endif /* CTRLRING_LOGGING */
 
 	/* Update the write pointer in TCM & ring bell */
 	prot_ring_write_complete(dhd, prot->h2dring_ctrl_subn, rxbuf_post,
@@ -1952,7 +1745,7 @@ free_pkt_return:
 	if (!event_buf)
 		PKTFREE_STATIC(dhd->osh, p, FALSE);
 	else
-#endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_IOCTLBUF */
+#endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_EVENTBUF */
 		PKTFREE(dhd->osh, p, FALSE);
 
 	return -1;
@@ -2290,12 +2083,6 @@ static void
 dhd_prot_ioctack_process(dhd_pub_t *dhd, void * buf, uint16 msglen)
 {
 	ioctl_req_ack_msg_t * ioct_ack = (ioctl_req_ack_msg_t *)buf;
-#ifdef CTRLRING_LOGGING
-	ioctl_buf_log_t *logentry = NULL, *logentrytemp = NULL;
-	unsigned long flags;
-	dhd_prot_t *prot = dhd->prot;
-	dll_t *item;
-#endif
 
 	DHD_CTL(("ioctl req ack: request_id %d, status 0x%04x, flow ring %d \n",
 		ioct_ack->cmn_hdr.request_id, ioct_ack->compl_hdr.status,
@@ -2303,26 +2090,6 @@ dhd_prot_ioctack_process(dhd_pub_t *dhd, void * buf, uint16 msglen)
 	if (ioct_ack->compl_hdr.status != 0)  {
 		DHD_ERROR(("got an error status for the ioctl request...need to handle that\n"));
 	}
-#ifdef CTRLRING_LOGGING
-	DHD_GENERAL_LOCK(dhd, flags);
-	logentry = kzalloc(sizeof(*logentry), GFP_ATOMIC);
-	if (logentry == NULL)
-		goto skip_logging;
-	logentry->pktid = ioct_ack->cmn_hdr.request_id;
-	logentry->msg_type = ioct_ack->cmn_hdr.msg_type;
-	do_gettimeofday(&logentry->tv);
-	if (atomic_read(&prot->ioctlack_cmpl) > CTRLRING_LOGGING_LIMIT) {
-		item = dll_head_p(&prot->ioctlack_cmpl_list);
-		logentrytemp = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log, list);
-		atomic_dec(&prot->ioctlack_cmpl);
-		dll_delete(&logentrytemp->list);
-		kfree(logentrytemp);
-	}
-	atomic_inc(&prot->ioctlack_cmpl);
-	dll_prepend(&prot->ioctlack_cmpl_list, &logentry->list);
-skip_logging:
-	DHD_GENERAL_UNLOCK(dhd, flags);
-#endif /* CTRLRING_LOGGING */
 
 #if defined(PCIE_D2H_SYNC_BZERO)
 	memset(buf, 0, msglen);
@@ -2336,41 +2103,11 @@ dhd_prot_ioctcmplt_process(dhd_pub_t *dhd, void * buf, uint16 msglen)
 	uint32 resp_len = 0;
 	uint32 pkt_id, xt_id;
 	ioctl_comp_resp_msg_t * ioct_resp = (ioctl_comp_resp_msg_t *)buf;
-#ifdef CTRLRING_LOGGING
-	ioctl_buf_log_t *logentry = NULL, *logentrytemp = NULL;
-	unsigned long flags;
-	dhd_pktid_map_t *map = dhd->prot->pktid_map_handle;
-	dll_t *item;
-#endif
 
 	resp_len = ltoh16(ioct_resp->resp_len);
 	xt_id = ltoh16(ioct_resp->trans_id);
 	pkt_id = ltoh32(ioct_resp->cmn_hdr.request_id);
 	status = ioct_resp->compl_hdr.status;
-#ifdef CTRLRING_LOGGING
-	DHD_GENERAL_LOCK(dhd, flags);
-	logentry = kzalloc(sizeof(*logentry), GFP_ATOMIC);
-	if (logentry == NULL)
-		goto skip_logging;
-	logentry->pktid = ioct_resp->cmn_hdr.request_id;
-	logentry->msg_type = ioct_resp->cmn_hdr.msg_type;
-	logentry->high_addr = PHYSADDRHI(map->lockers[pkt_id].physaddr);
-	logentry->low_addr = PHYSADDRLO(map->lockers[pkt_id].physaddr);
-	logentry->mbuf = buf;
-	logentry->p = buf;
-	do_gettimeofday(&logentry->tv);
-	if (atomic_read(&dhd->prot->ioctlresp_cmpl) > CTRLRING_LOGGING_LIMIT) {
-		item = dll_head_p(&dhd->prot->ioctlresp_cmpl_list);
-		logentrytemp = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log, list);
-		atomic_dec(&dhd->prot->ioctlresp_cmpl);
-		dll_delete(&logentrytemp->list);
-		kfree(logentrytemp);
-	}
-	atomic_inc(&dhd->prot->ioctlresp_cmpl);
-	dll_prepend(&dhd->prot->ioctlresp_cmpl_list, &logentry->list);
-skip_logging:
-	DHD_GENERAL_UNLOCK(dhd, flags);
-#endif /* CTRLRING_LOGGING */
 
 #if defined(PCIE_D2H_SYNC_BZERO)
 	memset(buf, 0, msglen);
@@ -2405,7 +2142,7 @@ dhd_prot_txstatus_process(dhd_pub_t *dhd, void * buf, uint16 msglen)
 		DHD_ERROR(("Extra packets are freed\n"));
 
 	ASSERT(pktid != 0);
-	pkt = dhd_prot_packet_get(dhd, pktid);
+	pkt = dhd_prot_packet_get(dhd, pktid, BUFF_TYPE_DATA_TX);
 	if (pkt) {
 #if defined(BCMPCIE)
 		dhd_txcomplete(dhd, pkt, true);
@@ -2447,11 +2184,6 @@ dhd_prot_event_process(dhd_pub_t *dhd, void* buf, uint16 len)
 	dhd_prot_t *prot = dhd->prot;
 	int post_cnt = 0;
 	bool zero_posted = FALSE;
-#ifdef CTRLRING_LOGGING
-	ioctl_buf_log_t *logentry = NULL, *logentrytemp = NULL;
-	dhd_pktid_map_t *map = dhd->prot->pktid_map_handle;
-	dll_t *item;
-#endif
 
 	/* Event complete header */
 	evnt = (wlevent_req_msg_t *)buf;
@@ -2478,30 +2210,8 @@ dhd_prot_event_process(dhd_pub_t *dhd, void* buf, uint16 len)
 
 	/* locks required to protect pktid_map */
 	DHD_GENERAL_LOCK(dhd, flags);
-	pkt = dhd_prot_packet_get(dhd, ltoh32(bufid));
+	pkt = dhd_prot_packet_get(dhd, ltoh32(bufid), BUFF_TYPE_EVENT_RX);
 
-#ifdef CTRLRING_LOGGING
-	logentry = kzalloc(sizeof(*logentry), GFP_ATOMIC);
-	if (logentry == NULL)
-		goto skip_logging;
-	logentry->pktid = bufid;
-	logentry->msg_type = evnt->cmn_hdr.msg_type;
-	logentry->high_addr = PHYSADDRHI(map->lockers[bufid].physaddr);
-	logentry->low_addr = PHYSADDRLO(map->lockers[bufid].physaddr);
-	logentry->mbuf = buf;
-	logentry->p = pkt;
-	do_gettimeofday(&logentry->tv);
-	if (atomic_read(&prot->event_cmpl) > CTRLRING_LOGGING_LIMIT) {
-		item = dll_head_p(&prot->event_cmpl_list);
-		logentrytemp = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log, list);
-		atomic_dec(&prot->event_cmpl);
-		dll_delete(&logentrytemp->list);
-		kfree(logentrytemp);
-	}
-	atomic_inc(&prot->event_cmpl);
-	dll_prepend(&prot->event_cmpl_list, &logentry->list);
-skip_logging:
-#endif /* CTRLRING_LOGGING */
 	DHD_GENERAL_UNLOCK(dhd, flags);
 
 	if (!pkt) {
@@ -2513,7 +2223,6 @@ skip_logging:
 	if (dhd->prot->rx_dataoffset)
 		PKTPULL(dhd->osh, pkt, dhd->prot->rx_dataoffset);
 
-	ASSERT(buflen <= DHD_FLOWRING_RX_BUFPOST_PKTSZ);
 	PKTSETLEN(dhd->osh, pkt, buflen);
 
 	dhd_bus_rx_frame(dhd->bus, pkt, ifidx, 1);
@@ -2539,7 +2248,8 @@ dhd_prot_rxcmplt_process(dhd_pub_t *dhd, void* buf, uint16 msglen)
 	data_offset = ltoh16(rxcmplt_h->data_offset);
 
 	DHD_GENERAL_LOCK(dhd, flags);
-	pkt = dhd_prot_packet_get(dhd, ltoh32(rxcmplt_h->cmn_hdr.request_id));
+	pkt = dhd_prot_packet_get(dhd, ltoh32(rxcmplt_h->cmn_hdr.request_id),
+		BUFF_TYPE_DATA_RX);
 	DHD_GENERAL_UNLOCK(dhd, flags);
 
 	if (!pkt) {
@@ -2677,9 +2387,11 @@ dhd_prot_txdata(dhd_pub_t *dhd, void *PKTBUF, uint8 ifidx)
 			__FUNCTION__, __LINE__, prot->active_tx_count));
 		/* Free up the PKTID */
 		PKTID_TO_NATIVE(dhd->prot->pktid_map_handle, pktid, physaddr,
-			pktlen);
+			pktlen, BUFF_TYPE_NO_CHECK);
 		goto err_no_res_pktfree;
 	}
+
+	/* test if dhcp pkt */
 
 	/* Extract the data pointer and length information */
 	pktdata = PKTDATA(dhd->osh, PKTBUF);
@@ -2701,7 +2413,7 @@ dhd_prot_txdata(dhd_pub_t *dhd, void *PKTBUF, uint8 ifidx)
 
 	/* No need to lock. Save the rest of the packet's metadata */
 	NATIVE_TO_PKTID_SAVE(dhd->prot->pktid_map_handle, PKTBUF, pktid,
-	                     physaddr, pktlen, DMA_TX);
+	                     physaddr, pktlen, DMA_TX, BUFF_TYPE_DATA_TX);
 
 #ifdef TXP_FLUSH_NITEMS
 	if (msg_ring->pend_items_count == 0)
@@ -2917,10 +2629,12 @@ int dhd_prot_ioctl(dhd_pub_t *dhd, int ifidx, wl_ioctl_t * ioc, void * buf, int 
 			ioc->used = ret;
 	}
 	/* Too many programs assume ioctl() returns 0 on success */
-	if (ret >= 0)
+	if (ret >= 0) {
 		ret = 0;
-	else {
+	} else {
+#ifndef CUSTOMER_HW4
 		DHD_ERROR(("%s: status ret value is %d \n", __FUNCTION__, ret));
+#endif /* CUSTOMER_HW4 */
 		dhd->dongle_error = ret;
 	}
 
@@ -3219,7 +2933,8 @@ dhdmsgbuf_cmplt(dhd_pub_t *dhd, uint32 id, uint32 len, void* buf, void* retbuf)
 		ioct_resp.cmn_hdr.request_id));
 	if (ioct_resp.resp_len != 0) {
 		DHD_GENERAL_LOCK(dhd, flags);
-		pkt = dhd_prot_packet_get(dhd, ioct_resp.cmn_hdr.request_id);
+		pkt = dhd_prot_packet_get(dhd, ioct_resp.cmn_hdr.request_id,
+			BUFF_TYPE_IOCTL_RX);
 		DHD_GENERAL_UNLOCK(dhd, flags);
 
 		DHD_INFO(("ioctl ret buf %p retlen %d status %x \n", pkt, retlen,
@@ -3240,9 +2955,11 @@ dhdmsgbuf_cmplt(dhd_pub_t *dhd, uint32 id, uint32 len, void* buf, void* retbuf)
 	} else {
 		DHD_GENERAL_LOCK(dhd, flags);
 #if defined(CONFIG_DHD_USE_STATIC_BUF) && defined(DHD_USE_STATIC_IOCTLBUF)
-		dhd_prot_static_packet_free(dhd, ioct_resp.cmn_hdr.request_id);
+		dhd_prot_static_packet_free(dhd, ioct_resp.cmn_hdr.request_id,
+			BUFF_TYPE_IOCTL_RX);
 #else
-		dhd_prot_packet_free(dhd, ioct_resp.cmn_hdr.request_id);
+		dhd_prot_packet_free(dhd, ioct_resp.cmn_hdr.request_id,
+			BUFF_TYPE_IOCTL_RX);
 #endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_IOCTLBUF */
 		DHD_GENERAL_UNLOCK(dhd, flags);
 	}
@@ -3408,9 +3125,6 @@ dhd_prot_dump_kernel_crash(dhd_pub_t *dhd)
 	if (prot->d2hring_rx_cpln)
 		dump_ring(dhd, prot->d2hring_rx_cpln);
 
-#ifdef CTRLRING_LOGGING
-	dhd_msgbuf_ctrlring_logging(prot);
-#endif
 }
 #endif /* DHD_DEBUG_PAGEALLOC */
 
@@ -3511,10 +3225,6 @@ dhd_fillup_ioct_reqst_ptrbased(dhd_pub_t *dhd, uint16 len, uint cmd, void* buf, 
 	uint16  rqstlen, resplen;
 	unsigned long flags;
 	uint16 alloced = 0;
-#ifdef CTRLRING_LOGGING
-	ioctl_buf_log_t *logentry = NULL, *logentrytemp = NULL;
-	dll_t *item;
-#endif
 
 	rqstlen = len;
 	resplen = len;
@@ -3550,28 +3260,6 @@ dhd_fillup_ioct_reqst_ptrbased(dhd_pub_t *dhd, uint16 len, uint cmd, void* buf, 
 	ioct_rqst->host_input_buf_addr.high = htol32(PHYSADDRHI(prot->ioctbuf.pa));
 	ioct_rqst->host_input_buf_addr.low = htol32(PHYSADDRLO(prot->ioctbuf.pa));
 
-#ifdef CTRLRING_LOGGING
-	logentry = kzalloc(sizeof(*logentry), GFP_ATOMIC);
-	if (logentry == NULL)
-		goto skip_logging;
-	logentry->pktid = ioct_rqst->cmn_hdr.request_id;
-	logentry->msg_type = MSG_TYPE_IOCTLPTR_REQ;
-	logentry->high_addr = ioct_rqst->host_input_buf_addr.high_addr;
-	logentry->low_addr = ioct_rqst->host_input_buf_addr.low_addr;
-	logentry->mbuf = ioct_rqst;
-	logentry->p = ioct_rqst;
-	do_gettimeofday(&logentry->tv);
-	if (atomic_read(&prot->ioctl_post) > CTRLRING_LOGGING_LIMIT) {
-		item = dll_head_p(&prot->ioctl_post_list);
-		logentrytemp = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log, list);
-		atomic_dec(&prot->ioctl_post);
-		dll_delete(&logentrytemp->list);
-		kfree(logentrytemp);
-	}
-	atomic_inc(&prot->ioctl_post);
-	dll_prepend(&prot->ioctl_post_list, &logentry->list);
-skip_logging:
-#endif /* CTRLRING_LOGGING */
 	/* copy ioct payload */
 	ioct_buf = (void *) prot->ioctbuf.va;
 
@@ -3764,13 +3452,6 @@ prot_ring_attach(dhd_prot_t * prot, char* name, uint16 max_item, uint16 len_item
 	size = max_item * len_item;
 
 	/* Ring Memmory allocation */
-#if defined(CONFIG_DHD_USE_STATIC_BUF) && defined(DHD_USE_STATIC_FLOWRING)
-	if (RING_IS_FLOWRING(ring)) {
-		ring->ring_base.va = DMA_ALLOC_CONSISTENT_STATIC(prot->osh,
-			size, DMA_ALIGN_LEN, &alloced, &ring->ring_base.pa,
-			&ring->ring_base.dmah, ringid);
-	} else
-#endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_FLOWRING */
 	ring->ring_base.va = DMA_ALLOC_CONSISTENT(prot->osh, size, DMA_ALIGN_LEN,
 		&alloced, &ring->ring_base.pa, &ring->ring_base.dmah);
 
@@ -3853,12 +3534,6 @@ dhd_prot_ring_detach(dhd_pub_t *dhd, msgbuf_ring_t * ring)
 	size = ring->ringmem->max_item * ring->ringmem->len_items;
 	/* Free up ring */
 	if (ring->ring_base.va) {
-#if defined(CONFIG_DHD_USE_STATIC_BUF) && defined(DHD_USE_STATIC_FLOWRING)
-		if (RING_IS_FLOWRING(ring)) {
-			DMA_FREE_CONSISTENT_STATIC(prot->osh, ring->ring_base.va, size,
-				ring->ring_base.pa, ring->ring_base.dmah, ring->idx);
-		} else
-#endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_FLOWRING */
 		DMA_FREE_CONSISTENT(prot->osh, ring->ring_base.va, size, ring->ring_base.pa,
 			ring->ring_base.dmah);
 		ring->ring_base.va = NULL;
@@ -4196,12 +3871,7 @@ dhd_prot_flow_ring_create(dhd_pub_t *dhd, flow_ring_node_t *flow_ring_node)
 	uint16 hdrlen = sizeof(tx_flowring_create_request_t);
 	uint16 msglen = hdrlen;
 	unsigned long flags;
-	char eabuf[ETHER_ADDR_STR_LEN];
 	uint16 alloced = 0;
-#ifdef CTRLRING_LOGGING
-	ioctl_buf_log_t *logentry = NULL, *logentrytemp = NULL;
-	dll_t *item;
-#endif
 
 	if (!(msgbuf_flow_info = prot_ring_attach(prot, "h2dflr",
 		H2DRING_TXPOST_MAX_ITEM, H2DRING_TXPOST_ITEMSIZE,
@@ -4243,27 +3913,10 @@ dhd_prot_flow_ring_create(dhd_pub_t *dhd, flow_ring_node_t *flow_ring_node)
 	flow_create_rqst->flow_ring_ptr.high_addr = msgbuf_flow_info->ringmem->base_addr.high_addr;
 	flow_create_rqst->max_items = htol16(H2DRING_TXPOST_MAX_ITEM);
 	flow_create_rqst->len_item = htol16(H2DRING_TXPOST_ITEMSIZE);
-	bcm_ether_ntoa((struct ether_addr *)flow_ring_node->flow_info.da, eabuf);
-#ifdef CTRLRING_LOGGING
-	logentry = kzalloc(sizeof(*logentry), GFP_ATOMIC);
-	if (logentry == NULL)
-		goto skip_logging;
-	logentry->msg_type = MSG_TYPE_FLOW_RING_CREATE;
-	do_gettimeofday(&logentry->tv);
-	if (atomic_read(&prot->ioctl_post) > CTRLRING_LOGGING_LIMIT) {
-		item = dll_head_p(&prot->ioctl_post_list);
-		logentrytemp = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log, list);
-		atomic_dec(&prot->ioctl_post);
-		dll_delete(&logentrytemp->list);
-		kfree(logentrytemp);
-	}
-	atomic_inc(&prot->ioctl_post);
-	dll_prepend(&prot->ioctl_post_list, &logentry->list);
-skip_logging:
-#endif /* CTRLRING_LOGGING */
 
-	DHD_ERROR(("%s Send Flow create Req msglen flow ID %d for peer %s prio %d ifindex %d\n",
-		__FUNCTION__, flow_ring_node->flowid, eabuf, flow_ring_node->flow_info.tid,
+	DHD_ERROR(("%s Send Flow create Req msglen flow ID %d for peer " MACDBG
+		" prio %d ifindex %d\n", __FUNCTION__, flow_ring_node->flowid,
+		MAC2STRDBG(flow_ring_node->flow_info.da), flow_ring_node->flow_info.tid,
 		flow_ring_node->flow_info.ifindex));
 
 	/* upd wrt ptr and raise interrupt */
@@ -4342,12 +3995,7 @@ dhd_prot_flow_ring_delete(dhd_pub_t *dhd, flow_ring_node_t *flow_ring_node)
 	dhd_prot_t *prot = dhd->prot;
 	uint16 msglen = sizeof(tx_flowring_delete_request_t);
 	unsigned long flags;
-	char eabuf[ETHER_ADDR_STR_LEN];
 	uint16 alloced = 0;
-#ifdef CTRLRING_LOGGING
-	ioctl_buf_log_t *logentry = NULL, *logentrytemp = NULL;
-	dll_t *item;
-#endif
 
 	/* align it to 4 bytes, so that all start addr form cbuf is 4 byte aligned */
 	msglen = align(msglen, DMA_ALIGN_LEN);
@@ -4372,28 +4020,10 @@ dhd_prot_flow_ring_delete(dhd_pub_t *dhd, flow_ring_node_t *flow_ring_node)
 	flow_delete_rqst->flow_ring_id = htol16((uint16)flow_ring_node->flowid);
 	flow_delete_rqst->reason = htol16(BCME_OK);
 
-	bcm_ether_ntoa((struct ether_addr *)flow_ring_node->flow_info.da, eabuf);
-#ifdef CTRLRING_LOGGING
-	logentry = kzalloc(sizeof(*logentry), GFP_ATOMIC);
-	if (logentry == NULL)
-		goto skip_logging;
-	logentry->msg_type = MSG_TYPE_FLOW_RING_DELETE;
-	do_gettimeofday(&logentry->tv);
-	if (atomic_read(&prot->ioctl_post) > CTRLRING_LOGGING_LIMIT) {
-		item = dll_head_p(&prot->ioctl_post_list);
-		logentrytemp = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log, list);
-		atomic_dec(&prot->ioctl_post);
-		dll_delete(&logentrytemp->list);
-		kfree(logentrytemp);
-	}
-	atomic_inc(&prot->ioctl_post);
-	dll_prepend(&prot->ioctl_post_list, &logentry->list);
-skip_logging:
-#endif /* CTRLRING_LOGGING */
 
-	DHD_ERROR(("%s sending FLOW RING ID %d for peer %s prio %d ifindex %d"
-		" Delete req msglen %d\n", __FUNCTION__,
-		flow_ring_node->flowid, eabuf, flow_ring_node->flow_info.tid,
+	DHD_ERROR(("%s sending FLOW RING ID %d for peer " MACDBG " prio %d ifindex %d"
+		" Delete req msglen %d\n", __FUNCTION__, flow_ring_node->flowid,
+		MAC2STRDBG(flow_ring_node->flow_info.da), flow_ring_node->flow_info.tid,
 		flow_ring_node->flow_info.ifindex, msglen));
 
 	/* upd wrt ptr and raise interrupt */
@@ -4424,10 +4054,6 @@ dhd_prot_flow_ring_flush(dhd_pub_t *dhd, flow_ring_node_t *flow_ring_node)
 	uint16 msglen = sizeof(tx_flowring_flush_request_t);
 	unsigned long flags;
 	uint16 alloced = 0;
-#ifdef CTRLRING_LOGGING
-	ioctl_buf_log_t *logentry = NULL, *logentrytemp = NULL;
-	dll_t *item;
-#endif
 
 	/* align it to 4 bytes, so that all start addr form cbuf is 4 byte aligned */
 	msglen = align(msglen, DMA_ALIGN_LEN);
@@ -4450,23 +4076,6 @@ dhd_prot_flow_ring_flush(dhd_pub_t *dhd, flow_ring_node_t *flow_ring_node)
 	flow_flush_rqst->flow_ring_id = htol16((uint16)flow_ring_node->flowid);
 	flow_flush_rqst->reason = htol16(BCME_OK);
 
-#ifdef CTRLRING_LOGGING
-	logentry = kzalloc(sizeof(*logentry), GFP_ATOMIC);
-	if (logentry == NULL)
-		goto skip_logging;
-	logentry->msg_type = MSG_TYPE_FLOW_RING_FLUSH;
-	do_gettimeofday(&logentry->tv);
-	if (atomic_read(&prot->ioctl_post) > CTRLRING_LOGGING_LIMIT) {
-		item = dll_head_p(&prot->ioctl_post_list);
-		logentrytemp = (ioctl_buf_log_t *)container_of(item, struct ioctl_buf_log, list);
-		atomic_dec(&prot->ioctl_post);
-		dll_delete(&logentrytemp->list);
-		kfree(logentrytemp);
-	}
-	atomic_inc(&prot->ioctl_post);
-	dll_prepend(&prot->ioctl_post_list, &logentry->list);
-skip_logging:
-#endif /* CTRLRING_LOGGING */
 	DHD_INFO(("%s sending FLOW RING Flush req msglen %d \n", __FUNCTION__, msglen));
 
 	/* upd wrt ptr and raise interrupt */

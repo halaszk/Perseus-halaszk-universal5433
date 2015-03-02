@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_pcie.c 505859 2014-10-01 11:22:53Z $
+ * $Id: dhd_pcie.c 503125 2014-09-17 11:56:12Z $
  */
 
 
@@ -581,7 +581,6 @@ dhpcie_bus_mask_interrupt(dhd_bus_t *bus)
 void
 dhdpcie_bus_intr_enable(dhd_bus_t *bus)
 {
-	uint mbmask = 0, pciectrl = 0, cfgreg = 0, retry = 0;
 	DHD_TRACE(("enable interrupts\n"));
 
 	if (!bus || !bus->sih)
@@ -592,27 +591,8 @@ dhdpcie_bus_intr_enable(dhd_bus_t *bus)
 		dhpcie_bus_unmask_interrupt(bus);
 	}
 	else if (bus->sih) {
-		mbmask = si_corereg(bus->sih, bus->sih->buscoreidx, PCIMailBoxMask,
+		si_corereg(bus->sih, bus->sih->buscoreidx, PCIMailBoxMask,
 			bus->def_intmask, bus->def_intmask);
-		/* For updating PCIMailBoxMask with retry if it is not updated */
-		while (!mbmask) {
-			DHD_ERROR(("%s : PCIMailBoxMask[0x%x] is not updated retrying \n",
-				__FUNCTION__, mbmask));
-			OSL_DELAY(10);
-			mbmask = si_corereg(bus->sih, bus->sih->buscoreidx, PCIMailBoxMask,
-				bus->def_intmask, bus->def_intmask);
-			if (++retry >= MAX_SET_MB_MASK) {
-				/* Read PCIEContol */
-				pciectrl = si_corereg(bus->sih, bus->sih->buscoreidx, 0x0,
-					bus->def_intmask, bus->def_intmask);
-				/* Read Vendor ID and Device ID */
-				cfgreg = dhdpcie_bus_cfg_read_dword(bus, 0x0, 4);
-				DHD_ERROR(("%s PCIMailBoxMask is not updated "
-					"PCIMailBoxMask[%x], PCIEControl[%x], Conf. Reg [%8x]",
-					__FUNCTION__, mbmask, pciectrl, cfgreg));
-				break;
-			}
-		}
 	}
 }
 
@@ -802,6 +782,7 @@ void dhd_bus_stop(struct dhd_bus *bus, bool enforce_mutex)
 
 	/* Clear rx control and wake any waiters */
 	bus->rxlen = 0;
+	dhd_os_set_ioctl_resp_timeout(IOCTL_DISABLE_TIMEOUT);
 	dhd_os_ioctl_resp_wake(bus->dhd);
 
 done:
@@ -1846,7 +1827,9 @@ dhd_bus_schedule_queue(struct dhd_bus  *bus, uint16 flow_id, bool txs)
 			PKTORPHAN(txp);
 
 #ifdef DHDTCPACK_SUPPRESS
-		dhd_tcpack_check_xmit(bus->dhd, txp);
+		if (bus->dhd->tcpack_sup_mode != TCPACK_SUP_HOLD) {
+			dhd_tcpack_check_xmit(bus->dhd, txp);
+		}
 #endif /* DHDTCPACK_SUPPRESS */
 			/* Attempt to transfer packet over flow ring */
 
@@ -1902,16 +1885,6 @@ dhd_bus_txdata(struct dhd_bus *bus, void *txp, uint8 ifidx)
 				__FUNCTION__, flowid, flow_ring_node->status,
 				flow_ring_node->active));
 			ret = BCME_ERROR;
-			if (flow_ring_node->pending_cnt > MAX_PENDING_CNT) {
-				struct net_device *net = NULL;
-				flow_ring_node->pending_cnt = 0;
-				DHD_ERROR(("%s: send hang for pendig flowid %d\n",
-					__FUNCTION__, flowid));
-				net = dhd_idx2net(bus->dhd, ifidx);
-				net_os_send_hang_message(net);
-			} else {
-				flow_ring_node->pending_cnt++;
-			}
 			goto toss;
 		}
 
@@ -2858,7 +2831,7 @@ dhdpcie_bus_doiovar(dhd_bus_t *bus, const bcm_iovar_t *vi, uint32 actionid, cons
 			int_val);
 		int_val = si_corereg(bus->sih, bus->sih->buscoreidx,
 			OFFSETOF(sbpcieregs_t, configdata), 0, 0);
-		bcopy(&int_val, arg, val_size);
+		bcopy(&int_val, arg, sizeof(int_val));
 		break;
 
 	case IOV_GVAL(IOV_BAR0_SECWIN_REG):
@@ -2959,7 +2932,7 @@ dhdpcie_bus_doiovar(dhd_bus_t *bus, const bcm_iovar_t *vi, uint32 actionid, cons
 		break;
 	case IOV_GVAL(IOV_PCIECOREREG):
 		int_val = si_corereg(bus->sih, bus->sih->buscoreidx, int_val, 0, 0);
-		bcopy(&int_val, arg, val_size);
+		bcopy(&int_val, arg, sizeof(int_val));
 		break;
 
 	case IOV_SVAL(IOV_PCIECFGREG):
@@ -2968,7 +2941,7 @@ dhdpcie_bus_doiovar(dhd_bus_t *bus, const bcm_iovar_t *vi, uint32 actionid, cons
 
 	case IOV_GVAL(IOV_PCIECFGREG):
 		int_val = OSL_PCI_READ_CONFIG(bus->osh, int_val, 4);
-		bcopy(&int_val, arg, val_size);
+		bcopy(&int_val, arg, sizeof(int_val));
 		break;
 
 	case IOV_SVAL(IOV_PCIE_LPBK):
@@ -3149,7 +3122,7 @@ dhdpcie_bus_doiovar(dhd_bus_t *bus, const bcm_iovar_t *vi, uint32 actionid, cons
 		d2h_support = DMA_INDX_ENAB(bus->dhd->dma_d2h_ring_upd_support) ? 1 : 0;
 		h2d_support = DMA_INDX_ENAB(bus->dhd->dma_h2d_ring_upd_support) ? 1 : 0;
 		int_val = d2h_support | (h2d_support << 1);
-		bcopy(&int_val, arg, val_size);
+		bcopy(&int_val, arg, sizeof(int_val));
 		break;
 	}
 	case IOV_SVAL(IOV_DMA_RINGINDICES):
@@ -3291,6 +3264,7 @@ dhdpcie_bus_suspend(struct  dhd_bus *bus, bool state)
 
 	int timeleft;
 	bool pending;
+	unsigned long flags;
 	int rc = 0;
 
 	if (bus->dhd == NULL) {
@@ -3301,10 +3275,13 @@ dhdpcie_bus_suspend(struct  dhd_bus *bus, bool state)
 		DHD_ERROR(("prot is not inited\n"));
 		return BCME_ERROR;
 	}
+	DHD_GENERAL_LOCK(bus->dhd, flags);
 	if (bus->dhd->busstate != DHD_BUS_DATA && bus->dhd->busstate != DHD_BUS_SUSPEND) {
 		DHD_ERROR(("not in a readystate to LPBK  is not inited\n"));
+		DHD_GENERAL_UNLOCK(bus->dhd, flags);
 		return BCME_ERROR;
 	}
+	DHD_GENERAL_UNLOCK(bus->dhd, flags);
 	if (bus->dhd->dongle_reset)
 		return -EIO;
 
@@ -3314,7 +3291,16 @@ dhdpcie_bus_suspend(struct  dhd_bus *bus, bool state)
 	if (state) {
 		bus->wait_for_d3_ack = 0;
 		bus->suspended = TRUE;
+		DHD_GENERAL_LOCK(bus->dhd, flags);
 		bus->dhd->busstate = DHD_BUS_SUSPEND;
+		if (bus->dhd->tx_in_progress) {
+			DHD_ERROR(("Tx Request is not ended\n"));
+			bus->dhd->busstate = DHD_BUS_DATA;
+			DHD_GENERAL_UNLOCK(bus->dhd, flags);
+			bus->suspended = FALSE;
+			return -EBUSY;
+		}
+		DHD_GENERAL_UNLOCK(bus->dhd, flags);
 		DHD_OS_WAKE_LOCK_WAIVE(bus->dhd);
 		dhd_os_set_ioctl_resp_timeout(DEFAULT_IOCTL_RESP_TIMEOUT);
 		dhdpcie_send_mb_data(bus, H2D_HOST_D3_INFORM);
@@ -3326,7 +3312,9 @@ dhdpcie_bus_suspend(struct  dhd_bus *bus, bool state)
 			if (!bus->force_suspend && dhd_os_check_wakelock_all(bus->dhd)) {
 				DHD_ERROR(("Suspend failed because of wakelock\n"));
 				bus->suspended = FALSE;
+				DHD_GENERAL_LOCK(bus->dhd, flags);
 				bus->dhd->busstate = DHD_BUS_DATA;
+				DHD_GENERAL_UNLOCK(bus->dhd, flags);
 				rc = BCME_ERROR;
 			} else {
 				dhdpcie_bus_intr_disable(bus);
@@ -3344,7 +3332,9 @@ dhdpcie_bus_suspend(struct  dhd_bus *bus, bool state)
 			}
 #endif /* DHD_DEBUG && CUSTOMER_HW4 */
 			bus->suspended = FALSE;
+			DHD_GENERAL_LOCK(bus->dhd, flags);
 			bus->dhd->busstate = DHD_BUS_DATA;
+			DHD_GENERAL_UNLOCK(bus->dhd, flags);
 			if (bus->dhd->d3ackcnt_timeout >= MAX_CNTL_D3ACK_TIMEOUT) {
 				DHD_ERROR(("%s: Event HANG send up "
 						"due to PCIe linkdown\n", __FUNCTION__));
@@ -3365,7 +3355,9 @@ dhdpcie_bus_suspend(struct  dhd_bus *bus, bool state)
 #endif /* BCMPCIE_OOB_HOST_WAKE */
 		rc = dhdpcie_pci_suspend_resume(bus, state);
 		bus->suspended = FALSE;
+		DHD_GENERAL_LOCK(bus->dhd, flags);
 		bus->dhd->busstate = DHD_BUS_DATA;
+		DHD_GENERAL_UNLOCK(bus->dhd, flags);
 		dhdpcie_bus_intr_enable(bus);
 	}
 	return rc;
@@ -3642,6 +3634,10 @@ int
 dhdpcie_downloadvars(dhd_bus_t *bus, void *arg, int len)
 {
 	int bcmerror = BCME_OK;
+#ifdef KEEP_JP_REGREV
+	char *tmpbuf;
+	uint tmpidx;
+#endif /* KEEP_JP_REGREV */
 
 	DHD_TRACE(("%s: Enter\n", __FUNCTION__));
 
@@ -3668,6 +3664,25 @@ dhdpcie_downloadvars(dhd_bus_t *bus, void *arg, int len)
 
 	/* Copy the passed variables, which should include the terminating double-null */
 	bcopy(arg, bus->vars, bus->varsz);
+#ifdef KEEP_JP_REGREV
+	if (bus->vars != NULL && bus->varsz > 0) {
+		tmpbuf = MALLOCZ(bus->dhd->osh, bus->varsz + 1);
+		if (tmpbuf == NULL) {
+			goto err;
+		}
+		memcpy(tmpbuf, bus->vars, bus->varsz);
+		for (tmpidx = 0; tmpidx < bus->varsz; tmpidx++) {
+			if (tmpbuf[tmpidx] == 0) {
+				tmpbuf[tmpidx] = '\n';
+			}
+		}
+		bus->dhd->vars_ccode[0] = 0;
+		bus->dhd->vars_regrev = 0;
+		sscanf(strstr(tmpbuf, "ccode"), "ccode=%s\n", bus->dhd->vars_ccode);
+		sscanf(strstr(tmpbuf, "regrev"), "regrev=%u\n", &(bus->dhd->vars_regrev));
+		MFREE(bus->dhd->osh, tmpbuf, bus->varsz + 1);
+	}
+#endif /* KEEP_JP_REGREV */
 err:
 	return bcmerror;
 }

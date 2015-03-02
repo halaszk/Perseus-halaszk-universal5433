@@ -197,7 +197,6 @@ void ssp_temp_task(struct work_struct *work) {
 /*************************************************************************/
 /* SSP Debug timer function                                              */
 /*************************************************************************/
-
 int print_mcu_debug(char *pchRcvDataFrame, int *pDataIdx,
 		int iRcvDataFrameLength)
 {
@@ -243,7 +242,6 @@ void sync_sensor_state(struct ssp_data *data)
 	udelay(10);
 
 	for (uSensorCnt = 0; uSensorCnt < SENSOR_MAX; uSensorCnt++) {
-		mutex_lock(&data->enable_mutex);
 		if (atomic_read(&data->aSensorEnable) & (1 << uSensorCnt)) {
 			s32 dMsDelay =
 				get_msdelay(data->adDelayBuf[uSensorCnt]);
@@ -253,7 +251,6 @@ void sync_sensor_state(struct ssp_data *data)
 			send_instruction(data, ADD_SENSOR, uSensorCnt, uBuf, 9);
 			udelay(10);
 		}
-		mutex_unlock(&data->enable_mutex);
 	}
 
 	if (data->bProximityRawEnabled == true) {

@@ -1231,7 +1231,6 @@ static int exynos_pcie_resume_noirq(struct device *dev)
 	writel(readl(g_pcie->gpio_base + 0x8) | (0x3 << 12), g_pcie->gpio_base + 0x8);
 
 	gpio_set_value(g_pcie->perst_gpio, 1);
-	msleep(80);
 	exynos_pcie_host_init(&g_pcie->pp);
 
 	/* setup ATU for cfg/mem outbound */

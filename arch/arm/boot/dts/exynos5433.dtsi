@@ -2043,17 +2043,17 @@
 			throttle_tab_3 {
 				temp = <95>;
 				freq_clip_max = <900000>;
-				freq_clip_max_kfc = <1300000>;
+				freq_clip_max_kfc = <1000000>;
 			};
 			throttle_tab_4 {
 				temp = <100>;
 				freq_clip_max = <800000>;
-				freq_clip_max_kfc = <1200000>;
+				freq_clip_max_kfc = <400000>;
 			};
 			throttle_tab_5 {
 				temp = <110>;
 				freq_clip_max = <800000>;
-				freq_clip_max_kfc = <800000>;
+				freq_clip_max_kfc = <400000>;
 			};
 		};
 	};

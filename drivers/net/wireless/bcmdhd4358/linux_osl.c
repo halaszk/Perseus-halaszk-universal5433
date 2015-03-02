@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: linux_osl.c 505854 2014-10-01 11:03:36Z $
+ * $Id: linux_osl.c 498825 2014-08-26 07:07:51Z $
  */
 
 #define LINUX_PORT
@@ -47,11 +47,6 @@
 #include <linux/fs.h>
 
 
-#if defined(BCMPCIE)
-#if defined(CONFIG_DHD_USE_STATIC_BUF) && defined(DHD_USE_STATIC_FLOWRING)
-#include <bcmpcie.h>
-#endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_FLOWRING */
-#endif /* BCMPCIE */
 
 #define PCI_CFG_RETRY		10
 
@@ -60,9 +55,16 @@
 #define DUMPBUFSZ 1024
 
 #ifdef CONFIG_DHD_USE_STATIC_BUF
+#if defined(BCMPCIE)
 #define DHD_SKB_1PAGE_BUFSIZE	(PAGE_SIZE*1)
 #define DHD_SKB_2PAGE_BUFSIZE	(PAGE_SIZE*2)
 #define DHD_SKB_4PAGE_BUFSIZE	(PAGE_SIZE*4)
+#else
+#define DHD_SKB_HDRSIZE		336
+#define DHD_SKB_1PAGE_BUFSIZE	((PAGE_SIZE*1)-DHD_SKB_HDRSIZE)
+#define DHD_SKB_2PAGE_BUFSIZE	((PAGE_SIZE*2)-DHD_SKB_HDRSIZE)
+#define DHD_SKB_4PAGE_BUFSIZE	((PAGE_SIZE*4)-DHD_SKB_HDRSIZE)
+#endif /* BCMPCIE */
 
 #define STATIC_BUF_MAX_NUM	16
 #define STATIC_BUF_SIZE	(PAGE_SIZE*2)
@@ -89,7 +91,7 @@ static bcm_static_buf_t *bcm_static_buf = 0;
 
 #ifdef BCMPCIE
 #define STATIC_PKT_1PAGE_NUM	0
-#define STATIC_PKT_2PAGE_NUM	16
+#define STATIC_PKT_2PAGE_NUM	64
 #else
 #define STATIC_PKT_1PAGE_NUM	8
 #define STATIC_PKT_2PAGE_NUM	8
@@ -101,34 +103,23 @@ static bcm_static_buf_t *bcm_static_buf = 0;
 	((STATIC_PKT_1_2PAGE_NUM) + (STATIC_PKT_4PAGE_NUM))
 
 typedef struct bcm_static_pkt {
-	struct sk_buff *skb_4k[STATIC_PKT_1PAGE_NUM+1];
+#if defined(BCMPCIE)
 	struct sk_buff *skb_8k[STATIC_PKT_2PAGE_NUM];
-#if !defined(BCMPCIE)
+	spinlock_t osl_pkt_lock;
+#else
+	struct sk_buff *skb_4k[STATIC_PKT_1PAGE_NUM];
+	struct sk_buff *skb_8k[STATIC_PKT_2PAGE_NUM];
 #ifdef ENHANCED_STATIC_BUF
 	struct sk_buff *skb_16k;
 #endif /* ENHANCED_STATIC_BUF */
 	struct semaphore osl_pkt_sem;
-#else
-	spinlock_t osl_pkt_lock;
 #endif /* !BCMPCIE */
 	unsigned char pkt_use[STATIC_PKT_MAX_NUM];
 } bcm_static_pkt_t;
 
 static bcm_static_pkt_t *bcm_static_skb = 0;
 
-#if defined(BCMPCIE) && defined(DHD_USE_STATIC_FLOWRING)
-#define STATIC_BUF_FLOWRING_SIZE	((PAGE_SIZE)*(7))
-#define STATIC_BUF_FLOWRING_NUM		42
-#define RINGID_TO_FLOWID(idx)	((idx) + (BCMPCIE_H2D_COMMON_MSGRINGS) \
-	- (BCMPCIE_H2D_TXFLOWRINGID))
-typedef struct bcm_static_flowring_buf {
-	spinlock_t flowring_lock;
-	void *buf_ptr[STATIC_BUF_FLOWRING_NUM];
-	unsigned char buf_use[STATIC_BUF_FLOWRING_NUM];
-} bcm_static_flowring_buf_t;
 
-bcm_static_flowring_buf_t *bcm_static_flowring = 0;
-#endif /* BCMPCIE && DHD_USE_STATIC_FLOWRING */
 
 void* wifi_platform_prealloc(void *adapter, int section, unsigned long size);
 #endif /* CONFIG_DHD_USE_STATIC_BUF */
@@ -260,16 +251,10 @@ osl_error(int bcmerror)
 	/* Array bounds covered by ASSERT in osl_attach */
 	return linuxbcmerrormap[-bcmerror];
 }
-#ifdef SHARED_OSL_CMN
-osl_t *
-osl_attach(void *pdev, uint bustype, bool pkttag, void **osl_cmn)
-{
-#else
 osl_t *
 osl_attach(void *pdev, uint bustype, bool pkttag)
 {
 	void **osl_cmn = NULL;
-#endif /* SHARED_OSL_CMN */
 	osl_t *osh;
 	gfp_t flags;
 
@@ -377,31 +362,8 @@ int osl_static_mem_init(osl_t *osh, void *adapter)
 #endif /* BCMPCIE */
 	}
 
-#if defined(BCMPCIE) && defined(DHD_USE_STATIC_FLOWRING)
-	if (!bcm_static_flowring && adapter) {
-		int i;
-		void *flowring_ptr = 0;
-		bcm_static_flowring =
-			(bcm_static_flowring_buf_t *)((char *)bcm_static_buf + 4096);
-		flowring_ptr = wifi_platform_prealloc(adapter, 10, 0);
-		if (!flowring_ptr) {
-			printk("%s: flowring_ptr is NULL\n", __FUNCTION__);
-			bcm_static_buf = NULL;
-			bcm_static_skb = NULL;
-			bcm_static_flowring = NULL;
-			ASSERT(osh->magic == OS_HANDLE_MAGIC);
-			return -ENOMEM;
-		}
 
-		bcopy(flowring_ptr, bcm_static_flowring->buf_ptr,
-			sizeof(void *) * STATIC_BUF_FLOWRING_NUM);
-		for (i = 0; i < STATIC_BUF_FLOWRING_NUM; i++) {
-			bcm_static_flowring->buf_use[i] = 0;
-		}
 
-		spin_lock_init(&bcm_static_flowring->flowring_lock);
-	}
-#endif /* BCMPCIE && DHD_USE_STATIC_FLOWRING */
 #endif /* CONFIG_DHD_USE_STATIC_BUF */
 
 	return 0;
@@ -440,11 +402,6 @@ int osl_static_mem_deinit(osl_t *osh, void *adapter)
 	if (bcm_static_skb) {
 		bcm_static_skb = 0;
 	}
-#if defined(BCMPCIE) && defined(DHD_USE_STATIC_FLOWRING)
-	if (bcm_static_flowring) {
-		bcm_static_flowring = 0;
-	}
-#endif /* BCMPCIE && DHD_USE_STATIC_FLOWRING */
 #endif /* CONFIG_DHD_USE_STATIC_BUF */
 	return 0;
 }
@@ -469,13 +426,8 @@ static struct sk_buff *osl_alloc_skb(osl_t *osh, unsigned int len)
 
 #ifdef CTFPOOL
 
-#ifdef CTFPOOL_SPINLOCK
-#define CTFPOOL_LOCK(ctfpool, flags)	spin_lock_irqsave(&(ctfpool)->lock, flags)
-#define CTFPOOL_UNLOCK(ctfpool, flags)	spin_unlock_irqrestore(&(ctfpool)->lock, flags)
-#else
 #define CTFPOOL_LOCK(ctfpool, flags)	spin_lock_bh(&(ctfpool)->lock)
 #define CTFPOOL_UNLOCK(ctfpool, flags)	spin_unlock_bh(&(ctfpool)->lock)
-#endif /* CTFPOOL_SPINLOCK */
 /*
  * Allocate and add an object to packet pool.
  */
@@ -483,9 +435,6 @@ void *
 osl_ctfpool_add(osl_t *osh)
 {
 	struct sk_buff *skb;
-#ifdef CTFPOOL_SPINLOCK
-	unsigned long flags;
-#endif /* CTFPOOL_SPINLOCK */
 
 	if ((osh == NULL) || (osh->ctfpool == NULL))
 		return NULL;
@@ -574,9 +523,6 @@ void
 osl_ctfpool_cleanup(osl_t *osh)
 {
 	struct sk_buff *skb, *nskb;
-#ifdef CTFPOOL_SPINLOCK
-	unsigned long flags;
-#endif /* CTFPOOL_SPINLOCK */
 
 	if ((osh == NULL) || (osh->ctfpool == NULL))
 		return;
@@ -615,11 +561,6 @@ osl_ctfpool_stats(osl_t *osh, void *b)
 	if (bcm_static_skb) {
 		bcm_static_skb = 0;
 	}
-#if defined(BCMPCIE) && defined(DHD_USE_STATIC_FLOWRING)
-	if (bcm_static_flowring) {
-		bcm_static_flowring = 0;
-	}
-#endif /* BCMPCIE && DHD_USE_STATIC_FLOWRING */
 #endif /* CONFIG_DHD_USE_STATIC_BUF */
 
 	bb = b;
@@ -638,9 +579,6 @@ static inline struct sk_buff *
 osl_pktfastget(osl_t *osh, uint len)
 {
 	struct sk_buff *skb;
-#ifdef CTFPOOL_SPINLOCK
-	unsigned long flags;
-#endif /* CTFPOOL_SPINLOCK */
 
 	/* Try to do fast allocate. Return null if ctfpool is not in use
 	 * or if there are no items in the ctfpool.
@@ -696,29 +634,17 @@ osl_pktfastget(osl_t *osh, uint len)
 }
 #endif /* CTFPOOL */
 
-#if defined(BCM_GMAC3)
 /* Account for a packet delivered to downstream forwarder.
  * Decrement a GMAC forwarder interface's pktalloced count.
  */
-void BCMFASTPATH
-osl_pkt_tofwder(osl_t *osh, void *skbs, int skb_cnt)
-{
 
-	atomic_sub(skb_cnt, &osh->cmn->pktalloced);
-}
 
 /* Account for a downstream forwarder delivered packet to a WL/DHD driver.
  * Increment a GMAC forwarder interface's pktalloced count.
  */
-void BCMFASTPATH
-osl_pkt_frmfwder(osl_t *osh, void *skbs, int skb_cnt)
-{
 
 
-	atomic_add(skb_cnt, &osh->cmn->pktalloced);
-}
 
-#endif /* BCM_GMAC3 */
 
 /* Convert a driver packet to native(OS) packet
  * In the process, packettag is zeroed out before sending up
@@ -796,9 +722,6 @@ static inline void
 osl_pktfastfree(osl_t *osh, struct sk_buff *skb)
 {
 	ctfpool_t *ctfpool;
-#ifdef CTFPOOL_SPINLOCK
-	unsigned long flags;
-#endif /* CTFPOOL_SPINLOCK */
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 14)
 	skb->tstamp.tv.sec = 0;
@@ -900,43 +823,26 @@ osl_pktget_static(osl_t *osh, uint len)
 	spin_lock_irqsave(&bcm_static_skb->osl_pkt_lock, flags);
 #else
 	down(&bcm_static_skb->osl_pkt_sem);
-#endif /* BCMPCIE */
 
 	if (len <= DHD_SKB_1PAGE_BUFSIZE) {
-		for (i = 0; i < STATIC_PKT_1PAGE_NUM; i++)
-		{
+		for (i = 0; i < STATIC_PKT_1PAGE_NUM; i++) {
 			if (bcm_static_skb->pkt_use[i] == 0) {
 				break;
 			}
 		}
 
-		if (i != STATIC_PKT_1PAGE_NUM)
-		{
+		if (i != STATIC_PKT_1PAGE_NUM) {
 			bcm_static_skb->pkt_use[i] = 1;
 
 			skb = bcm_static_skb->skb_4k[i];
+			skb->tail = skb->data + len;
 			skb->len = len;
 
-#if defined(BCMPCIE)
-#if defined(__ARM_ARCH_7A__)
-			skb->data = skb->head + NET_SKB_PAD;
-			skb->tail = skb->head + NET_SKB_PAD;
-#else
-			skb->data = skb->head + 16;
-			skb->tail = skb->head + 16;
-#endif /* __ARM_ARCH_7A__ */
-			skb->cloned = 0;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 14)
-			skb->list = NULL;
-#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 14) */
-			spin_unlock_irqrestore(&bcm_static_skb->osl_pkt_lock, flags);
-#else
-			skb->tail = skb->data + len;
 			up(&bcm_static_skb->osl_pkt_sem);
-#endif /* BCMPCIE */
 			return skb;
 		}
 	}
+#endif /* BCMPCIE */
 
 	if (len <= DHD_SKB_2PAGE_BUFSIZE) {
 		for (i = STATIC_PKT_1PAGE_NUM; i < STATIC_PKT_1_2PAGE_NUM; i++) {
@@ -947,6 +853,12 @@ osl_pktget_static(osl_t *osh, uint len)
 		if ((i >= STATIC_PKT_1PAGE_NUM) && (i < STATIC_PKT_1_2PAGE_NUM)) {
 			bcm_static_skb->pkt_use[i] = 1;
 			skb = bcm_static_skb->skb_8k[i - STATIC_PKT_1PAGE_NUM];
+#if defined(BCMPCIE)
+			skb->data = skb->head + NET_SKB_PAD;
+			skb->tail = skb->head + NET_SKB_PAD;
+			skb->cloned = 0;
+			skb->priority = 0;
+#endif /* BCMPCIE */
 			skb->tail = skb->data + len;
 			skb->len = len;
 #if defined(BCMPCIE)
@@ -999,20 +911,15 @@ osl_pktfree_static(osl_t *osh, void *p, bool send)
 	spin_lock_irqsave(&bcm_static_skb->osl_pkt_lock, flags);
 #else
 	down(&bcm_static_skb->osl_pkt_sem);
-#endif /* BCMPCIE */
 
 	for (i = 0; i < STATIC_PKT_1PAGE_NUM; i++) {
 		if (p == bcm_static_skb->skb_4k[i]) {
 			bcm_static_skb->pkt_use[i] = 0;
-#if defined(BCMPCIE)
-			spin_unlock_irqrestore(&bcm_static_skb->osl_pkt_lock, flags);
-#else
 			up(&bcm_static_skb->osl_pkt_sem);
-#endif /* BCMPCIE */
 			return;
 		}
 	}
-
+#endif /* BCMPCIE */
 	for (i = STATIC_PKT_1PAGE_NUM; i < STATIC_PKT_1_2PAGE_NUM; i++) {
 		if (p == bcm_static_skb->skb_8k[i - STATIC_PKT_1PAGE_NUM]) {
 			bcm_static_skb->pkt_use[i] = 0;
@@ -1024,6 +931,7 @@ osl_pktfree_static(osl_t *osh, void *p, bool send)
 			return;
 		}
 	}
+
 #if !defined(BCMPCIE)
 #ifdef ENHANCED_STATIC_BUF
 	if (p == bcm_static_skb->skb_16k) {
@@ -1073,91 +981,25 @@ osl_pktclear_static(osl_t *osh)
 #endif /* BCMPCIE */
 }
 
-#if defined(BCMPCIE) && defined(DHD_USE_STATIC_FLOWRING)
-void*
-osl_dma_alloc_consistent_static(osl_t *osh, uint size, uint16 align_bits,
-	uint *alloced, dmaaddr_t *pap, uint16 idx)
-{
-	void *va = NULL;
-	uint16 align = (1 << align_bits);
-	uint16 flow_id = RINGID_TO_FLOWID(idx);
-	unsigned long flags;
 
-	ASSERT((osh && (osh->magic == OS_HANDLE_MAGIC)));
 
-	if (!ISALIGNED(DMA_CONSISTENT_ALIGN, align))
-		size += align;
 
-	if ((flow_id < 0) || (flow_id >= STATIC_BUF_FLOWRING_NUM)) {
-		printk("%s: flow_id %d is wrong\n", __FUNCTION__, flow_id);
-		return osl_dma_alloc_consistent(osh, size, align_bits,
-			alloced, pap);
-	}
 
-	if (!bcm_static_flowring) {
-		printk("%s: bcm_static_flowring is not initialized\n",
-			__FUNCTION__);
-		return osl_dma_alloc_consistent(osh, size, align_bits,
-			alloced, pap);
-	}
 
-	if (size > STATIC_BUF_FLOWRING_SIZE) {
-		printk("%s: attempt to allocate huge packet, size=%d\n",
-			__FUNCTION__, size);
-		return osl_dma_alloc_consistent(osh, size, align_bits,
-			alloced, pap);
-	}
 
-	*alloced = size;
 
-	spin_lock_irqsave(&bcm_static_flowring->flowring_lock, flags);
-	if (bcm_static_flowring->buf_use[flow_id]) {
-		printk("%s: flowring %d is already alloced\n",
-			__FUNCTION__, flow_id);
-		spin_unlock_irqrestore(&bcm_static_flowring->flowring_lock, flags);
-		return NULL;
-	}
 
-	va = bcm_static_flowring->buf_ptr[flow_id];
-	if (va) {
-		*pap = (ulong)__virt_to_phys((ulong)va);
-		bcm_static_flowring->buf_use[flow_id] = 1;
-	}
-	spin_unlock_irqrestore(&bcm_static_flowring->flowring_lock, flags);
 
-	return va;
-}
 
-void
-osl_dma_free_consistent_static(osl_t *osh, void *va, uint size,
-	dmaaddr_t pa, uint16 idx)
-{
-	uint16 flow_id = RINGID_TO_FLOWID(idx);
-	unsigned long flags;
 
-	ASSERT((osh && (osh->magic == OS_HANDLE_MAGIC)));
 
-	if ((flow_id < 0) || (flow_id >= STATIC_BUF_FLOWRING_NUM)) {
-		printk("%s: flow_id %d is wrong\n", __FUNCTION__, flow_id);
-		return osl_dma_free_consistent(osh, va, size, pa);
-	}
 
-	if (!bcm_static_flowring) {
-		printk("%s: bcm_static_flowring is not initialized\n",
-			__FUNCTION__);
-		return osl_dma_free_consistent(osh, va, size, pa);
-	}
 
-	spin_lock_irqsave(&bcm_static_flowring->flowring_lock, flags);
-	if (bcm_static_flowring->buf_use[flow_id]) {
-		bcm_static_flowring->buf_use[flow_id] = 0;
-	} else {
-		printk("%s: flowring %d is already freed\n",
-			__FUNCTION__, flow_id);
-	}
-	spin_unlock_irqrestore(&bcm_static_flowring->flowring_lock, flags);
-}
-#endif /* BCMPCIE && DHD_USE_STATIC_FLOWRING */
+
+
+
+
+
 #endif /* CONFIG_DHD_USE_STATIC_BUF */
 
 uint32
@@ -1525,12 +1367,7 @@ osl_cache_inv(void *va, uint size)
 
 inline void osl_prefetch(const void *ptr)
 {
-	/* Borrowed from linux/linux-2.6/include/asm-arm/processor.h */
-	__asm__ __volatile__(
-		"pld\t%0"
-		:
-		: "o" (*(char *)ptr)
-		: "cc");
+	__asm__ __volatile__("pld\t%0" :: "o"(*(char *)ptr) : "cc");
 }
 
 int osl_arch_is_coherent(void)

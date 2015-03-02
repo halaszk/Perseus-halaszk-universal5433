@@ -54,8 +54,6 @@
 
 #define DHD_FLOW_PRIO_AC_MAP		0
 #define DHD_FLOW_PRIO_TID_MAP		1
-#define MAX_PENDING_CNT                 5
-
 
 
 /* Pkttag not compatible with PROP_TXSTATUS or WLFC */
@@ -119,7 +117,6 @@ typedef struct flow_ring_node {
 	flow_info_t	flow_info;
 	void		*prot_info;
 	void		*lock; /* OS specific lock handle for Q access protection */
-	uint16		pending_cnt;
 } flow_ring_node_t;
 typedef flow_ring_node_t flow_ring_table_t;
 

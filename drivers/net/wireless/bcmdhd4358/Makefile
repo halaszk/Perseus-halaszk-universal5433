@@ -31,6 +31,8 @@ ifeq ($(BUS_IFACE_SDIO),y)
 	DHDCFLAGS += -DDHD_USE_IDLECOUNT
 	# SKB TAILPAD to avoid out of boundary memory access
 	DHDCFLAGS += -DDHDENABLE_TAILPAD
+	# Enable PROP_TXSTATUS
+	DHDCFLAGS += -DPROP_TXSTATUS
 	DHDCFLAGS += -DSUPPORT_P2P_GO_PS
 endif
 
@@ -49,8 +51,6 @@ ifeq ($(BUS_IFACE_PCIE),y)
 	# Debugging Pagealloc
 #	DHDCFLAGS += -DDHD_DEBUG_PAGEALLOC
 #endif
-	# log both directions control rings
-#	DHDCFLAGS += -DCTRLRING_LOGGING
 endif
 
 
@@ -75,7 +75,6 @@ DHDCFLAGS += -DDHD_8021X_DUMP
 DHDCFLAGS += -DDHD_DHCP_DUMP
 
 # VSDB
-DHDCFLAGS += -DPROP_TXSTATUS
 DHDCFLAGS += -DVSDB
 
 # Wi-Fi Direct
@@ -94,7 +93,6 @@ DHDCFLAGS += -DROAM_AP_ENV_DETECTION
 DHDCFLAGS += -DROAM_ENABLE -DROAM_CHANNEL_CACHE -DROAM_API
 DHDCFLAGS += -DENABLE_FW_ROAM_SUSPEND
 
-DHDCFLAGS += -DDISABLE_ROAM_OFFLOAD
 
 # CCX
 ifeq ($(CONFIG_BRCM_CCX),y)
@@ -165,6 +163,8 @@ DHDCFLAGS += -DCONFIG_HAS_WAKELOCK
 # Used short dwell time during initial scan
 DHDCFLAGS += -DUSE_INITIAL_SHORT_DWELL_TIME
 
+# Japan ccode revision will be fixed by nvram's value
+DHDCFLAGS += -DKEEP_JP_REGREV
 ##############################
 # Android Platform Definition
 ##############################
@@ -205,7 +205,6 @@ ifneq ($(CONFIG_BCM4358),)
 # tput enhancement for common
   DHDCFLAGS += -DUSE_WL_TXBF
   DHDCFLAGS += -DUSE_WL_FRAMEBURST
-  DHDCFLAGS += -DPROP_TXSTATUS_VSDB
   DHDCFLAGS += -DDISABLE_FRAMEBURST_VSDB
   DHDCFLAGS += -DDISABLE_PM_BCNRX
 
@@ -225,6 +224,7 @@ ifeq ($(BUS_IFACE_SDIO),y)
   DHDCFLAGS += -DDHD_FIRSTREAD=128
   DHDCFLAGS += -DCUSTOM_AMPDU_MPDU=16
   DHDCFLAGS += -DDHDTCPACK_SUPPRESS
+  DHDCFLAGS += -DPROP_TXSTATUS_VSDB
 endif
 
 # tput enhancement for PCIE
@@ -271,7 +271,6 @@ ifneq ($(CONFIG_BCM4354),)
 # tput enhancement for common
   DHDCFLAGS += -DUSE_WL_TXBF
   DHDCFLAGS += -DUSE_WL_FRAMEBURST
-  DHDCFLAGS += -DPROP_TXSTATUS_VSDB
 
 # tput enhancement for SDIO
 ifeq ($(BUS_IFACE_SDIO),y)
@@ -289,6 +288,7 @@ ifeq ($(BUS_IFACE_SDIO),y)
   DHDCFLAGS += -DDHD_FIRSTREAD=128
   DHDCFLAGS += -DCUSTOM_AMPDU_MPDU=16
   DHDCFLAGS += -DDHDTCPACK_SUPPRESS
+  DHDCFLAGS += -DPROP_TXSTATUS_VSDB
 endif
 
 # tput enhancement for PCIE
@@ -529,6 +529,7 @@ endif
 
 ifeq ($(CONFIG_OF),y)
 ifneq ($(CONFIG_MACH_UNIVERSAL5433),)
+obj-$(CONFIG_MACH_UNIVERSAL5433) += dhd_custom_exynos.o
 DHDCFLAGS += -DDHD_OF_SUPPORT
 DHDCFLAGS += -DBCMPCIE_OOB_HOST_WAKE
 endif
@@ -563,12 +564,13 @@ DHDOFILES := dhd_pno.o dhd_common.o dhd_ip.o dhd_custom_gpio.o dhd_custom_sec.o 
 	bcmutils.o bcmwifi_channels.o hndpmu.o linux_osl.o sbutils.o siutils.o \
 	wl_android.o wl_cfg80211.o wl_cfgp2p.o wl_cfg_btcoex.o wldev_common.o \
 	wl_linux_mon.o wl_roam.o dhd_linux_platdev.o dhd_linux_wq.o wl_cfg_btcoex.o \
-	dhd_wlfc.o hnd_pktq.o hnd_pktpool.o wl_cfgnan.o bcmxtlv.o
+	hnd_pktq.o hnd_pktpool.o wl_cfgnan.o bcmxtlv.o
 
 
 ifeq ($(BUS_IFACE_SDIO),y)
 DHDOFILES += bcmsdh.o bcmsdh_linux.o bcmsdh_sdmmc.o bcmsdh_sdmmc_linux.o
 DHDOFILES += dhd_cdc.o dhd_sdio.o
+DHDOFILES += dhd_wlfc.o
 endif
 
 ifeq ($(BUS_IFACE_PCIE),y)

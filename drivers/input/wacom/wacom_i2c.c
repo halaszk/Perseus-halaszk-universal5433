@@ -139,7 +139,7 @@ int wacom_power(bool on)
 	struct wacom_g5_platform_data *pdata = wac_i2c->pdata;
 	static bool wacom_power_enabled = false;
 	int ret = 0;
-	struct regulator *regulator_vdd;
+	struct regulator *regulator_vdd = NULL;
 	static struct timeval off_time = {0, 0};
 	struct timeval cur_time = {0, 0};
 
@@ -169,9 +169,10 @@ int wacom_power(bool on)
 	}
 
 	regulator_vdd = regulator_get(NULL, "wacom_3.3v");
-	if (IS_ERR(regulator_vdd)) {
+	if (IS_ERR_OR_NULL(regulator_vdd)) {
 		printk(KERN_ERR"epen: %s reg get err\n", __func__);
-		return PTR_ERR(regulator_vdd);
+		regulator_vdd = NULL;
+		return -EINVAL;
 	}
 
 	if (on) {
@@ -236,7 +237,7 @@ static void wacom_compulsory_flash_mode(bool en)
 #endif
 	if (likely(pdata->boot_on_ldo)) {
 		static bool is_enabled = false;
-		struct regulator *reg_fwe;
+		struct regulator *reg_fwe = NULL;
 		int ret = 0;
 
 		if (is_enabled == en) {
@@ -245,8 +246,9 @@ static void wacom_compulsory_flash_mode(bool en)
 		}
 
 		reg_fwe = regulator_get(NULL, "wacom_fwe_1.8v");
-		if (IS_ERR(reg_fwe)) {
+		if (IS_ERR_OR_NULL(reg_fwe)) {
 			printk(KERN_ERR"epen: %s reg get err\n", __func__);
+			reg_fwe = NULL;
 			return ;
 		}
 

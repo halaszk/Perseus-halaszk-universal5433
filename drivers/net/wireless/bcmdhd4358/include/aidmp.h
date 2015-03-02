@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: aidmp.h 505607 2014-09-30 14:35:08Z $
+ * $Id: aidmp.h 456346 2014-02-18 16:48:52Z $
  */
 
 #ifndef	_AIDMP_H

@@ -162,9 +162,17 @@ static const unsigned char SEQ_PENTILE_CONTROL[] = {
 	0x00, 0x00, 0xD8, 0xD8
 };
 
-static const unsigned char SEQ_POC_SETTING[] = {
+static const unsigned char SEQ_POC_SETTING1[] = {
 	0xC3,
 	0xC0, 0x00, 0x33
+};
+static const unsigned char SEQ_POC_SETTING2[] = {
+	0xB0,
+	0x20
+};
+static const unsigned char SEQ_POC_SETTING3[] = {
+	0xFE,
+	0x08
 };
 
 static const unsigned char SEQ_PCD_SET_OFF[] = {
@@ -191,27 +199,42 @@ static const unsigned char SEQ_TE_START_SETTING[] = {
 	0x10, 0x09, 0xFF, 0x00, 0x09
 };
 
+
+static const unsigned char SEQ_FREQ_MEMCLOCK_SETTING[] = {
+	0xFE,
+	0x20, 0x19, 0x05, 0x00, 0x00, 0x00, 0x00, 0x96, 0x2C, 0x01,
+	0x00, 0x12, 0x22, 0x50, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x0C, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00
+};
+
 static const unsigned char SEQ_FREQ_CALIBRATION_SETTING1[] = {
 	0xFD,
 	0x1C
 };
 
 static const unsigned char SEQ_FREQ_CALIBRATION_SETTING2[] = {
-	0xFE,
-	0x20, 0x39
+	0xF2,
+	0x67, 0x40, 0xC5
 };
 
 static const unsigned char SEQ_FREQ_CALIBRATION_SETTING3[] = {
 	0xFE,
-	0xA0
+	0x20, 0x39
 };
 
 static const unsigned char SEQ_FREQ_CALIBRATION_SETTING4[] = {
 	0xFE,
-	0x20
+	0xA0
 };
 
 static const unsigned char SEQ_FREQ_CALIBRATION_SETTING5[] = {
+	0xFE,
+	0x20
+};
+
+static const unsigned char SEQ_FREQ_CALIBRATION_SETTING6[] = {
 	0xCE,
 	0x03, 0x3B, 0x14, 0x6D,
 	0x40, 0x80, 0xC0, 0x28, 0x28, 0x28, 0x28, 0x39,
@@ -224,7 +247,15 @@ static struct lcd_seq_info SEQ_LDI_FPS_SET[] = {
 	{(u8 *)SEQ_FREQ_CALIBRATION_SETTING3, ARRAY_SIZE(SEQ_FREQ_CALIBRATION_SETTING3), 0},
 	{(u8 *)SEQ_FREQ_CALIBRATION_SETTING4, ARRAY_SIZE(SEQ_FREQ_CALIBRATION_SETTING4), 0},
 	{(u8 *)SEQ_FREQ_CALIBRATION_SETTING5, ARRAY_SIZE(SEQ_FREQ_CALIBRATION_SETTING5), 0},
+	{(u8 *)SEQ_FREQ_CALIBRATION_SETTING6, ARRAY_SIZE(SEQ_FREQ_CALIBRATION_SETTING6), 0},
 };
+
+static struct lcd_seq_info SEQ_POC_SET[] = {
+	{(u8 *)SEQ_POC_SETTING1, ARRAY_SIZE(SEQ_POC_SETTING1), 0},
+	{(u8 *)SEQ_POC_SETTING2, ARRAY_SIZE(SEQ_POC_SETTING2), 0},
+	{(u8 *)SEQ_POC_SETTING3, ARRAY_SIZE(SEQ_POC_SETTING3), 0},
+};
+
 
 enum {
 	HBM_STATUS_OFF,
@@ -330,16 +361,161 @@ static const unsigned char SEQ_NORMAL_MODE_ON[] = {
 };
 
 static struct lcd_seq_info SEQ_ALPM_ON_SET[] = {
-	{(u8 *)SEQ_DISPLAY_OFF, ARRAY_SIZE(SEQ_DISPLAY_OFF), 34},
+	{(u8 *)SEQ_DISPLAY_OFF, ARRAY_SIZE(SEQ_DISPLAY_OFF), 17},
+	{(u8 *)SEQ_TEST_KEY_ON_F0, ARRAY_SIZE(SEQ_TEST_KEY_ON_F0), 0},
 	{(u8 *)SEQ_ALPM2NIT_MODE_ON, ARRAY_SIZE(SEQ_ALPM2NIT_MODE_ON), 0},
+	{(u8 *)SEQ_GAMMA_UPDATE, ARRAY_SIZE(SEQ_GAMMA_UPDATE), 0},
+	{(u8 *)SEQ_GAMMA_UPDATE_L, ARRAY_SIZE(SEQ_GAMMA_UPDATE_L), 0},
+	{(u8 *)SEQ_TEST_KEY_OFF_F0, ARRAY_SIZE(SEQ_TEST_KEY_OFF_F0), 17},
 	{(u8 *)SEQ_DISPLAY_ON, ARRAY_SIZE(SEQ_DISPLAY_ON), 0},
 };
 
 static struct lcd_seq_info SEQ_ALPM_OFF_SET[] = {
-	{(u8 *)SEQ_DISPLAY_OFF, ARRAY_SIZE(SEQ_DISPLAY_OFF), 34},
+	{(u8 *)SEQ_DISPLAY_OFF, ARRAY_SIZE(SEQ_DISPLAY_OFF), 17},
+	{(u8 *)SEQ_TEST_KEY_ON_F0, ARRAY_SIZE(SEQ_TEST_KEY_ON_F0), 0},
 	{(u8 *)SEQ_NORMAL_MODE_ON, ARRAY_SIZE(SEQ_NORMAL_MODE_ON), 0},
+	{(u8 *)SEQ_GAMMA_UPDATE, ARRAY_SIZE(SEQ_GAMMA_UPDATE), 0},
+	{(u8 *)SEQ_GAMMA_UPDATE_L, ARRAY_SIZE(SEQ_GAMMA_UPDATE_L), 0},
+	{(u8 *)SEQ_TEST_KEY_OFF_F0, ARRAY_SIZE(SEQ_TEST_KEY_OFF_F0), 17},
 	{(u8 *)SEQ_DISPLAY_ON, ARRAY_SIZE(SEQ_DISPLAY_ON), 0},
 };
+
+static const unsigned char SEQ_GLOBAL_PARAM_21[] = {
+	0xB0,
+	0x15
+};
+
+static const unsigned char VDDMRVDD_LUT[] = {
+	72,
+	72,
+	71,
+	70,
+	69,
+	68,
+	67,
+	66,
+	65,
+	64,
+	1,
+	2,
+	3,
+	4,
+	5,
+	6,
+	7,
+	8,
+	9,
+	10,
+	11,
+	12,
+	13,
+	14,
+	15,
+	16,
+	17,
+	18,
+	19,
+	20,
+	21,
+	22,
+	23,
+	24,
+	25,
+	26,
+	27,
+	28,
+	29,
+	30,
+	31,
+	32,
+	33,
+	34,
+	35,
+	36,
+	37,
+	38,
+	39,
+	40,
+	41,
+	42,
+	43,
+	44,
+	45,
+	46,
+	47,
+	48,
+	49,
+	50,
+	51,
+	52,
+	53,
+	54,
+	73,
+	74,
+	75,
+	76,
+	77,
+	78,
+	79,
+	80,
+	81,
+	82,
+	83,
+	84,
+	85,
+	86,
+	87,
+	88,
+	89,
+	90,
+	91,
+	92,
+	93,
+	94,
+	95,
+	96,
+	97,
+	98,
+	99,
+	100,
+	101,
+	102,
+	103,
+	104,
+	105,
+	106,
+	107,
+	108,
+	109,
+	110,
+	111,
+	112,
+	113,
+	114,
+	115,
+	116,
+	117,
+	118,
+	119,
+	120,
+	121,
+	122,
+	123,
+	124,
+	125,
+	126,
+	127,
+	127,
+	127,
+	127,
+	127,
+	127,
+	127,
+	127,
+	127,
+	127
+};
+
 #endif
 
 #ifdef CONFIG_LCD_HMT

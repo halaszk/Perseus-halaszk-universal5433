@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: osl.h 505854 2014-10-01 11:03:36Z $
+ * $Id: osl.h 498511 2014-08-24 09:17:44Z $
  */
 
 #ifndef _osl_h_
@@ -69,7 +69,7 @@ typedef void  (*osl_wreg_fn_t)(void *ctx, volatile void *reg, unsigned int val, 
 #define OSL_SYSUPTIME_SUPPORT TRUE
 #endif /* OSL_SYSUPTIME */
 
-#if !defined(PKTC) && !defined(PKTC_DONGLE)
+#if !defined(PKTC_DONGLE)
 #define	PKTCGETATTR(skb)	(0)
 #define	PKTCSETATTR(skb, f, p, b) BCM_REFERENCE(skb)
 #define	PKTCCLRATTR(skb)	BCM_REFERENCE(skb)
@@ -92,6 +92,7 @@ typedef void  (*osl_wreg_fn_t)(void *ctx, volatile void *reg, unsigned int val, 
 	for ((nskb) = NULL; (skb) != NULL; (skb) = (nskb))
 #define	PKTCFREE		PKTFREE
 
+
 #define PKTCENQTAIL(h, t, p) \
 do { \
 	if ((t) == NULL) { \
@@ -100,11 +101,9 @@ do { \
 } while (0)
 #endif /* !linux || !PKTC */
 
-#if !defined(HNDCTF) && !defined(PKTC_TX_DONGLE)
 #define PKTSETCHAINED(osh, skb)		BCM_REFERENCE(osh)
 #define PKTCLRCHAINED(osh, skb)		BCM_REFERENCE(osh)
 #define PKTISCHAINED(skb)		FALSE
-#endif
 
 /* Lbuf with fraglist */
 #define PKTFRAGPKTID(osh, lb)		(0)

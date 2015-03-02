@@ -1,7 +1,7 @@
 #ifndef __MDNIE_TABLE_H__
 #define __MDNIE_TABLE_H__
 
-/* 2014.09.26 */
+/* 2014.12.26 */
 
 /* SCR Position can be different each panel */
 #define MDNIE_RED_R		133		/* ASCR_WIDE_CR[7:0] */

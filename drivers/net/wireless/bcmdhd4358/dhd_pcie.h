@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_pcie.h 505858 2014-10-01 11:17:10Z $
+ * $Id: dhd_pcie.h 500805 2014-09-05 04:54:06Z $
  */
 
 
@@ -51,9 +51,6 @@
 
 #define MAX_DHD_TX_FLOWS	256
 
-#ifndef MAX_SET_MB_MASK
-#define MAX_SET_MB_MASK 3
-#endif /* MAX_SET_MB_MASK */
 /* user defined data structures */
 #ifdef DHD_DEBUG
 /* Device console log buffer state */

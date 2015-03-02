@@ -689,7 +689,7 @@ int wacom_i2c_coord(struct wacom_i2c *wac_i2c)
 	rdy = data[0] & 0x80;
 
 #ifdef LCD_FREQ_SYNC
-	if (!rdy) {
+	if (!rdy && !data[1] && !data[2] && !data[3] && !data[4]) {
 		if (likely(wac_i2c->use_lcd_freq_sync)) {
 			if (unlikely(!wac_i2c->pen_prox)) {
 				wacom_i2c_lcd_freq_check(wac_i2c, data);

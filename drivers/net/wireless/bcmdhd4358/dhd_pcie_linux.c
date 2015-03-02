@@ -90,6 +90,7 @@ typedef struct dhdpcie_info
 	uint16		last_intrstatus;	/* to cache intrstatus */
 	int	irq;
 	char pciname[32];
+	struct pci_saved_state* default_state;
 	struct pci_saved_state* state;
 #ifdef BCMPCIE_OOB_HOST_WAKE
 	void *os_cxt;			/* Pointer to per-OS private data */
@@ -162,6 +163,9 @@ static struct pci_driver dhdpcie_driver = {
 int dhdpcie_init_succeeded = FALSE;
 
 
+	/* Clear PME Status by writing 1 to it and enable PME# */
+
+
 static int dhdpcie_set_suspend_resume(struct pci_dev *pdev, bool state)
 {
 	int ret = 0;
@@ -208,10 +212,18 @@ static int dhdpcie_pci_resume(struct pci_dev *pdev)
 static int dhdpcie_suspend_dev(struct pci_dev *dev)
 {
 	int ret;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0))
+	dhdpcie_info_t *pch = pci_get_drvdata(dev);
+#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0)) */
 	DHD_TRACE_HW4(("%s: Enter\n", __FUNCTION__));
 	pci_save_state(dev);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0))
+	pch->state = pci_store_saved_state(dev);
+#endif /* BCMPCIE_OOB_HOST_WAKE */
 	pci_enable_wake(dev, PCI_D0, TRUE);
+	if (pci_is_enabled(dev)) {
 	pci_disable_device(dev);
+	}
 	ret = pci_set_power_state(dev, PCI_D3hot);
 	if (ret) {
 		DHD_ERROR(("%s: pci_set_power_state error %d\n",
@@ -223,6 +235,10 @@ static int dhdpcie_suspend_dev(struct pci_dev *dev)
 static int dhdpcie_resume_dev(struct pci_dev *dev)
 {
 	int err = 0;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0))
+	dhdpcie_info_t *pch = pci_get_drvdata(dev);
+	pci_load_and_free_saved_state(dev, &pch->state);
+#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0)) */
 	DHD_TRACE_HW4(("%s: Enter\n", __FUNCTION__));
 	pci_restore_state(dev);
 	err = pci_enable_device(dev);
@@ -347,8 +363,9 @@ dhdpcie_detach(dhdpcie_info_t *pch)
 	if (pch) {
 		osl_t *osh = pch->osh;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0))
-		if (!dhd_download_fw_on_driverload)
-			pci_load_and_free_saved_state(pch->dev, &pch->state);
+		if (!dhd_download_fw_on_driverload) {
+			pci_load_and_free_saved_state(pch->dev, &pch->default_state);
+		}
 #endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0) */
 		MFREE(osh, pch, sizeof(dhdpcie_info_t));
 	}
@@ -477,9 +494,9 @@ int dhdpcie_get_resource(dhdpcie_info_t *dhdpcie_info)
 			 * in case of built in driver
 			 */
 			pci_save_state(pdev);
-			dhdpcie_info->state = pci_store_saved_state(pdev);
+			dhdpcie_info->default_state = pci_store_saved_state(pdev);
 
-			if (dhdpcie_info->state == NULL) {
+			if (dhdpcie_info->default_state == NULL) {
 				DHD_ERROR(("%s pci_store_saved_state returns NULL\n",
 					__FUNCTION__));
 				REG_UNMAP(dhdpcie_info->regs);
@@ -872,8 +889,13 @@ dhdpcie_enable_device(dhd_bus_t *bus)
 	if (pch == NULL)
 		return BCME_ERROR;
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0))
-	if (pci_load_saved_state(bus->dev, pch->state))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0))
+	if (pci_load_and_free_saved_state(bus->dev, &pch->default_state)) {
+		pci_disable_device(bus->dev);
+	} else {
+#elif ((LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0)) && \
+	(LINUX_VERSION_CODE < KERNEL_VERSION(3, 14, 0)))
+	if (pci_load_saved_state(bus->dev, pch->default_state))
 		pci_disable_device(bus->dev);
 	else {
 #endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0) */

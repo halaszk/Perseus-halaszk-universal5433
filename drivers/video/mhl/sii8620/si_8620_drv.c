@@ -5713,7 +5713,7 @@ static void disconnect_mhl(struct drv_hw_context *hw_context,
 	mhl_tx_write_reg(hw_context, REG_MHL_DP_CTL5, 0x3F);
 	mhl_tx_write_reg(hw_context, REG_MHL_DP_CTL2, 0x2F);
 	mhl_tx_write_reg(hw_context, REG_MHL_DP_CTL6, 0x2A);
-	mhl_tx_write_reg(hw_context, REG_MHL_DP_CTL7, 0x03);
+	mhl_tx_write_reg(hw_context, REG_MHL_DP_CTL7, dev_context->pdata->ref_current);
 
 	hw_context->cbus_mode = CM_NO_CONNECTION;
 	hw_context->mhl_peer_version_stat = 0;
@@ -5920,7 +5920,7 @@ static int int_4_isr(struct drv_hw_context *hw_context, uint8_t int_4_status)
 			mhl_tx_write_reg(hw_context, REG_MHL_DP_CTL3, 0x35);
 			mhl_tx_write_reg(hw_context, REG_MHL_DP_CTL5, 0x02);
 			mhl_tx_write_reg(hw_context, REG_MHL_DP_CTL6, 0x02);
-			mhl_tx_write_reg(hw_context, REG_MHL_DP_CTL7, 0x03);
+			mhl_tx_write_reg(hw_context, REG_MHL_DP_CTL7, dev_context->pdata->ref_current);
 			mhl_tx_write_reg(hw_context, REG_COC_CTLC, 0xFF);
 			mhl_tx_write_reg(hw_context, REG_DPD,
 				BIT_DPD_PWRON_PLL |

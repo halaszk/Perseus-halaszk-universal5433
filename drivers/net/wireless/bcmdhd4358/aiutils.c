@@ -22,7 +22,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: aiutils.c 505607 2014-09-30 14:35:08Z $
+ * $Id: aiutils.c 467150 2014-04-02 17:30:43Z $
  */
 #include <bcm_cfg.h>
 #include <typedefs.h>
@@ -69,8 +69,6 @@ get_erom_ent(si_t *sih, uint32 **eromptr, uint32 mask, uint32 match)
 
 		if ((ent & mask) == match)
 			break;
-
-		/* escape condition related EROM size if it has invalid values */
 		size += sizeof(*eromptr);
 		if (size >= ER_SZ_MAX) {
 			SI_ERROR(("Failed to find end of EROM marker\n"));
