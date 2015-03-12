@@ -82,8 +82,8 @@ static int gpu_dvfs_governor_default(struct exynos_context *platform, int utiliz
 	if ((platform->step > gpu_dvfs_get_level(platform->gpu_max_clock)) &&
 			(utilization > platform->table[platform->step].max_threshold)) {
 		platform->step--;
-		if ((!platform->hwcnt_bt_clk) && (platform->table[platform->step].clock > platform->gpu_max_clock_limit))
-			platform->step = gpu_dvfs_get_level(platform->gpu_max_clock_limit);
+/*		if ((!platform->hwcnt_bt_clk) && (platform->table[platform->step].clock > platform->gpu_max_clock_limit))
+			platform->step = gpu_dvfs_get_level(platform->gpu_max_clock_limit);*/
 		platform->down_requirement = platform->table[platform->step].stay_count;
 	} else if ((platform->step < gpu_dvfs_get_level(platform->gpu_min_clock)) && (utilization < platform->table[platform->step].min_threshold)) {
 		platform->down_requirement--;
