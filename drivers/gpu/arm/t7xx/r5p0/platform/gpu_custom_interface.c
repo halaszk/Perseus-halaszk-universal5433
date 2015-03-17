@@ -267,13 +267,13 @@ static ssize_t set_volt_table(struct device *dev, struct device_attribute *attr,
 	spin_lock_irqsave(&platform->gpu_dvfs_spinlock, flags);
 
 	if (tokens == 2 && target > -1) {
-		sanitize_min_max(t[1], 600000, 1100000);
+		sanitize_min_max(t[1], 600000, 1187500);
 		if ((rest = t[1] % 6250) != 0) t[1] += 6250-rest;
 		platform->table[target].voltage = t[1];
 	} else {
 		for (i = 0; i < tokens; i++) {
 			if ((rest = t[1] % 6250) != 0) t[1] += 6250-rest;
-			sanitize_min_max(t[i], 600000, 1100000);
+			sanitize_min_max(t[i], 600000, 1187500);
 			platform->table[i + max].voltage = t[i];
 		}
 	}
