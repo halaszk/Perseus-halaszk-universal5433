@@ -112,7 +112,7 @@ if [ -e $KERNELDIR/arch/arm/boot/zImage ]; then
 	echo "--- Creating boot.img ---"
 	# copy all needed to out kernel folder
 #	./utilities/mkbootimg --kernel zImage --ramdisk ramdisk.gz --cmdline --base 0x10000000 --name SYSMAGIC000K --page_size 2048 --kernel_offset 0x00008000 --ramdisk_offset 0x01000000 --tags_offset 0x00000100 --dt_size 1083392 --output boot.img
-        ./utilities/mkbootimg --kernel zImage --dt $KERNELDIR/utilities/dt.img --ramdisk ramdisk.gz --base 0x10000000 --kernel_offset 0x10000000 --ramdisk_offset 0x10008000 --tags_offset 0x10000100 --pagesize 2048 -o boot.img
+        ./utilities/mkbootimg --kernel zImage --dt $KERNELDIR/utilities/kitkat/dt.img --ramdisk ramdisk.gz --base 0x10000000 --kernel_offset 0x10000000 --ramdisk_offset 0x10008000 --tags_offset 0x10000100 --pagesize 2048 -o boot.img
 	GETVER=`grep 'perseus-halaszk-*V' .config | sed 's/.*".//g' | sed 's/-S.*//g'`
 	cp ${KERNELDIR}/.config ${KERNELDIR}/arch/arm/configs/${KERNEL_CONFIG}
 	cp ${KERNELDIR}/.config ${KERNELDIR}/READY/
