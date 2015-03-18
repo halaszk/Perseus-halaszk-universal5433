@@ -76,10 +76,6 @@
 #define TSET_PARAM_SIZE			(LDI_TSET_LEN + 1)
 #define LDI_ELVSS_REG			0xB6
 #define LDI_ELVSS_LEN			(ELVSS_PARAM_SIZE - 1)
-#define LDI_VDDMRVDD_REG		0xD7
-#define LDI_VDDMRVDD_LEN		23
-#define RVDD_NUM 21
-#define VDDM_NUM 22
 
 
 #define LDI_COORDINATE_REG		0xA1
@@ -156,7 +152,6 @@ struct lcd_info {
 #ifdef CONFIG_LCD_ALPM
 	int				alpm;
 	int				current_alpm;
-	struct mutex			alpm_lock;
 #endif
 #ifdef CONFIG_LCD_HMT
 	struct dynamic_aid_param_t	hmt_daid;
@@ -188,8 +183,6 @@ struct lcd_info {
 		unsigned int			oled_det_irq;
 		unsigned int			oled_det_gpio;
 #endif
-	unsigned int			vddm_delta;
-	unsigned int			rvdd_delta;
 
 	struct mipi_dsim_device		*dsim;
 };
@@ -470,7 +463,7 @@ static int s6e3hf2_write_set(struct lcd_info *lcd, struct lcd_seq_info *seq, u32
 			}
 		}
 		if (seq[i].sleep)
-			usleep_range(seq[i].sleep * 1000 , seq[i].sleep * 1000);
+			msleep(seq[i].sleep);
 	}
 	return ret;
 }
@@ -577,26 +570,6 @@ static int s6e3hf2_read_tset(struct lcd_info *lcd)
 		smtd_dbg("%02dth value is %02x\n", i, lcd->tset_table[i]);
 
 	lcd->tset_table[0] = LDI_TSET_REG;
-
-	return ret;
-}
-
-static int s6e3hf2_read_vddmrvdd(struct lcd_info *lcd)
-{
-	int ret, i, rvdd_delta, vddm_delta;
-	unsigned char buf[LDI_VDDMRVDD_LEN];
-
-	ret = s6e3hf2_read(lcd, LDI_VDDMRVDD_REG, buf, LDI_VDDMRVDD_LEN);
-
-	smtd_dbg("%s: %02xh\n", __func__, LDI_VDDMRVDD_REG);
-	for (i = 0; i < LDI_VDDMRVDD_LEN; i++)
-		smtd_dbg("%02dth value is %02x\n", i,buf[i]);
-
-	rvdd_delta = buf[RVDD_NUM];
-	vddm_delta = buf[VDDM_NUM];
-
-	lcd->vddm_delta = VDDMRVDD_LUT[vddm_delta];
-	lcd->rvdd_delta = VDDMRVDD_LUT[rvdd_delta];
 
 	return ret;
 }
@@ -1092,8 +1065,7 @@ static int update_brightness(struct lcd_info *lcd, u8 force)
 		s6e3hf2_write(lcd, SEQ_GAMMA_UPDATE_L, ARRAY_SIZE(SEQ_GAMMA_UPDATE_L));
 		s6e3hf2_set_acl(lcd, force);
 		s6e3hf2_set_tset(lcd, force);
-		if (!(lcd->current_alpm && lcd->alpm))
-			s6e3hf2_set_hbm(lcd, force);
+		s6e3hf2_set_hbm(lcd, force);
 		s6e3hf2_write(lcd, SEQ_TEST_KEY_OFF_F0, ARRAY_SIZE(SEQ_TEST_KEY_OFF_F0));
 
 		lcd->current_bl = lcd->bl;
@@ -1111,25 +1083,6 @@ static int s6e3hf2_set_fps(struct lcd_info *lcd)
 {
 	int ret = 0;
 	s6e3hf2_write_set(lcd, SEQ_LDI_FPS_SET, ARRAY_SIZE(SEQ_LDI_FPS_SET));
-	return ret;
-}
-
-static int s6e3hf2_set_rvddvddm(struct lcd_info *lcd)
-{
-	int ret = 0;
-	unsigned char SEQ_VDDM_RVDD_SET[] = {
-		0xD7, 0, 0
-	};
-	SEQ_VDDM_RVDD_SET[1] = lcd->rvdd_delta;
-	SEQ_VDDM_RVDD_SET[2] = lcd->vddm_delta;
-
-	dev_info(&lcd->ld->dev, "%s: rvdd_delta = %x, vddm_delta = %x\n", __func__, lcd->rvdd_delta, lcd->vddm_delta);
-
-	s6e3hf2_write(lcd, SEQ_GLOBAL_PARAM_21, ARRAY_SIZE(SEQ_GLOBAL_PARAM_21));
-	s6e3hf2_write(lcd, SEQ_VDDM_RVDD_SET, ARRAY_SIZE(SEQ_VDDM_RVDD_SET));
-	s6e3hf2_write(lcd, SEQ_FREQ_CALIBRATION_SETTING4, ARRAY_SIZE(SEQ_FREQ_CALIBRATION_SETTING4));
-	s6e3hf2_write(lcd, SEQ_FREQ_CALIBRATION_SETTING5, ARRAY_SIZE(SEQ_FREQ_CALIBRATION_SETTING5));
-
 	return ret;
 }
 
@@ -1152,9 +1105,6 @@ static int s6e3hf2_ldi_init(struct lcd_info *lcd)
 
 	/* Calibration code */
 	s6e3hf2_write(lcd, SEQ_TEST_KEY_ON_FC, ARRAY_SIZE(SEQ_TEST_KEY_ON_FC));
-	s6e3hf2_set_rvddvddm(lcd);
-	s6e3hf2_write(lcd, SEQ_FREQ_MEMCLOCK_SETTING, ARRAY_SIZE(SEQ_FREQ_MEMCLOCK_SETTING));
-
 	s6e3hf2_set_fps(lcd);
 
 	/* 10. Wait 120ms */
@@ -1168,7 +1118,7 @@ static int s6e3hf2_ldi_init(struct lcd_info *lcd)
 	s6e3hf2_write(lcd, SEQ_TOUCH_HSYNC_ON, ARRAY_SIZE(SEQ_TOUCH_HSYNC_ON));
 	s6e3hf2_write(lcd, SEQ_PENTILE_CONTROL, ARRAY_SIZE(SEQ_PENTILE_CONTROL));
 
-	s6e3hf2_write_set(lcd, SEQ_POC_SET, ARRAY_SIZE(SEQ_POC_SET));
+	s6e3hf2_write(lcd, SEQ_POC_SETTING, ARRAY_SIZE(SEQ_POC_SETTING));
 	s6e3hf2_write(lcd, SEQ_TEST_KEY_OFF_FC, ARRAY_SIZE(SEQ_TEST_KEY_OFF_FC));
 
 	/* PCD setting Off for TB */
@@ -1237,21 +1187,24 @@ static int s6e3hf2_ldi_disable(struct lcd_info *lcd)
 }
 
 #ifdef CONFIG_LCD_ALPM
-
 static int s6e3hf2_ldi_alpm_init(struct lcd_info *lcd)
 {
 	int ret = 0;
- 	s6e3hf2_write_set(lcd, SEQ_ALPM_ON_SET, ARRAY_SIZE(SEQ_ALPM_ON_SET));
+
+	s6e3hf2_write_set(lcd, SEQ_ALPM_ON_SET, ARRAY_SIZE(SEQ_ALPM_ON_SET));
 
 	/* ALPM MODE */
-	lcd->current_alpm = lcd->dsim->lcd_alpm = 1;
+	lcd->current_alpm = 1;
+
 	return ret;
 }
 
 static int s6e3hf2_ldi_alpm_exit(struct lcd_info *lcd)
 {
 	int ret = 0;
+
 	s6e3hf2_write_set(lcd, SEQ_ALPM_OFF_SET, ARRAY_SIZE(SEQ_ALPM_OFF_SET));
+
 	/* NORMAL MODE */
 	lcd->current_alpm = lcd->dsim->lcd_alpm = 0;
 
@@ -1270,42 +1223,36 @@ static int s6e3hf2_power_on(struct lcd_info *lcd)
 #endif
 
 #ifdef CONFIG_LCD_ALPM
-	mutex_lock(&lcd->alpm_lock);
 	if (lcd->current_alpm && lcd->alpm) {
 //		s6e3hf2_set_partial_display(lcd);
 		dev_info(&lcd->ld->dev, "%s : ALPM mode\n", __func__);
-	} else if (lcd->current_alpm) {
-		ret = s6e3hf2_ldi_alpm_exit(lcd);
-		if (ret) {
-			dev_err(&lcd->ld->dev, "failed to exit alpm.\n");
-			mutex_unlock(&lcd->alpm_lock);
-			goto err;
-		}
 	} else {
+		if (lcd->current_alpm) {
+			ret = s6e3hf2_ldi_alpm_exit(lcd);
+			if (ret) {
+				dev_err(&lcd->ld->dev, "failed to exit alpm.\n");
+				goto err;
+			}
+		}
+
 		ret = s6e3hf2_ldi_init(lcd);
 		if (ret) {
 			dev_err(&lcd->ld->dev, "failed to initialize ldi.\n");
-			mutex_unlock(&lcd->alpm_lock);
 			goto err;
 		}
 
 		if (lcd->alpm) {
 			ret = s6e3hf2_ldi_alpm_init(lcd);
-			if (ret) {
+			if (ret)
 				dev_err(&lcd->ld->dev, "failed to initialize alpm.\n");
-				mutex_unlock(&lcd->alpm_lock);
-				goto err;
-			}
 		} else {
 			ret = s6e3hf2_ldi_enable(lcd);
 			if (ret) {
 				dev_err(&lcd->ld->dev, "failed to enable ldi.\n");
-				mutex_unlock(&lcd->alpm_lock);
 				goto err;
 			}
 		}
 	}
-	mutex_unlock(&lcd->alpm_lock);
 #else
 	ret = s6e3hf2_ldi_init(lcd);
 	if (ret) {
@@ -1358,13 +1305,11 @@ static int s6e3hf2_power_off(struct lcd_info *lcd)
 	mutex_unlock(&lcd->bl_lock);
 
 #ifdef CONFIG_LCD_ALPM
-	mutex_lock(&lcd->alpm_lock);
 	if (lcd->current_alpm && lcd->alpm) {
 		lcd->dsim->lcd_alpm = 1;
 		dev_info(&lcd->ld->dev, "%s : ALPM mode\n", __func__);
 	} else
 		ret = s6e3hf2_ldi_disable(lcd);
-	mutex_unlock(&lcd->alpm_lock);
 #else
 	ret = s6e3hf2_ldi_disable(lcd);
 #endif
@@ -1778,7 +1723,6 @@ static ssize_t alpm_store(struct device *dev,
 	sscanf(buf, "%9d", &value);
 	dev_info(dev, "%s: %d \n", __func__, value);
 
-	mutex_lock(&lcd->alpm_lock);
 	if (value) {
 		if (lcd->ldi_enable && !lcd->current_alpm)
 			s6e3hf2_ldi_alpm_init(lcd);
@@ -1788,7 +1732,6 @@ static ssize_t alpm_store(struct device *dev,
 	}
 
 	lcd->alpm = value;
-	mutex_unlock(&lcd->alpm_lock);
 
 	dev_info(dev, "%s: %d\n", __func__, lcd->alpm);
 
@@ -2354,7 +2297,8 @@ static int s6e3hf2_probe(struct mipi_dsim_device *dsim)
 		ret = -ENOMEM;
 		goto err_alloc;
 	}
- 	lcd->ld = lcd_device_register("panel", dsim->dev, lcd, &s6e3hf2_lcd_ops);
+
+	lcd->ld = lcd_device_register("panel", dsim->dev, lcd, &s6e3hf2_lcd_ops);
 	if (IS_ERR(lcd->ld)) {
 		pr_err("failed to register lcd device\n");
 		ret = PTR_ERR(lcd->ld);
@@ -2465,7 +2409,6 @@ static int s6e3hf2_probe(struct mipi_dsim_device *dsim)
 
 	mutex_init(&lcd->lock);
 	mutex_init(&lcd->bl_lock);
-	mutex_init(&lcd->alpm_lock);
 
 	s6e3hf2_write(lcd, SEQ_TEST_KEY_ON_F0, ARRAY_SIZE(SEQ_TEST_KEY_ON_F0));
 	s6e3hf2_read_id(lcd, lcd->id);
@@ -2474,7 +2417,6 @@ static int s6e3hf2_probe(struct mipi_dsim_device *dsim)
 	s6e3hf2_read_mtp(lcd, mtp_data);
 	s6e3hf2_read_elvss(lcd, elvss_data);
 	s6e3hf2_read_tset(lcd);
-	s6e3hf2_read_vddmrvdd(lcd);
 	s6e3hf2_read_mcd(lcd);
 
 	s6e3hf2_write(lcd, SEQ_TEST_KEY_OFF_F0, ARRAY_SIZE(SEQ_TEST_KEY_OFF_F0));

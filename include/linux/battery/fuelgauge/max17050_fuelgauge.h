@@ -149,7 +149,6 @@ struct sec_fg_info {
 
 	/* battery info */
 	u32 soc;
-	bool is_charging;
 
 	/* miscellaneous */
 	unsigned long fullcap_check_interval;

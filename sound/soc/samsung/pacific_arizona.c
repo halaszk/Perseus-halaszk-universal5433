@@ -1030,6 +1030,48 @@ static struct snd_soc_ops pacific_aif3_ops = {
 	.hw_params = pacific_aif3_hw_params,
 };
 
+static struct snd_soc_dai_driver pacific_ext_dai[] = {
+	{
+		.name = "pacific-ext voice call",
+		.playback = {
+			.channels_min = 1,
+			.channels_max = 4,
+			.rate_min = 8000,
+			.rate_max = 48000,
+			.rates = (SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |
+					SNDRV_PCM_RATE_48000),
+			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+		},
+		.capture = {
+			.channels_min = 1,
+			.channels_max = 4,
+			.rate_min = 8000,
+			.rate_max = 48000,
+			.rates = (SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |
+					SNDRV_PCM_RATE_48000),
+			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+		},
+	},
+	{
+		.name = "pacific-ext bluetooth sco",
+		.playback = {
+			.channels_min = 1,
+			.channels_max = 4,
+			.rate_min = 8000,
+			.rate_max = 16000,
+			.rates = (SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000),
+			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+		},
+		.capture = {
+			.channels_min = 1,
+			.channels_max = 2,
+			.rate_min = 8000,
+			.rate_max = 16000,
+			.rates = (SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000),
+			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+		},
+	},
+};
 
 static struct snd_soc_dai_link pacific_wm5102_dai[] = {
 	{ /* playback & recording */
@@ -1064,35 +1106,39 @@ static struct snd_soc_dai_link pacific_wm5102_dai[] = {
 		.codec_dai_name = "wm5102-aif1",
 		.ops = &pacific_aif1_ops,
 	},
+#ifdef CONFIG_SND_SOC_SAMSUNG_PACIFIC_EAX
 	{ /* eax0 playback */
 		.name = "playback-eax0",
 		.stream_name = "eax0",
+		.codec_dai_name = "florida-aif1",
 		.cpu_dai_name = "samsung-eax.0",
 		.platform_name = "samsung-eax.0",
-		.codec_dai_name = "wm5102-aif1",
+		.codec_dai_name = "florida-aif1",
 		.ops = &pacific_aif1_ops,
 	},
 	{ /* eax1 playback */
 		.name = "playback-eax1",
 		.stream_name = "eax1",
+		.codec_dai_name = "florida-aif1",
 		.cpu_dai_name = "samsung-eax.1",
 		.platform_name = "samsung-eax.1",
-		.codec_dai_name = "wm5102-aif1",
+		.codec_dai_name = "florida-aif1",
 		.ops = &pacific_aif1_ops,
 	},
+#endif
 };
 
 static struct snd_soc_dai_link pacific_wm5110_dai[] = {
 	{ /* playback & recording */
 		.name = "playback-pri",
-		.stream_name = "playback-pri",
+		.stream_name = "i2s0-pri",
 		.codec_dai_name = "florida-aif1",
 		.ops = &pacific_aif1_ops,
 	},
 	{ /* voice call */
 		.name = "baseband",
-		.stream_name = "baseband",
-		.cpu_dai_name = "snd-soc-dummy-dai",
+		.stream_name = "pacific-ext voice call",
+		.cpu_dai_name = "pacific-ext voice call",
 		.platform_name = "snd-soc-dummy",
 		.codec_dai_name = "florida-aif2",
 		.ops = &pacific_aif2_ops,
@@ -1100,8 +1146,8 @@ static struct snd_soc_dai_link pacific_wm5110_dai[] = {
 	},
 	{ /* bluetooth sco */
 		.name = "bluetooth sco",
-		.stream_name = "bluetooth sco",
-		.cpu_dai_name = "snd-soc-dummy-dai",
+		.stream_name = "pacific-ext bluetooth sco",
+		.cpu_dai_name = "pacific-ext bluetooth sco",
 		.platform_name = "snd-soc-dummy",
 		.codec_dai_name = "florida-aif3",
 		.ops = &pacific_aif3_ops,
@@ -1109,7 +1155,7 @@ static struct snd_soc_dai_link pacific_wm5110_dai[] = {
 	},
 	{ /* deep buffer playback */
 		.name = "playback-sec",
-		.stream_name = "playback-sec",
+		.stream_name = "i2s0-sec",
 		.cpu_dai_name = "samsung-i2s-sec",
 		.platform_name = "samsung-i2s-sec",
 		.codec_dai_name = "florida-aif1",
@@ -1121,6 +1167,7 @@ static struct snd_soc_dai_link pacific_wm5110_dai[] = {
 		.cpu_dai_name = "florida-cpu-voicectrl",
 		.platform_name = "florida-codec",
 		.codec_dai_name = "florida-dsp-voicectrl",
+		.codec_name = "florida-codec",
 	},
 	{ /* pcm dump interface */
 		.name = "CPU-DSP trace",
@@ -1128,10 +1175,13 @@ static struct snd_soc_dai_link pacific_wm5110_dai[] = {
 		.cpu_dai_name = "florida-cpu-trace",
 		.platform_name = "florida-codec",
 		.codec_dai_name = "florida-dsp-trace",
+		.codec_name = "florida-codec",
 	},
+#ifdef CONFIG_SND_SOC_SAMSUNG_PACIFIC_EAX
 	{ /* eax0 playback */
 		.name = "playback-eax0",
-		.stream_name = "playback-eax0",
+		.stream_name = "eax0",
+		.codec_dai_name = "florida-aif1",
 		.cpu_dai_name = "samsung-eax.0",
 		.platform_name = "samsung-eax.0",
 		.codec_dai_name = "florida-aif1",
@@ -1139,15 +1189,18 @@ static struct snd_soc_dai_link pacific_wm5110_dai[] = {
 	},
 	{ /* eax1 playback */
 		.name = "playback-eax1",
-		.stream_name = "playback-eax1",
+		.stream_name = "eax1",
+		.codec_dai_name = "florida-aif1",
 		.cpu_dai_name = "samsung-eax.1",
 		.platform_name = "samsung-eax.1",
 		.codec_dai_name = "florida-aif1",
 		.ops = &pacific_aif1_ops,
 	},
+#if 0
 	{ /* eax2 playback */
 		.name = "playback-eax2",
-		.stream_name = "playback-eax2",
+		.stream_name = "eax2",
+		.codec_dai_name = "florida-aif1",
 		.cpu_dai_name = "samsung-eax.2",
 		.platform_name = "samsung-eax.2",
 		.codec_dai_name = "florida-aif1",
@@ -1155,12 +1208,15 @@ static struct snd_soc_dai_link pacific_wm5110_dai[] = {
 	},
 	{ /* eax3 playback */
 		.name = "playback-eax3",
-		.stream_name = "playback-eax3",
+		.stream_name = "eax3",
+		.codec_dai_name = "florida-aif1",
 		.cpu_dai_name = "samsung-eax.3",
 		.platform_name = "samsung-eax.3",
 		.codec_dai_name = "florida-aif1",
 		.ops = &pacific_aif1_ops,
 	},
+#endif
+#endif
 };
 
 static int pacific_of_get_pdata(struct snd_soc_card *card)
@@ -1774,32 +1830,65 @@ static int pacific_audio_probe(struct platform_device *pdev)
 	} else
 		clk_prepare(priv->mclk);
 
-	for (n = 0; n < card->num_links; n++) {
-		if (!dai_link[n].cpu_name && !dai_link[n].cpu_dai_name) {
-			cpu_np = of_parse_phandle(np, "samsung,audio-cpu", n);
-			if (cpu_np) {
+	ret = snd_soc_register_component(card->dev, &pacific_cmpnt,
+				pacific_ext_dai, ARRAY_SIZE(pacific_ext_dai));
+	if (ret != 0)
+		dev_err(&pdev->dev, "Failed to register component: %d\n", ret);
+
+	if (np) {
+		for (n = 0; n < card->num_links; n++) {
+
+			/* Skip parsing DT for fully formed dai links */
+			if (dai_link[n].platform_name &&
+			    dai_link[n].codec_name) {
+				dev_dbg(card->dev,
+					"Skipping dt for populated dai link %s\n",
+					dai_link[n].name);
+				continue;
+			}
+
+			cpu_np = of_parse_phandle(np,
+					"samsung,audio-cpu", n);
+			if (!cpu_np) {
+				dev_err(&pdev->dev,
+					"Property 'samsung,audio-cpu'"
+					" missing or invalid\n");
+				ret = -EINVAL;
+				goto out;
+			}
+
+			codec_np = of_parse_phandle(np,
+					"samsung,audio-codec", n);
+			if (!codec_np) {
+				dev_err(&pdev->dev,
+					"Property 'samsung,audio-codec'"
+					" missing or invalid\n");
+				ret = -EINVAL;
+				goto out;
+			}
+
+			if (!dai_link[n].cpu_dai_name)
 				dai_link[n].cpu_of_node = cpu_np;
+
+			if (!dai_link[n].platform_name)
 				dai_link[n].platform_of_node = cpu_np;
-			} else
-				dev_err(&pdev->dev, "Property 'samsung,audio-cpu'"
-						": dai_link[%d] missing or invalid\n",n);
+
+			dai_link[n].codec_of_node = codec_np;
 		}
-		if (!dai_link[n].codec_name) {
-			codec_np = of_parse_phandle(np, "samsung,audio-codec", n);
-			if (codec_np)
-				dai_link[n].codec_of_node = codec_np;
-			else
-				dev_err(&pdev->dev, "Property 'samsung,audio-codec'"
-						": dai_link[%d] missing or invalid\n", n);
-		}
-	}
+	} else
+		dev_err(&pdev->dev, "Failed to get device node\n");
 
 	ret = snd_soc_register_card(card);
-	if (ret)
+	if (ret) {
 		dev_err(&pdev->dev, "Failed to register card:%d\n", ret);
+		goto out;
+	}
 
 	return ret;
 
+out:
+	snd_soc_unregister_component(card->dev);
+	return ret;
 }
 
 static int pacific_audio_remove(struct platform_device *pdev)

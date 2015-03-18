@@ -39,14 +39,9 @@
 #include <linux/magic.h>
 #include "ecryptfs_kernel.h"
 
-#ifdef CONFIG_SDP
-#include "ecryptfs_sdp_chamber.h"
-#endif
-
 #ifdef CONFIG_WTL_ENCRYPTION_FILTER
 #include <linux/ctype.h>
 #endif
-
 
 /**
  * Module parameter that defines the ecryptfs_verbosity level.
@@ -189,11 +184,11 @@ enum { ecryptfs_opt_sig, ecryptfs_opt_ecryptfs_sig,
 #ifdef CONFIG_WTL_ENCRYPTION_FILTER
        ecryptfs_opt_enable_filtering,
 #endif
-#if defined(CONFIG_CRYPTO_FIPS) && !defined(CONFIG_FORCE_DISABLE_FIPS)
+#ifdef CONFIG_CRYPTO_FIPS
 	ecryptfs_opt_enable_cc,
 #endif
 #ifdef CONFIG_SDP
-	ecryptfs_opt_userid, ecryptfs_opt_sdp, ecryptfs_opt_chamber_dirs,
+	ecryptfs_opt_userid, ecryptfs_opt_sdp,
 #endif
        ecryptfs_opt_err };
 
@@ -215,11 +210,10 @@ static const match_table_t tokens = {
 #ifdef CONFIG_WTL_ENCRYPTION_FILTER
 	{ecryptfs_opt_enable_filtering, "ecryptfs_enable_filtering=%s"},
 #endif
-#if defined(CONFIG_CRYPTO_FIPS) && !defined(CONFIG_FORCE_DISABLE_FIPS)
+#ifdef CONFIG_CRYPTO_FIPS
 	{ecryptfs_opt_enable_cc, "ecryptfs_enable_cc"},
 #endif
 #ifdef CONFIG_SDP
-	{ecryptfs_opt_chamber_dirs, "chamber=%s"},
 	{ecryptfs_opt_userid, "userid=%s"},
 	{ecryptfs_opt_sdp, "sdp_enabled"},
 #endif
@@ -262,11 +256,6 @@ static void ecryptfs_init_mount_crypt_stat(
 	INIT_LIST_HEAD(&mount_crypt_stat->global_auth_tok_list);
 	mutex_init(&mount_crypt_stat->global_auth_tok_list_mutex);
 	mount_crypt_stat->flags |= ECRYPTFS_MOUNT_CRYPT_STAT_INITIALIZED;
-
-#ifdef CONFIG_SDP
-	spin_lock_init(&mount_crypt_stat->chamber_dir_list_lock);
-	INIT_LIST_HEAD(&mount_crypt_stat->chamber_dir_list);
-#endif
 }
 #ifdef CONFIG_WTL_ENCRYPTION_FILTER
 
@@ -286,7 +275,6 @@ static int parse_enc_file_filter_parms(
 	}
 	return 0;
 }
-
 
 static int parse_enc_ext_filter_parms(
 	struct ecryptfs_mount_crypt_stat *mcs, char *str)
@@ -488,7 +476,7 @@ static int ecryptfs_parse_options(struct ecryptfs_sb_info *sbi, char *options,
 			mount_crypt_stat->flags |= ECRYPTFS_ENABLE_FILTERING;
 			break;
 #endif
-#if defined(CONFIG_CRYPTO_FIPS) && !defined(CONFIG_FORCE_DISABLE_FIPS)
+#ifdef CONFIG_CRYPTO_FIPS
 		case ecryptfs_opt_enable_cc:
             mount_crypt_stat->flags |= ECRYPTFS_ENABLE_CC;
 			break;
@@ -510,16 +498,6 @@ static int ecryptfs_parse_options(struct ecryptfs_sb_info *sbi, char *options,
 		case ecryptfs_opt_sdp:
 			mount_crypt_stat->flags |= ECRYPTFS_MOUNT_SDP_ENABLED;
 			break;
-		case ecryptfs_opt_chamber_dirs: {
-			char *chamber_dirs = args[0].from;
-			char *token = NULL;
-
-			printk("%s : chamber dirs : %s\n", __func__, chamber_dirs);
-			while ((token = strsep(&chamber_dirs, "|")) != NULL)
-				if(!is_chamber_directory(mount_crypt_stat, token))
-					add_chamber_directory(mount_crypt_stat, token);
-		}
-		break;
 #endif
 		case ecryptfs_opt_err:
 		default:
@@ -567,7 +545,7 @@ static int ecryptfs_parse_options(struct ecryptfs_sb_info *sbi, char *options,
 	mutex_lock(&key_tfm_list_mutex);
 	if (!ecryptfs_tfm_exists(mount_crypt_stat->global_default_cipher_name,
 				 NULL)) {
-#if defined(CONFIG_CRYPTO_FIPS) && !defined(CONFIG_FORCE_DISABLE_FIPS)
+#ifdef CONFIG_CRYPTO_FIPS
 		rc = ecryptfs_add_new_key_tfm(
 			NULL, mount_crypt_stat->global_default_cipher_name,
 			mount_crypt_stat->global_default_cipher_key_size,
@@ -592,7 +570,7 @@ static int ecryptfs_parse_options(struct ecryptfs_sb_info *sbi, char *options,
 	if ((mount_crypt_stat->flags & ECRYPTFS_GLOBAL_ENCRYPT_FILENAMES)
 	    && !ecryptfs_tfm_exists(
 		    mount_crypt_stat->global_default_fn_cipher_name, NULL)) {
-#if defined(CONFIG_CRYPTO_FIPS) && !defined(CONFIG_FORCE_DISABLE_FIPS)
+#ifdef CONFIG_CRYPTO_FIPS
 		rc = ecryptfs_add_new_key_tfm(
 			NULL, mount_crypt_stat->global_default_fn_cipher_name,
 			mount_crypt_stat->global_default_fn_cipher_key_bytes,

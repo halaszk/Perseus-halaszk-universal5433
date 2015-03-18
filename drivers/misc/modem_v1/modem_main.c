@@ -73,11 +73,10 @@ static struct modem_shared *create_modem_shared_data(
 		(MAX_MIF_SEPA_SIZE * 2), GFP_KERNEL);
 	if (!msd->storage.addr) {
 		mif_err("IPC logger buff alloc failed!!\n");
-		kfree(msd);
 		return NULL;
 	}
 	memset(msd->storage.addr, 0, size + (MAX_MIF_SEPA_SIZE * 2));
-	memcpy(msd->storage.addr, MIF_SEPARATOR, strlen(MIF_SEPARATOR));
+	memcpy(msd->storage.addr, MIF_SEPARATOR, MAX_MIF_SEPA_SIZE);
 	msd->storage.addr += MAX_MIF_SEPA_SIZE;
 	memcpy(msd->storage.addr, &size, MAX_MIF_SEPA_SIZE);
 	msd->storage.addr += MAX_MIF_SEPA_SIZE;
@@ -331,19 +330,6 @@ static int __parse_dt_mandatory_gpio_pdata(struct device_node *np,
 	if (ret)
 		mif_err("fail to request gpio %s:%d\n", "PHONE_ACTIVE", ret);
 	gpio_direction_input(pdata->gpio_phone_active);
-
-	/* GPIO_IPC_INT2CP */
-	pdata->gpio_ipc_int2cp = of_get_named_gpio(np,
-						"mif,gpio_ipc_int2cp", 0);
-	if (gpio_is_valid(pdata->gpio_ipc_int2cp)) {
-		mif_err("gpio_ipc_int2cp: %d\n", pdata->gpio_ipc_int2cp);
-		ret = gpio_request(pdata->gpio_ipc_int2cp, "IPC_INT2CP");
-		if (ret)
-			mif_err("fail to request gpio %s:%d\n",
-				"SEND_SIG", ret);
-		else
-			gpio_direction_output(pdata->gpio_ipc_int2cp, 0);
-	}
 
 	return ret;
 }
@@ -643,7 +629,7 @@ static void modem_shutdown(struct platform_device *pdev)
 	mc->ops.modem_off(mc);
 	mc->phone_state = STATE_OFFLINE;
 
-	mif_info("%s(%s)\n", mc->name, FUNC);
+	evt_log(0, "%s(%s)\n", mc->name, FUNC);
 }
 
 static int modem_suspend(struct device *pdev)
@@ -666,7 +652,7 @@ static int modem_suspend(struct device *pdev)
 	mbox_set_interrupt(mc->int_pda_active);
 #endif
 
-	mif_info("%s: %s\n", FUNC, mc->name);
+	evt_log(0, "%s: %s\n", FUNC, mc->name);
 
 	return 0;
 }
@@ -698,7 +684,7 @@ static int modem_resume(struct device *pdev)
 	mbox_set_interrupt(mc->int_pda_active);
 #endif
 
-	mif_info("%s: %s\n", FUNC, mc->name);
+	evt_log(0, "%s: %s\n", FUNC, mc->name);
 
 	return 0;
 }

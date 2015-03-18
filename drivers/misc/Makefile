@@ -68,5 +68,3 @@ obj-$(CONFIG_TIMA_LOG)		+= tima_debug_log.o
 endif
 
 obj-$(CONFIG_DM_VERITY)		+= dmverity_query.o
-
-obj-y += dualwave/

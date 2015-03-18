@@ -656,6 +656,8 @@ int cdc_ncm_bind(struct if_usb_devdata *pipe_data,
 	if (pipe_data->iod->ndev->mtu != (ctx->max_datagram_size - ETH_HLEN))
 		pipe_data->iod->ndev->mtu = ctx->max_datagram_size - ETH_HLEN;
 
+	pipe_data->ntb_pool = &pipe_data->usb_ld->skb_pool;
+
 	return 0;
 
 error2:
@@ -1166,8 +1168,7 @@ error:
 int cdc_ncm_rx_fixup(struct if_usb_devdata *pipe_data, struct sk_buff *skb_in)
 {
 	int rc = __cdc_ncm_rx_fixup(pipe_data, skb_in, false);
-	if (rc)
-		dev_kfree_skb_any(skb_in);
+	dev_kfree_skb_any(skb_in);
 	return rc;
 }
 
@@ -1176,6 +1177,7 @@ int cdc_ncm_rx_fixup_copyskb(struct if_usb_devdata *pipe_data,
 {
 	int rc = __cdc_ncm_rx_fixup(pipe_data, skb_in, true);
 	/* skb_in will reuse for static RX NTB buffer */
+	dev_kfree_skb_any(skb_in);
 	return rc;
 }
 

@@ -434,6 +434,8 @@ static void exynos5_i2c_reset(struct exynos5_i2c *i2c)
 
 	dev_err(i2c->dev, "exynos5_i2c_reset\n");
 
+	printk(KERN_ERR "Xtopher: exynos5_i2c_reset\n");
+
 	/* Set and clear the bit for reset */
 	i2c_ctl = readl(i2c->regs + HSI2C_CTL);
 	i2c_ctl |= HSI2C_SW_RST;

@@ -119,7 +119,7 @@ if [ -e $KERNELDIR/arch/arm/boot/zImage ]; then
 	stat ${KERNELDIR}/boot.img
 	cp ${KERNELDIR}/boot.img /${KERNELDIR}/READY/boot/
 	cd ${KERNELDIR}/READY/
-	zip -r Kernel_${GETVER}-`date +"[%H-%M]-[%d-%m]-SM-N910C-PWR-CORE"`.zip .
+	zip -r Kernel_${GETVER}-`date +"[%H-%M]-[%d-%m]-SM-N910C-KITKAT-PWR-CORE"`.zip .
 	rm ${KERNELDIR}/boot.img
 	rm ${KERNELDIR}/READY/boot/boot.img
 	rm ${KERNELDIR}/READY/.config

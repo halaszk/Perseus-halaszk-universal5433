@@ -29,7 +29,6 @@
 
 #define EXYRNG_MAX_FAILURES		25
 #define EXYRNG_START_UP_SIZE		4096
-#define EXYRNG_RETRY_MAX_COUNT		1000
 
 uint32_t hwrng_read_flag;
 static struct hwrng rng;
@@ -65,19 +64,13 @@ void exynos_swd_test_fail(void)
 static int exynos_swd_startup_test(void)
 {
 	uint32_t start_up_size;
-	uint32_t retry_cnt;
 	int ret = 0;
 
 	start_up_size = EXYRNG_START_UP_SIZE;
-	retry_cnt = 0;
 
 	while (start_up_size) {
 		ret = exynos_smc(SMC_CMD_RANDOM, HWRNG_GET_DATA, 1, 0);
 		if (ret == HWRNG_RET_RETRY_ERROR) {
-			if (retry_cnt++ > EXYRNG_RETRY_MAX_COUNT) {
-				printk("[ExyRNG] exceed retry in test\n");
-				return -EFAULT;
-			}
 			usleep_range(50, 100);
 			continue;
 		}
@@ -93,7 +86,6 @@ static int exynos_swd_startup_test(void)
 		}
 
 		start_up_size -= 32;
-		retry_cnt = 0;
 	}
 
 	return 0;
@@ -105,7 +97,6 @@ static int exynos_swd_read(struct hwrng *rng, void *data, size_t max, bool wait)
 	uint32_t read_size = max;
 	uint32_t r_data[2];
 	unsigned long flag;
-	uint32_t retry_cnt;
 	int32_t ret;
 
 	register u32 reg0 __asm__("r0");
@@ -128,21 +119,19 @@ static int exynos_swd_read(struct hwrng *rng, void *data, size_t max, bool wait)
 	if (ret != HWRNG_RET_OK) {
 		spin_unlock_irqrestore(&hwrandom_lock, flag);
 		msleep(1);
-		return -EFAULT;
+		return -EAGAIN;
 	}
 	hwrng_read_flag = 1;
 	spin_unlock_irqrestore(&hwrandom_lock, flag);
 
 	if (start_up_test) {
-		ret = exynos_swd_startup_test();
-		if (ret != HWRNG_RET_OK)
+		if (exynos_swd_startup_test())
 			goto out;
 
 		start_up_test = 0;
 		exyrng_debug("[ExyRNG] passed the start-up test\n");
 	}
 
-	retry_cnt = 0;
 	while (read_size) {
 		spin_lock_irqsave(&hwrandom_lock, flag);
 		ret = exynos_smc(SMC_CMD_RANDOM, HWRNG_GET_DATA, 0, 0);
@@ -155,11 +144,6 @@ static int exynos_swd_read(struct hwrng *rng, void *data, size_t max, bool wait)
 		spin_unlock_irqrestore(&hwrandom_lock, flag);
 
 		if (ret == HWRNG_RET_RETRY_ERROR) {
-			if (retry_cnt++ > EXYRNG_RETRY_MAX_COUNT) {
-				printk("[ExyRNG] exceed retry in read\n");
-				ret = -EFAULT;
-				goto out;
-			}
 			usleep_range(50, 100);
 			continue;
 		}
@@ -186,7 +170,6 @@ static int exynos_swd_read(struct hwrng *rng, void *data, size_t max, bool wait)
 		*(uint32_t*)(read_buf++) = r_data[1];
 
 		read_size -= 8;
-		retry_cnt = 0;
 	}
 
 	ret = max;

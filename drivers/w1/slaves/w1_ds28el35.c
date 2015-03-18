@@ -1482,22 +1482,16 @@ static ssize_t w1_ds28el35_verify_mac(struct device *device,
 
 static int w1_ds28el35_get_buffer(struct w1_slave *sl, uchar *rdbuf, int retry_limit)
 {
-	int ret = 0, retry = 0;
+	int retry = 0;
 	bool rslt = false;
 
 	while ((rslt == FALSE) && (retry < retry_limit)) {
 		rslt = read_memorypage(sl, 0, 0, &rdbuf[0], 0);
-		if (rslt == FALSE)
-			pr_info("%s : error %d\n", __func__, rslt);
-
+		if (rslt == TRUE)
+			return 0;
 		retry++;
 	}
-
-	if (rslt == TRUE)
-		ret = 0;
-	else
-		ret = -1;
-	return ret;
+	return -1;
 }
 
 static const int sn_cdigit[19] = {
@@ -1568,46 +1562,45 @@ static void w1_ds28el35_slave_sn(const uchar *rdbuf)
 static void w1_ds28el35_update_slave_info(struct w1_slave *sl)
 {
 	u8 rdbuf[32];
-	int ret, retry, success = 0;
+	int ret, retry_out, retry_in;
+	for (retry_out = 0; retry_out < 5; retry_out++) {
+		for (retry_in = 0; retry_in < 10; retry_in++) {
+			ret = w1_ds28el35_get_buffer(sl, &rdbuf[0], 10);
+			if (ret != 0) {
+				pr_info("%s : retry(%d*5+%d) fail to get buffer %d\n"
+						, __func__, retry_out,retry_in,ret);
+				continue;
+			}
 
-	for (retry = 0; retry < 10; retry++) {
-		ret = w1_ds28el35_get_buffer(sl, &rdbuf[0], 10);
-		if (ret != 0) {
-			pr_info("%s : fail to get buffer %d\n", __func__, ret);
-			continue;
+			if (rdbuf[CO_INDEX] < CO_MIN || rdbuf[CO_INDEX] > CO_MAX)
+				continue;
+			if (rdbuf[MD_INDEX] < MD_MIN || rdbuf[MD_INDEX] > MD_MAX)
+				continue;
+			if ((rdbuf[ID_INDEX] >= ID_MIN && rdbuf[ID_INDEX] <= ID_MAX)
+					|| (rdbuf[ID_INDEX] >= ID_MIN2 && rdbuf[ID_INDEX] <= ID_MAX2)) {
+				w1_model = rdbuf[MD_INDEX];
+				w1_color = rdbuf[CO_INDEX];
+				w1_id = rdbuf[ID_INDEX];
+				pr_info("%s retry count(%d*5+%d), Read ID(%d) & Color(%d) & Model(%d)\n"
+					, __func__, retry_out, retry_in, w1_id, w1_color, w1_model);
+				goto w1_update_success;
+			}
 		}
-
-		if (rdbuf[CO_INDEX] > CO_MAX)
-			continue;
-		if (rdbuf[MD_INDEX] < MD_MIN || rdbuf[MD_INDEX] > MD_MAX)
-			continue;
-		if ((rdbuf[ID_INDEX] <= ID_MAX)
-				|| (rdbuf[ID_INDEX] >= ID_MIN2 && rdbuf[ID_INDEX] <= ID_MAX2)) {
-
-			w1_model = rdbuf[MD_INDEX];
-			w1_color = rdbuf[CO_INDEX];
-			w1_id = rdbuf[ID_INDEX];
-			pr_info("%s retry count(%d), Read ID(%d) & Color(%d) & Model(%d)\n"
-				, __func__, retry, w1_id, w1_color, w1_model);
-			success++;
-			break;
-		}
-
+		msleep(500);
 	}
-	if (!success) {
-		pr_info("%s Before change ID(%d) & Color(%d) & Model(%d)\n"
-				, __func__, w1_id, w1_color, w1_model);
+	pr_info("%s Before change ID(%d) & Color(%d) & Model(%d)\n"
+			, __func__, w1_id, w1_color, w1_model);
 #ifdef CONFIG_TB_DS28EL35
-		w1_id = TB_ID_DEFAULT;
-		w1_color = CO_DEFAULT;
-		w1_model = TB_MD_DEFAULT;
+	w1_id = TB_ID_DEFAULT;
+	w1_color = CO_DEFAULT;
+	w1_model = TB_MD_DEFAULT;
 #else
-		w1_id = ID_DEFAULT;
-		w1_color = CO_DEFAULT;
-		w1_model = MD_DEFAULT;
+	w1_id = ID_DEFAULT;
+	w1_color = CO_DEFAULT;
+	w1_model = MD_DEFAULT;
 #endif
-	}
 
+w1_update_success:
 	w1_attached = true;
 	w1_ds28el35_slave_sn(&rdbuf[0]);
 }

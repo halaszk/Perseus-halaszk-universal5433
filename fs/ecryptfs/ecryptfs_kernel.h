@@ -42,8 +42,6 @@
 
 #ifdef CONFIG_SDP
 #include <sdp/dek_common.h>
-#include <linux/list.h>
-#include <linux/spinlock.h>
 #endif
 
 #ifdef CONFIG_WTL_ENCRYPTION_FILTER
@@ -153,7 +151,7 @@ ecryptfs_get_key_payload_data(struct key *key)
 #define ECRYPTFS_DEFAULT_CIPHER "aes"
 #define ECRYPTFS_DEFAULT_KEY_BYTES 16
 #define ECRYPTFS_DEFAULT_HASH "md5"
-#if defined(CONFIG_CRYPTO_FIPS) && !defined(CONFIG_FORCE_DISABLE_FIPS)
+#ifdef CONFIG_CRYPTO_FIPS
 #define ECRYPTFS_SHA256_HASH "sha256"
 #endif
 #define ECRYPTFS_TAG_70_DIGEST ECRYPTFS_DEFAULT_HASH
@@ -183,7 +181,7 @@ ecryptfs_get_key_payload_data(struct key *key)
 #define ECRYPTFS_FILENAME_MIN_RANDOM_PREPEND_BYTES 16
 #define ECRYPTFS_NON_NULL 0x42 /* A reasonable substitute for NULL */
 #define MD5_DIGEST_SIZE 16
-#if defined(CONFIG_CRYPTO_FIPS) && !defined(CONFIG_FORCE_DISABLE_FIPS)
+#ifdef CONFIG_CRYPTO_FIPS
 #define SHA256_HASH_SIZE 32
 #endif
 #define ECRYPTFS_TAG_70_DIGEST_SIZE MD5_DIGEST_SIZE
@@ -257,7 +255,7 @@ struct ecryptfs_crypt_stat {
 #ifdef CONFIG_SDP
 #define ECRYPTFS_DEK_SDP_ENABLED      0x00100000
 #define ECRYPTFS_DEK_IS_SENSITIVE     0x00200000
-#define ECRYPTFS_SDP_IS_CHAMBER_DIR   0x02000000
+
 #endif
 
 	u32 flags;
@@ -378,7 +376,7 @@ struct ecryptfs_mount_crypt_stat {
 #define ECRYPTFS_ENABLE_FILTERING              0x00000100
 #define ECRYPTFS_ENABLE_NEW_PASSTHROUGH        0x00000200
 #endif
-#if defined(CONFIG_CRYPTO_FIPS) && !defined(CONFIG_FORCE_DISABLE_FIPS)
+#ifdef CONFIG_CRYPTO_FIPS
 #define ECRYPTFS_ENABLE_CC                     0x00000400
 #endif
 #ifdef CONFIG_SDP
@@ -404,8 +402,6 @@ struct ecryptfs_mount_crypt_stat {
 #endif
 #ifdef CONFIG_SDP
 	int userid;
-	struct list_head chamber_dir_list;
-	spinlock_t chamber_dir_list_lock;
 #endif
 
 };
@@ -734,7 +730,7 @@ ecryptfs_add_global_auth_tok(struct ecryptfs_mount_crypt_stat *mount_crypt_stat,
 int ecryptfs_get_global_auth_tok_for_sig(
 	struct ecryptfs_global_auth_tok **global_auth_tok,
 	struct ecryptfs_mount_crypt_stat *mount_crypt_stat, char *sig);
-#if defined(CONFIG_CRYPTO_FIPS) && !defined(CONFIG_FORCE_DISABLE_FIPS)
+#ifdef CONFIG_CRYPTO_FIPS
 int
 ecryptfs_add_new_key_tfm(struct ecryptfs_key_tfm **key_tfm, char *cipher_name,
 			 size_t key_size, u32 mount_flags);
@@ -746,7 +742,7 @@ ecryptfs_add_new_key_tfm(struct ecryptfs_key_tfm **key_tfm, char *cipher_name,
 int ecryptfs_init_crypto(void);
 int ecryptfs_destroy_crypto(void);
 int ecryptfs_tfm_exists(char *cipher_name, struct ecryptfs_key_tfm **key_tfm);
-#if defined(CONFIG_CRYPTO_FIPS) && !defined(CONFIG_FORCE_DISABLE_FIPS)
+#ifdef CONFIG_CRYPTO_FIPS
 int ecryptfs_get_tfm_and_mutex_for_cipher_name(struct crypto_blkcipher **tfm,
 					       struct mutex **tfm_mutex,
 					       char *cipher_name,

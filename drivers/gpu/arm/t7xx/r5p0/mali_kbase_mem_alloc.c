@@ -47,7 +47,6 @@ static unsigned long kbase_mem_allocator_count(struct shrinker *s,
 						struct shrink_control *sc)
 {
 	struct kbase_mem_allocator *allocator;
-
 	allocator = container_of(s, struct kbase_mem_allocator, free_list_reclaimer);
 	return atomic_read(&allocator->free_list_size);
 }
@@ -86,7 +85,7 @@ static unsigned long kbase_mem_allocator_scan(struct shrinker *s,
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 12, 0)
 static int kbase_mem_allocator_shrink(struct shrinker *s,
-		struct shrink_control *sc)
+					struct shrink_control *sc)
 {
 	if (sc->nr_to_scan == 0)
 		return kbase_mem_allocator_count(s, sc);
@@ -138,11 +137,10 @@ void kbase_mem_allocator_term(struct kbase_mem_allocator *allocator)
 	mutex_lock(&allocator->free_list_lock);
 	while (!list_empty(&allocator->free_list_head)) {
 		struct page *p;
-
 		p = list_first_entry(&allocator->free_list_head, struct page,
 				     lru);
 		list_del(&p->lru);
-		dma_unmap_page(allocator->kbdev->dev, kbase_dma_addr(p),
+		dma_unmap_page(allocator->kbdev->dev, page_private(p),
 			       PAGE_SIZE,
 			       DMA_BIDIRECTIONAL);
 		ClearPagePrivate(p);
@@ -156,12 +154,11 @@ KBASE_EXPORT_TEST_API(kbase_mem_allocator_term)
 
 mali_error kbase_mem_allocator_alloc(struct kbase_mem_allocator *allocator, size_t nr_pages, phys_addr_t *pages)
 {
-	struct page *p;
-	void *mp;
+	struct page * p;
+	void * mp;
 	int i;
 	int num_from_free_list;
 	struct list_head from_free_list = LIST_HEAD_INIT(from_free_list);
-	gfp_t gfp;
 
 	might_sleep();
 
@@ -181,7 +178,8 @@ mali_error kbase_mem_allocator_alloc(struct kbase_mem_allocator *allocator, size
 	i = 0;
 
 	/* Allocate as many pages from the pool of already allocated pages. */
-	list_for_each_entry(p, &from_free_list, lru) {
+	list_for_each_entry(p, &from_free_list, lru)
+	{
 		pages[i] = PFN_PHYS(page_to_pfn(p));
 		i++;
 	}
@@ -189,29 +187,23 @@ mali_error kbase_mem_allocator_alloc(struct kbase_mem_allocator *allocator, size
 	if (i == nr_pages)
 		return MALI_ERROR_NONE;
 
-#if defined(CONFIG_ARM) && !defined(CONFIG_HAVE_DMA_ATTRS) && LINUX_VERSION_CODE < KERNEL_VERSION(3, 5, 0)
-	/* DMA cache sync fails for HIGHMEM before 3.5 on ARM */
-	gfp = GFP_USER;
-#else
-	gfp = GFP_HIGHUSER;
-#endif
-
-#ifndef SLSI_INTEGRATION
-	if (current->flags & PF_KTHREAD) {
-		/* Don't trigger OOM killer from kernel threads, e.g. when
-		 * growing memory on GPU page fault */
-		gfp |= __GFP_NORETRY;
-	}
-#endif
-
 	/* If not all pages were sourced from the pool, request new ones. */
-	for (; i < nr_pages; i++) {
+	for (; i < nr_pages; i++)
+	{
 		dma_addr_t dma_addr;
-		p = alloc_page(gfp);
+#if defined(CONFIG_ARM) && LINUX_VERSION_CODE < KERNEL_VERSION(3, 5, 0)
+		/* DMA cache sync fails for HIGHMEM before 3.5 on ARM */
+		p = alloc_page(GFP_USER);
+#else
+		p = alloc_page(GFP_HIGHUSER);
+#endif
 		if (NULL == p)
+		{
 			goto err_out_roll_back;
+		}
 		mp = kmap(p);
-		if (NULL == mp) {
+		if (NULL == mp)
+		{
 			__free_page(p);
 			goto err_out_roll_back;
 		}
@@ -226,7 +218,7 @@ mali_error kbase_mem_allocator_alloc(struct kbase_mem_allocator *allocator, size
 		}
 
 		SetPagePrivate(p);
-		kbase_set_dma_addr(p, dma_addr);
+		set_page_private(p, dma_addr);
 		pages[i] = PFN_PHYS(page_to_pfn(p));
 		BUG_ON(dma_addr != pages[i]);
 	}
@@ -238,7 +230,7 @@ err_out_roll_back:
 		struct page *p;
 		p = pfn_to_page(PFN_DOWN(pages[i]));
 		pages[i] = (phys_addr_t)0;
-		dma_unmap_page(allocator->kbdev->dev, kbase_dma_addr(p),
+		dma_unmap_page(allocator->kbdev->dev, page_private(p),
 			       PAGE_SIZE,
 			       DMA_BIDIRECTIONAL);
 		ClearPagePrivate(p);
@@ -313,7 +305,7 @@ void kbase_mem_allocator_free(struct kbase_mem_allocator *allocator, size_t nr_p
 			struct page *p;
 
 			p = pfn_to_page(PFN_DOWN(pages[i]));
-			dma_unmap_page(allocator->kbdev->dev, kbase_dma_addr(p),
+			dma_unmap_page(allocator->kbdev->dev, page_private(p),
 				       PAGE_SIZE,
 				       DMA_BIDIRECTIONAL);
 			ClearPagePrivate(p);
@@ -333,9 +325,9 @@ void kbase_mem_allocator_free(struct kbase_mem_allocator *allocator, size_t nr_p
 			/* Sync back the memory to ensure that future cache
 			 * invalidations don't trample on memory.
 			 */
-			if (sync_back)
+			if(sync_back)
 				dma_sync_single_for_cpu(allocator->kbdev->dev,
-						kbase_dma_addr(p),
+						page_private(p),
 						PAGE_SIZE,
 						DMA_BIDIRECTIONAL);
 

@@ -37,6 +37,4 @@ void trustedui_set_mode(int mode);
 int trustedui_set_mask(int mask);
 int trustedui_clear_mask(int mask);
 
-void trustedui_set_tsp_irq(int irq);
-
 #endif

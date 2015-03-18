@@ -34,14 +34,12 @@
 
 #define MEMPOOL_PAGES 16384
 
-
 /**
  * @brief Create a kernel base context.
  *
  * Allocate and init a kernel base context.
  */
-struct kbase_context *
-kbase_create_context(struct kbase_device *kbdev, bool is_compat)
+struct kbase_context *kbase_create_context(struct kbase_device *kbdev)
 {
 	struct kbase_context *kctx;
 	mali_error mali_err;
@@ -62,7 +60,6 @@ kbase_create_context(struct kbase_device *kbdev, bool is_compat)
 
 	kctx->kbdev = kbdev;
 	kctx->as_nr = KBASEP_AS_NR_INVALID;
-	kctx->is_compat = is_compat;
 #if SLSI_INTEGRATION
 	kctx->ctx_status = CTX_UNINITIALIZED;
 	kctx->ctx_need_qos = false;
@@ -144,18 +141,15 @@ kbase_create_context(struct kbase_device *kbdev, bool is_compat)
 	if (MALI_ERROR_NONE != mali_err)
 		goto no_region_tracker;
 
-	if (kbasep_jd_debugfs_ctx_add(kctx))
-		goto free_mem_profile;
-
 #if SLSI_INTEGRATION
 	kctx->ctx_status = CTX_INITIALIZED;
 #endif
 
+	/* default non-legacy */
+	kctx->legacy_app = 0;
 
 	return kctx;
 
-free_mem_profile:
-	kbasep_mem_profile_debugfs_remove(kctx);
 no_region_tracker:
 no_sink_page:
 	kbase_mem_allocator_free(&kctx->osalloc, 1, &kctx->aliasing_sink_page, 0);
@@ -171,7 +165,7 @@ free_jd:
 free_allocator:
 	kbase_mem_allocator_term(&kctx->osalloc);
 free_kctx:
-	vfree(kctx);
+    vfree(kctx);
 out:
 	return NULL;
 
@@ -213,8 +207,6 @@ void kbase_destroy_context(struct kbase_context *kctx)
 	KBASE_DEBUG_ASSERT(NULL != kbdev);
 
 	KBASE_TRACE_ADD(kbdev, CORE_CTX_DESTROY, kctx, NULL, 0u, 0u);
-
-	kbasep_jd_debugfs_ctx_remove(kctx);
 
 	kbasep_mem_profile_debugfs_remove(kctx);
 
@@ -343,9 +335,7 @@ void kbase_destroy_context(struct kbase_context *kctx)
 		set_hmp_boost(0);
 		set_hmp_aggressive_up_migration(false);
 		set_hmp_aggressive_yield(false);
-#ifdef CONFIG_MALI_DVFS
 		gpu_dvfs_boost_lock(GPU_DVFS_BOOST_UNSET);
-#endif /* CONFIG_MALI_DVFS */
 	}
 #endif
 	vfree(kctx);

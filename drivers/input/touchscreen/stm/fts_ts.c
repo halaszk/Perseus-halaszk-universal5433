@@ -72,12 +72,6 @@
 #include <linux/input/mt.h>
 #include "fts_ts.h"
 
-#ifdef FTS_SUPPORT_SIDE_GESTURE
-#include <linux/wakelock.h>
-struct wake_lock  report_wake_lock;
-#endif
-
-
 static struct i2c_driver fts_i2c_driver;
 
 #ifdef FTS_SUPPORT_TOUCH_KEY
@@ -110,20 +104,12 @@ static void fts_open_work(struct work_struct *work);
 #endif
 #endif
 
-#ifdef FTS_SUPPORT_MAINSCREEN_DISBLE
-extern void set_mainscreen_disable_cmd(struct fts_ts_info *info, bool on);
-#endif
-
 static int fts_stop_device(struct fts_ts_info *info);
 static int fts_start_device(struct fts_ts_info *info);
 static int fts_irq_enable(struct fts_ts_info *info, bool enable);
 static void fts_reset_work(struct work_struct *work);
 void fts_release_all_finger(struct fts_ts_info *info);
 
-#ifdef CONFIG_SEC_DEBUG_TSP_LOG
-static void dump_tsp_rawdata(struct work_struct *work);
-struct delayed_work * p_debug_work;
-#endif
 
 #if (!defined(CONFIG_HAS_EARLYSUSPEND)) && (!defined(CONFIG_PM)) && !defined(USE_OPEN_CLOSE)
 static int fts_suspend(struct i2c_client *client, pm_message_t mesg);
@@ -221,7 +207,6 @@ int fts_read_reg(struct fts_ts_info *info, unsigned char *reg, int cnum,
 	return 0;
 }
 
-#ifdef FTS_SUPPORT_STRINGLIB
 static int fts_read_from_string(struct fts_ts_info *info,
 					unsigned short *reg, unsigned char *data, int length)
 {
@@ -342,7 +327,6 @@ static int fts_write_to_string(struct fts_ts_info *info,
 
 	return ret;
 }
-#endif
 
 static void fts_delay(unsigned int ms)
 {
@@ -720,12 +704,6 @@ static int fts_init(struct fts_ts_info *info)
 		fts_command(info, FTS_CMD_KEY_SENSE_ON);
 #endif
 
-#ifdef FTS_SUPPORT_SIDE_GESTURE
-	if (info->board->support_sidegesture)
-		fts_enable_feature(info, FTS_FEATURE_SIDE_GUSTURE, true);
-#endif
-
-
 #ifdef FTS_SUPPORT_NOISE_PARAM
 	fts_get_noise_param_address(info);
 #endif
@@ -734,7 +712,6 @@ static int fts_init(struct fts_ts_info *info)
 	info->hover_enabled = false;
 	info->hover_ready = false;
 	info->flip_enable = false;
-	info->mainscr_disable = false;
 
 	info->deepsleep_mode = false;
 	info->lowpower_mode = false;
@@ -749,7 +726,6 @@ static int fts_init(struct fts_ts_info *info)
 	if (info->board->support_2ndscreen) {
 		info->SIDE_Flag = 0;
 		info->previous_SIDE_value = 0;
-		info->run_autotune = true;
 	}
 #endif
 
@@ -815,6 +791,9 @@ static unsigned char fts_event_handler_type_b(struct fts_ts_info *info,
 #if defined (CONFIG_INPUT_BOOSTER)
 	bool booster_restart = false;
 #endif
+	unsigned short string_addr;
+	unsigned char string_data[10] = {0, };
+	unsigned char string_clear = 0;
 #ifdef FTS_SUPPORT_2NDSCREEN
 	u8 currentSideFlag = 0;
 #endif
@@ -912,8 +891,6 @@ static unsigned char fts_event_handler_type_b(struct fts_ts_info *info,
 					int direction, distance;
 					direction = data[2 + EventNum * FTS_EVENT_SIZE];
 					distance = *(int *)&data[3 + EventNum * FTS_EVENT_SIZE];
-
-					wake_lock_timeout(&report_wake_lock, 3*HZ);
 
 					input_report_key(info->input_dev, KEY_SIDE_GESTURE, 1);
 					tsp_debug_info(true, &info->client->dev,
@@ -1039,13 +1016,14 @@ static unsigned char fts_event_handler_type_b(struct fts_ts_info *info,
 						  FTS_EVENT_SIZE] << 4);
 			bw = data[4 + EventNum * FTS_EVENT_SIZE];
 			bh = data[5 + EventNum * FTS_EVENT_SIZE];
+
 			palm =
 			    (data[6 + EventNum * FTS_EVENT_SIZE] >> 7) & 0x01;
 
 			sumsize = (data[6 + EventNum * FTS_EVENT_SIZE] & 0x7f) << 1;
-
 			if ((info->touch_count == 1) && (sumsize < 40))
 				sumsize = 39;
+
 #ifdef FTS_SUPPORT_2NDSCREEN
 			if (info->board->support_2ndscreen) {
 				currentSideFlag = (data[7 + EventNum * FTS_EVENT_SIZE] >> 7) & 0x01;
@@ -1075,11 +1053,12 @@ static unsigned char fts_event_handler_type_b(struct fts_ts_info *info,
 			input_report_abs(info->input_dev,
 					 ABS_MT_TOUCH_MINOR, min(bw,
 								 bh));
-#ifdef FTS_SUPPORT_SEC_SWIPE
+
+			input_report_abs(info->input_dev,
+					 ABS_MT_SUMSIZE, sumsize);
 			input_report_abs(info->input_dev, ABS_MT_PALM,
 					 palm);
-#endif
-#if defined(FTS_SUPPORT_SIDE_GESTURE)
+#if defined(FTS_SUPPORT_SIDE_GESTURE) && defined(CONFIG_INPUT_EXPANDED_ABS)
 			if (info->board->support_sidegesture)
 				input_report_abs(info->input_dev, ABS_MT_GRIP, 0);
 #endif
@@ -1103,7 +1082,7 @@ static unsigned char fts_event_handler_type_b(struct fts_ts_info *info,
 
 			input_mt_slot(info->input_dev, TouchID);
 
-#if defined(FTS_SUPPORT_SIDE_GESTURE)
+#if defined(FTS_SUPPORT_SIDE_GESTURE) && defined(CONFIG_INPUT_EXPANDED_ABS)
 			if (info->board->support_sidegesture) {
 				if (longpress_release[TouchID] == 1) {
 					input_report_abs(info->input_dev, ABS_MT_GRIP, 1);
@@ -1123,10 +1102,8 @@ static unsigned char fts_event_handler_type_b(struct fts_ts_info *info,
 			if (info->touch_count == 0) {
 				/* Clear BTN_TOUCH when All touch are released  */
 				input_report_key(info->input_dev, BTN_TOUCH, 0);
-#ifdef FTS_SUPPORT_STRINGLIB
 				input_report_key(info->input_dev, KEY_REAR_CAMERA_DETECTED, 0);
 				input_report_key(info->input_dev, KEY_FRONT_CAMERA_DETECTED, 0);
-#endif
 				input_report_key(info->input_dev, BTN_TOOL_FINGER, 0);
 #ifdef FTS_SUPPORT_SIDE_SCROLL
 				if (info->board->support_sidescroll) {
@@ -1200,12 +1177,8 @@ static unsigned char fts_event_handler_type_b(struct fts_ts_info *info,
 			}
 			break;
 #endif
-#ifdef FTS_SUPPORT_STRINGLIB
-		case EVENTID_FROM_STRING:
-			unsigned short string_addr;
-			unsigned char string_data[10] = {0, };
-			unsigned char string_clear = 0;
 
+		case EVENTID_FROM_STRING:
 			string_addr = FTS_CMD_STRING_ACCESS;
 			fts_read_from_string(info, &string_addr, string_data, 6);
 			tsp_debug_info(true, &info->client->dev,
@@ -1262,7 +1235,6 @@ static unsigned char fts_event_handler_type_b(struct fts_ts_info *info,
 			input_report_key(info->input_dev, KEY_BLACK_UI_GESTURE, 0);
 
 			break;
-#endif
 
 		default:
 			fts_unknown_event_handler(info,
@@ -1304,17 +1276,17 @@ static unsigned char fts_event_handler_type_b(struct fts_ts_info *info,
 		else if (EventID == EVENTID_LEAVE_POINTER) {
 #if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
 			tsp_debug_info(true, &info->client->dev,
-				"[R] tID:%d mc: %d tc:%d lx: %d ly: %d Ver[%02X%04X%01X%01X%01X]\n",
+				"[R] tID:%d mc: %d tc:%d lx: %d ly: %d Ver[%02X%04X%01X%01X]\n",
 				TouchID, info->finger[TouchID].mcount, info->touch_count,
 				info->finger[TouchID].lx, info->finger[TouchID].ly,
 				info->panel_revision, info->fw_main_version_of_ic,
-				info->flip_enable, info->mshover_enabled, info->mainscr_disable);
+				info->flip_enable, info->mshover_enabled);
 #else
 			tsp_debug_info(true, &info->client->dev,
-				"[R] tID:%d mc: %d tc:%d Ver[%02X%04X%01X%01X%01X]\n",
+				"[R] tID:%d mc: %d tc:%d Ver[%02X%04X%01X%01X]\n",
 				TouchID, info->finger[TouchID].mcount, info->touch_count,
 				info->panel_revision, info->fw_main_version_of_ic,
-				info->flip_enable, info->mshover_enabled, info->mainscr_disable);
+				info->flip_enable, info->mshover_enabled);
 #endif
 			info->finger[TouchID].mcount = 0;
 		} else if (EventID == EVENTID_HOVER_LEAVE_POINTER) {
@@ -1370,6 +1342,19 @@ static void fts_ta_cb(struct fts_callbacks *cb, int ta_status)
 }
 #endif
 
+static void fts_cam_work(struct work_struct *work)
+{
+	struct fts_ts_info *info = container_of(work, struct fts_ts_info,
+						cam_work.work);
+
+	tsp_debug_info(true, &info->client->dev, "%s\n", __func__);
+
+	input_report_key(info->input_dev, KEY_REAR_CAMERA_DETECTED, 0);
+	input_report_key(info->input_dev, KEY_FRONT_CAMERA_DETECTED, 0);
+	input_report_key(info->input_dev, KEY_BLACK_UI_GESTURE, 0);
+	input_sync(info->input_dev);
+}
+
 /**
  * fts_interrupt_handler()
  *
@@ -1385,15 +1370,12 @@ static irqreturn_t fts_interrupt_handler(int irq, void *handle)
 	struct fts_ts_info *info = handle;
 	unsigned char regAdd[4] = {0xb6, 0x00, 0x45, READ_ALL_EVENT};
 	unsigned short evtcount = 0;
-#ifdef FTS_SUPPORT_SIDE_GESTURE
+
 	if ((info->board->support_sidegesture) &&
 		(info->fts_power_state == FTS_POWER_STATE_LOWPOWER))
 		pm_wakeup_event(info->input_dev->dev.parent, 1000);
-#endif
 
 	evtcount = 0;
-
-
 	fts_read_reg(info, &regAdd[0], 3, (unsigned char *)&evtcount, 2);
 	evtcount = evtcount >> 10;
 
@@ -1406,11 +1388,10 @@ static irqreturn_t fts_interrupt_handler(int irq, void *handle)
 				  FTS_EVENT_SIZE * evtcount);
 		fts_event_handler_type_b(info, info->data, evtcount);
 	}
-#ifdef FTS_SUPPORT_SIDE_GESTURE
+
 	if ((info->board->support_sidegesture) &&
 		(info->fts_power_state == FTS_POWER_STATE_LOWPOWER))
 		pm_relax(info->input_dev->dev.parent);
-#endif
 
 	return IRQ_HANDLED;
 }
@@ -1533,14 +1514,14 @@ static int fts_power_ctrl(void *data, bool on)
 	tsp_debug_info(true, dev, "%s: %s\n", __func__, on ? "on" : "off");
 
 	if (on) {
-		retval = regulator_enable(regulator_avdd);
-		if (retval) {
-			tsp_debug_err(true, dev, "%s: Failed to enable avdd: %d\n", __func__, retval);
-			return retval;
-		}
 		retval = regulator_enable(regulator_dvdd);
 		if (retval) {
 			tsp_debug_err(true, dev, "%s: Failed to enable vdd: %d\n", __func__, retval);
+			return retval;
+		}
+		retval = regulator_enable(regulator_avdd);
+		if (retval) {
+			tsp_debug_err(true, dev, "%s: Failed to enable avdd: %d\n", __func__, retval);
 			return retval;
 		}
 
@@ -1593,9 +1574,6 @@ static int fts_parse_dt(struct i2c_client *client)
 		return -EINVAL;
 	}
 
-	if (of_property_read_u32(np, "stm,grip_area", &pdata->grip_area))
-		tsp_debug_err(true, dev, "Failed to get grip_area property\n");
-
 	if (of_property_read_u32_array(np, "stm,max_coords", coords, 2)) {
 		tsp_debug_err(true, dev, "Failed to get max_coords property\n");
 		return -EINVAL;
@@ -1643,9 +1621,6 @@ static int fts_parse_dt(struct i2c_client *client)
 	if (of_property_read_u32(np, "stm,num_touchkey", &pdata->num_touchkey))
 		tsp_debug_dbg(true, dev, "skipped to get num_touchkey property\n");
 	else {
-#ifdef FTS_SUPPORT_SIDE_GESTURE
-		pdata->support_sidegesture = true;
-#endif
 		pdata->support_mskey = true;
 		pdata->touchkey = fts_touchkeys;
 
@@ -1656,10 +1631,23 @@ static int fts_parse_dt(struct i2c_client *client)
 	}
 #endif
 
+	if (strncmp(pdata->project_name, "TB", 2) == 0) {
+#ifdef FTS_SUPPORT_SIDE_GESTURE
+		pdata->support_sidegesture = true;
+#endif
+#ifdef FTS_SUPPORT_2NDSCREEN
+		pdata->support_2ndscreen = true;
+#endif
+#ifdef FTS_SUPPORT_SIDE_SCROLL
+		pdata->support_sidescroll = true;
+#endif
+	}
+
 	pdata->panel_revision = (lcdtype & 0xF000) >> 12;
+
 	tsp_debug_info(true, dev,
-		"irq :%d, irq_type: 0x%04x, max[x,y]: [%d,%d], grip_area :%d, project/model_name: %s/%s, panel_revision: %d, lcdtype: 0x%06X\n",
-		pdata->gpio, pdata->irq_type, pdata->max_x, pdata->max_y, pdata->grip_area,
+		"irq :%d, irq_type: 0x%04x, max[x,y]: [%d,%d], project/model_name: %s/%s, panel_revision: %d, lcdtype: 0x%06X\n",
+		pdata->gpio, pdata->irq_type, pdata->max_x, pdata->max_y,
 		pdata->project_name, pdata->model_name,
 		pdata->panel_revision, lcdtype);
 
@@ -1728,8 +1716,6 @@ static int fts_setup_drv_data(struct i2c_client *client)
 	info->board = pdata;
 	info->irq = client->irq;
 	info->irq_type = info->board->irq_type;
-
-	info->edge_grip_mode = true;	// default;
 	info->irq_enabled = false;
 	info->touch_stopped = false;
 	info->panel_revision = info->board->panel_revision;
@@ -1742,10 +1728,9 @@ static int fts_setup_drv_data(struct i2c_client *client)
 	info->fts_systemreset = fts_systemreset;
 	info->fts_get_version_info = fts_get_version_info;
 	info->fts_wait_for_ready = fts_wait_for_ready;
-#ifdef FTS_SUPPORT_STRINGLIB
 	info->fts_read_from_string = fts_read_from_string;
 	info->fts_write_to_string = fts_write_to_string;
-#endif
+
 #ifdef FTS_SUPPORT_NOISE_PARAM
 	info->fts_get_noise_param_address = fts_get_noise_param_address;
 #endif
@@ -1753,13 +1738,11 @@ static int fts_setup_drv_data(struct i2c_client *client)
 #ifdef USE_OPEN_DWORK
 	INIT_DELAYED_WORK(&info->open_work, fts_open_work);
 #endif
+
+	INIT_DELAYED_WORK(&info->cam_work, fts_cam_work);
 	info->delay_time = 300;
 	INIT_DELAYED_WORK(&info->reset_work, fts_reset_work);
 
-#ifdef CONFIG_SEC_DEBUG_TSP_LOG
-	INIT_DELAYED_WORK(&info->debug_work, dump_tsp_rawdata);
-	p_debug_work = &info->debug_work;
-#endif
 #ifdef SEC_TSP_FACTORY_TEST
 	INIT_DELAYED_WORK(&info->cover_cmd_work, clear_cover_cmd_work);
 #endif
@@ -1861,11 +1844,11 @@ static int fts_probe(struct i2c_client *client, const struct i2c_device_id *idp)
 		set_bit(BTN_L_FLICK_FLAG, info->input_dev->keybit);
 	}
 #endif
-#ifdef FTS_SUPPORT_STRINGLIB
+
 	set_bit(KEY_REAR_CAMERA_DETECTED, info->input_dev->keybit);
 	set_bit(KEY_FRONT_CAMERA_DETECTED, info->input_dev->keybit);
 	set_bit(KEY_BLACK_UI_GESTURE, info->input_dev->keybit);
-#endif
+
 #ifdef FTS_SUPPORT_TOUCH_KEY
 	if (info->board->support_mskey) {
 		for (i = 0 ; i < info->board->num_touchkey ; i++)
@@ -1904,10 +1887,10 @@ static int fts_probe(struct i2c_client *client, const struct i2c_device_id *idp)
 				 0, 255, 0, 0);
 	input_set_abs_params(info->input_dev, ABS_MT_TOUCH_MINOR,
 				 0, 255, 0, 0);
-#ifdef FTS_SUPPORT_SEC_SWIPE
+	input_set_abs_params(info->input_dev, ABS_MT_SUMSIZE,
+				 0, 255, 0, 0);
 	input_set_abs_params(info->input_dev, ABS_MT_PALM, 0, 1, 0, 0);
-#endif
-#if defined(FTS_SUPPORT_SIDE_GESTURE)
+#if defined(FTS_SUPPORT_SIDE_GESTURE) && defined(CONFIG_INPUT_EXPANDED_ABS)
 	if (info->board->support_sidegesture)
 		input_set_abs_params(info->input_dev, ABS_MT_GRIP, 0, 1, 0, 0);
 #endif
@@ -1927,9 +1910,6 @@ static int fts_probe(struct i2c_client *client, const struct i2c_device_id *idp)
 		info->finger[i].state = EVENTID_LEAVE_POINTER;
 		info->finger[i].mcount = 0;
 	}
-#ifdef FTS_SUPPORT_SIDE_GESTURE
-	wake_lock_init(&report_wake_lock, WAKE_LOCK_SUSPEND,"report_wake_lock");
-#endif
 
 	info->enabled = true;
 
@@ -1940,12 +1920,6 @@ static int fts_probe(struct i2c_client *client, const struct i2c_device_id *idp)
 						__func__);
 		goto err_enable_irq;
 	}
-
-#ifdef CONFIG_TRUSTONIC_TRUSTED_UI
-	trustedui_set_tsp_irq(info->irq);
-	tsp_debug_info(true, &client->dev, "%s[%d] called!\n",
-		__func__, info->irq);
-#endif
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	info->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1;
@@ -2356,10 +2330,10 @@ void fts_release_all_finger(struct fts_ts_info *info)
 				info->touch_count = 0;
 
 			tsp_debug_info(true, &info->client->dev,
-				"[RA] tID:%d mc: %d tc:%d Ver[%02X%04X%01X%01X%01X]\n",
+				"[RA] tID:%d mc: %d tc:%d Ver[%02X%04X%01X%01X]\n",
 				i, info->finger[i].mcount, info->touch_count,
 				info->panel_revision, info->fw_main_version_of_ic,
-				info->flip_enable, info->mshover_enabled, info->mainscr_disable);
+				info->flip_enable, info->mshover_enabled);
 		}
 
 		info->finger[i].state = EVENTID_LEAVE_POINTER;
@@ -2387,11 +2361,10 @@ void fts_release_all_finger(struct fts_ts_info *info)
 	input_report_switch(info->input_dev, SW_GLOVE, false);
 	info->touch_mode = FTS_TM_NORMAL;
 #endif
-#ifdef FTS_SUPPORT_STRINGLIB
 	input_report_key(info->input_dev, KEY_REAR_CAMERA_DETECTED, 0);
 	input_report_key(info->input_dev, KEY_FRONT_CAMERA_DETECTED, 0);
 	input_report_key(info->input_dev, KEY_BLACK_UI_GESTURE, 0);
-#endif
+
 #ifdef FTS_SUPPORT_SIDE_GESTURE
 	if (info->board->support_sidegesture)
 		input_report_key(info->input_dev, KEY_SIDE_GESTURE, 0);
@@ -2403,47 +2376,6 @@ void fts_release_all_finger(struct fts_ts_info *info)
 
 	input_sync(info->input_dev);
 }
-
-#ifdef CONFIG_SEC_DEBUG_TSP_LOG
-static void dump_tsp_rawdata(struct work_struct *work)
-{
-	struct fts_ts_info *info = container_of(work, struct fts_ts_info,
-							debug_work.work);
-	int i;
-
-	if (info->rawdata_read_lock == true)
-		tsp_debug_err(true, &info->client->dev, "%s, ## checking.. ignored.\n", __func__);
-
-	info->rawdata_read_lock = true;
-	tsp_debug_info(true, &info->client->dev, "%s, ## run CX data ##, %d\n", __func__, __LINE__);
-	run_cx_data_read((void *)info);
-
-	for (i = 0; i < 5; i++) {
-		tsp_debug_info(true, &info->client->dev, "%s, ## run Raw Cap data ##, %d\n", __func__, __LINE__);
-		run_rawcap_read((void *)info);
-
-		tsp_debug_info(true, &info->client->dev, "%s, ## run Delta ##, %d\n", __func__, __LINE__);
-		run_delta_read((void *)info);
-		fts_delay(50);
-	}
-	tsp_debug_info(true, &info->client->dev, "%s, ## Done ##, %d\n", __func__, __LINE__);
-
-	info->rawdata_read_lock = false;
-}
-
-void tsp_dump(void)
-{
-#ifdef CONFIG_BATTERY_SAMSUNG
-	if (lpcharge)
-		return;
-#endif
-	if (!p_debug_work)
-		return;
-
-	printk(KERN_ERR "FTS %s: start \n", __func__);
-	schedule_delayed_work(p_debug_work, msecs_to_jiffies(100));
-}
-#endif
 
 static void fts_reset_work(struct work_struct *work)
 {
@@ -2479,21 +2411,6 @@ static int fts_stop_device(struct fts_ts_info *info)
 	}
 
 	if (info->lowpower_mode) {
-#ifdef FTS_ADDED_RESETCODE_IN_LPLM
-
-		info->mainscr_disable = false;
-		info->edge_grip_mode = false;
-#else	// clear cmd list.
-#ifdef FTS_SUPPORT_MAINSCREEN_DISBLE
-		dev_info(&info->client->dev, "%s mainscreen disebla flag:%d, clear 0\n", __func__, info->mainscr_disable);
-			set_mainscreen_disable_cmd((void *)info, 0);
-#endif
-		if(info->edge_grip_mode == false){
-			dev_info(&info->client->dev, "%s edge grip enable flag:%d, clear 1\n", __func__, info->edge_grip_mode);
-			longpress_grip_enable_mode(info, 1);		// default
-			grip_check_enable_mode(info, 1);			// default
-		}
-#endif
 		tsp_debug_info(true, &info->client->dev, "%s lowpower flag:%d\n", __func__, info->lowpower_flag);
 
 		info->fts_power_state = FTS_POWER_STATE_LOWPOWER;
@@ -2546,10 +2463,6 @@ static int fts_stop_device(struct fts_ts_info *info)
 
 static int fts_start_device(struct fts_ts_info *info)
 {
-#ifdef FTS_SUPPORT_STRINGLIB
-	unsigned short addr = FTS_CMD_STRING_ACCESS;
-	int ret;
-#endif
 	tsp_debug_info(true, &info->client->dev, "%s %s\n",
 			__func__, info->lowpower_mode ? "exit low power mode" : "");
 
@@ -2567,48 +2480,9 @@ static int fts_start_device(struct fts_ts_info *info)
 
 	if (info->lowpower_mode) {
 		/* low power mode command is sent after LCD OFF. turn on touch power @ LCD ON */
-		if (info->touch_stopped) {
-			fts_power_ctrl(info, true);
+		if (info->touch_stopped)
+			goto tsp_power_on;
 
-			info->touch_stopped = false;
-			info->reinit_done = false;
-
-			fts_reinit(info);
-
-			info->reinit_done = true;
-
-			enable_irq(info->irq);
-#ifdef FTS_SUPPORT_STRINGLIB
-			if (info->fts_mode) {
-				ret = info->fts_write_to_string(info, &addr, &info->fts_mode, sizeof(info->fts_mode));
-				if (ret < 0)
-					dev_err(&info->client->dev, "%s: failed. ret: %d\n", __func__, ret);
-			}
-#endif
-			goto out;
-		}
-#ifdef USE_RESET_WORK_EXIT_LOWPOWERMODE
-		schedule_work(&info->reset_work.work);
-		goto out;
-#endif
-
-#ifdef FTS_ADDED_RESETCODE_IN_LPLM
-
-		disable_irq(info->irq);
-		info->reinit_done = false;
-
-		fts_reinit(info);
-
-		info->reinit_done = true;
-		enable_irq(info->irq);
-#ifdef FTS_SUPPORT_STRINGLIB
-		if (info->fts_mode) {
-			ret = info->fts_write_to_string(info, &addr, &info->fts_mode, sizeof(info->fts_mode));
-			if (ret < 0)
-				dev_err(&info->client->dev, "%s: failed. ret: %d\n", __func__, ret);
-		}
-#endif
-#else
 		fts_command(info, SLEEPIN);
 		fts_delay(50);
 		fts_command(info, SLEEPOUT);
@@ -2622,10 +2496,11 @@ static int fts_start_device(struct fts_ts_info *info)
 		}
 #endif
 		fts_command(info, FLUSHBUFFER);
-#endif
+
 		if (device_may_wakeup(&info->client->dev))
 			disable_irq_wake(info->irq);
 	} else {
+tsp_power_on:
 		if (info->board->power)
 			info->board->power(info, true);
 		info->touch_stopped = false;
@@ -2636,7 +2511,6 @@ static int fts_start_device(struct fts_ts_info *info)
 
 		enable_irq(info->irq);
 
-#ifdef FTS_SUPPORT_STRINGLIB
 		if (info->fts_mode) {
 			unsigned short addr = FTS_CMD_STRING_ACCESS;
 			int ret;
@@ -2645,7 +2519,6 @@ static int fts_start_device(struct fts_ts_info *info)
 			if (ret < 0)
 				tsp_debug_err(true, &info->client->dev, "%s: failed. ret: %d\n", __func__, ret);
 		}
-#endif
 	}
  out:
 	mutex_unlock(&info->device_mutex);
@@ -2674,7 +2547,7 @@ static int fts_pm_suspend(struct device *dev)
 {
 	struct fts_ts_info *info = dev_get_drvdata(dev);
 
-	tsp_debug_err(true, &info->client->dev, "%s\n", __func__);;
+	tsp_debug_dbg(false, &info->client->dev, "%s\n", __func__);;
 
 	mutex_lock(&info->input_dev->mutex);
 
@@ -2690,7 +2563,7 @@ static int fts_pm_resume(struct device *dev)
 {
 	struct fts_ts_info *info = dev_get_drvdata(dev);
 
-	tsp_debug_err(true, &info->client->dev, "%s\n", __func__);
+	tsp_debug_dbg(false, &info->client->dev, "%s\n", __func__);
 
 	mutex_lock(&info->input_dev->mutex);
 

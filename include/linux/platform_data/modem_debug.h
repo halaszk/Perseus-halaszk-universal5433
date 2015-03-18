@@ -31,7 +31,6 @@ struct log_buff_circ_queue {
 enum modemctl_event {
 	MDM_EVENT_CP_FORCE_RESET,
 	MDM_EVENT_CP_FORCE_CRASH,
-	MDM_EVENT_CP_ABNORMAL_RX,
 };
 
 int register_cp_crash_notifier(struct notifier_block *nb);

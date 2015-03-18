@@ -6,18 +6,12 @@ config VIDEO_EXYNOS_FIMC_IS
         default n
         help
           This is a v4l2 driver for exynos FIMC-IS device.
-config CAMERA_EEPROM_SUPPORT_REAR
-        bool "Enable eeprom for rear cam"
+config CAMERA_EEPROM_SUPPORT
+        bool "Enable to eeprom"
         depends on VIDEO_EXYNOS_FIMC_IS
         default n
         help
-          Enable eeprom for rear cam.
-config CAMERA_EEPROM_SUPPORT_FRONT
-        bool "Enable eeprom for front cam"
-        depends on VIDEO_EXYNOS_FIMC_IS
-        default n
-        help
-          Enable eeprom for front cam.
+          Enable to eeprom.
 config COMPANION_USE
         bool "Enable to companion"
         depends on VIDEO_EXYNOS_FIMC_IS
@@ -114,12 +108,6 @@ config CAMERA_SENSOR_2P2_12M_OBJ
         default n
         help
           Use to build 2P2_12M camera sensor.
-config CAMERA_SENSOR_2P3_OBJ
-        bool "Use 2P3 camera sensor"
-        depends on VIDEO_EXYNOS_FIMC_IS
-        default n
-        help
-          Use to build 2P3 camera sensor.
 config CAMERA_SENSOR_3H5_OBJ
         bool "Use 3H5 camera sensor"
         depends on VIDEO_EXYNOS_FIMC_IS
@@ -150,12 +138,6 @@ config CAMERA_SENSOR_IMX175_OBJ
         default n
         help
           Use to build IMX175 camera sensor.
-config CAMERA_SENSOR_IMX219_OBJ
-        bool "Use IMX219 camera sensor"
-        depends on VIDEO_EXYNOS_FIMC_IS
-        default n
-        help
-          Use to build IMX219 camera sensor.
 config CAMERA_SENSOR_IMX240_OBJ
         bool "Use IMX240 camera sensor"
         depends on VIDEO_EXYNOS_FIMC_IS

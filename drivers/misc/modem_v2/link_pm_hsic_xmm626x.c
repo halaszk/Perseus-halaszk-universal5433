@@ -598,10 +598,8 @@ static int xmm626x_gpio_l2tol0_resume(struct xmm626x_linkpm_data *pmdata)
 	while (spin-- && !get_hostwake(pmdata))
 		mdelay(5);
 
-	if (!get_hostwake(pmdata)) {
-		set_slavewake(pmdata->pdata, 0);
+	if (!get_hostwake(pmdata))
 		return -ETIMEDOUT;
-	}
 exit:
 	return 0;
 }

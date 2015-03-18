@@ -167,10 +167,7 @@ static const struct regulator_init_data arizona_ldo1_dvfs = {
 
 static const struct regulator_init_data arizona_ldo1_default = {
 	.constraints = {
-		.min_uV = 1175000,
-		.max_uV = 1200000,
-		.valid_ops_mask = REGULATOR_CHANGE_STATUS |
-				  REGULATOR_CHANGE_VOLTAGE,
+		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
 	},
 	.num_consumer_supplies = 1,
 };

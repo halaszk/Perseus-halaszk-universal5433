@@ -19,11 +19,6 @@
 #include <linux/sched.h>
 #include <linux/highmem.h>
 #include <linux/perf_event.h>
-
-#ifdef CONFIG_TIMA_RKP_RO_CRED
-#include <linux/security.h>
-#endif /*CONFIG_TIMA_RKP_RO_CRED*/
-
 #ifdef CONFIG_TIMA_RKP
 #include <linux/io.h>
 #include <linux/slab.h>
@@ -684,10 +679,6 @@ hook_fault_code(int nr, int (*fn)(unsigned long, unsigned int, struct pt_regs *)
 	fsr_info[nr].name = name;
 }
 
-#ifdef CONFIG_TIMA_RKP_RO_CRED
-extern int tima_ro_page(unsigned long addr);
-#endif /*CONFIG_TIMA_RKP_RO_CRED*/
-
 /*
  * Dispatch a data abort to the relevant handler.
  */
@@ -696,13 +687,6 @@ do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 {
 	const struct fsr_info *inf = fsr_info + fsr_fs(fsr);
 	struct siginfo info;
-
-/*Lets check whether Abort come from Cred Area */
-#ifdef CONFIG_TIMA_RKP_RO_CRED
-	if (tima_ro_page(addr)) {
-		printk(KERN_ERR"RKP RO_SLAB: Illegal write, 0x%08lx, 0x%08lx", addr, regs->ARM_pc);
-	}
-#endif /*CONFIG_TIMA_RKP_RO_CRED*/
 
 	if (!inf->fn(addr, fsr & ~FSR_LNX_PF, regs))
 		return;

@@ -77,9 +77,7 @@ int of_get_named_gpio_flags(struct device_node *np, const char *propname,
 					 &gg_data.gpiospec);
 	if (ret) {
 		pr_debug("%s: can't parse gpios property\n", __func__);
-#if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
 		dump_stack();
-#endif
 		return ret;
 	}
 

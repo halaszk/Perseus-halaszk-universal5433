@@ -231,6 +231,9 @@ void bbd_mcu_ready_work_func(struct work_struct *work)
 	int ret = 0;
 	int retries = 0;
 
+	//to hold wakelock until initialize MCU
+        wake_lock_timeout(&data->ssp_wake_lock, 4 * HZ);
+
 	msleep(1000);
 	dprint("MCU is ready.(work_queue)\n");
 
@@ -280,9 +283,9 @@ void bbd_on_packet_work_func(struct work_struct *work)
 	int iRet = 0;
 	unsigned char *pData = NULL, *p, *q;
 	int nDataLen = 0;
-	struct timespec ts;
-	ts = ktime_to_timespec(ktime_get_boottime());
-	data->timestamp = ts.tv_sec * 1000000000ULL + ts.tv_nsec;
+
+	if(data == NULL)
+		return;
 
 	iRet = bbd_pull_packet(rBuff, sizeof(rBuff), BBD_PULL_TIMEOUT);
 	if (iRet <= 0) {

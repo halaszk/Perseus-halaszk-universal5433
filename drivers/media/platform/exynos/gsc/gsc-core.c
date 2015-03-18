@@ -1229,12 +1229,10 @@ static irqreturn_t gsc_irq_handler(int irq, void *priv)
 		pm_runtime_put(&gsc->pdev->dev);
 	} else if (test_bit(ST_OUTPUT_STREAMON, &gsc->state) &&
 			gsc->out.vbq.streaming) {
-		if (!list_empty(&gsc->out.active_buf_q) &&
-		    !list_is_singular(&gsc->out.active_buf_q)) {
+		if (!list_empty(&gsc->out.active_buf_q)) {
 			struct gsc_input_buf *done_buf;
-			done_buf = active_queue_pop(&gsc->out, gsc);
+			done_buf = active_q_pop(&gsc->out);
 			vb2_buffer_done(&done_buf->vb, VB2_BUF_STATE_DONE);
-			list_del(&done_buf->list);
 		}
 		gsc->isr_cnt++;
 	} else if (test_and_clear_bit(ST_CAPT_RUN, &gsc->state)) {

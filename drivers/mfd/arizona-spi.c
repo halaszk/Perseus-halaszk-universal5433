@@ -27,8 +27,7 @@ static int arizona_spi_probe(struct spi_device *spi)
 	const struct spi_device_id *id = spi_get_device_id(spi);
 	struct arizona *arizona;
 	const struct regmap_config *regmap_config;
-	unsigned long type;
-	int ret;
+	int ret, type;
 
 	if (spi->dev.of_node)
 		type = arizona_of_get_type(&spi->dev);

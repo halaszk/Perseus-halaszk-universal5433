@@ -92,13 +92,12 @@ static int touchled_cmd_reversed;
 #ifdef LED_LDO_WITH_REGULATOR
 static void change_touch_key_led_voltage(struct device *dev, int vol_mv)
 {
-	struct regulator *tled_regulator = NULL;
+	struct regulator *tled_regulator;
 
 	tled_regulator = regulator_get(NULL, TK_LED_REGULATOR_NAME);
-	if (IS_ERR_OR_NULL(tled_regulator)) {
+	if (IS_ERR(tled_regulator)) {
 		tk_debug_err(true, dev, "%s: failed to get resource %s\n", __func__,
 		       "touchkey_led");
-		tled_regulator = NULL;
 		return;
 	}
 	regulator_set_voltage(tled_regulator, vol_mv * 1000, vol_mv * 1000);
@@ -2121,7 +2120,7 @@ static int touchkey_power_on(void *data, bool on)
 {
 	struct touchkey_i2c *tkey_i2c = (struct touchkey_i2c *)data;
 	struct device *dev = &tkey_i2c->client->dev;
-	struct regulator *regulator = NULL;
+	struct regulator *regulator;
 	static bool enabled;
 	int ret = 0;
 	int state = on ? I_STATE_ON_IRQ : I_STATE_OFF_IRQ;
@@ -2135,10 +2134,9 @@ static int touchkey_power_on(void *data, bool on)
 	tk_debug_info(true, dev, "%s: %s",__func__,(on)?"on":"off");
 
 	regulator = regulator_get(NULL, TK_REGULATOR_NAME);
-	if (IS_ERR_OR_NULL(regulator)) {
+	if (IS_ERR(regulator)) {
 		tk_debug_err(true, dev,
 			"%s : TK regulator_get failed\n", __func__);
-		regulator = NULL;
 		return -EIO;
 	}
 
@@ -2167,7 +2165,7 @@ static int touchkey_power_on(void *data, bool on)
 static int touchkey_led_power_on(void *data, bool on)
 {
 	struct touchkey_i2c *tkey_i2c = (struct touchkey_i2c *)data;
-	struct regulator *regulator = NULL;
+	struct regulator *regulator;
 	static bool enabled;
 	int ret = 0;
 
@@ -2181,10 +2179,8 @@ static int touchkey_led_power_on(void *data, bool on)
 
 	if (on) {
 		regulator = regulator_get(NULL, TK_LED_REGULATOR_NAME);
-		if (IS_ERR_OR_NULL(regulator)){
-			regulator = NULL;
-			return -EINVAL;
-		}
+		if (IS_ERR(regulator))
+			return 0;
 		ret = regulator_enable(regulator);
 		if (ret) {
 			tk_debug_err(true, &tkey_i2c->client->dev,

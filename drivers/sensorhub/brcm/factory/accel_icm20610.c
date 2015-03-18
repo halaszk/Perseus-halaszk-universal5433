@@ -355,7 +355,7 @@ static ssize_t accel_hw_selftest_show(struct device *dev,
 	msg->buffer = chTempBuf;
 	msg->free_buffer = 0;
 
-	iRet = ssp_spi_sync(data, msg, 3000);
+	iRet = ssp_spi_sync(data, msg, 7000);
 	if (iRet != SUCCESS) {
 		pr_err("[SSP] %s - accel hw selftest Timeout!!\n", __func__);
 		goto exit;

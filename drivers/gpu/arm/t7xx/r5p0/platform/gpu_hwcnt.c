@@ -18,9 +18,6 @@
 #include <mali_kbase.h>
 #include <mali_kbase_mem_linux.h>
 #include "mali_kbase_platform.h"
-
-#include <linux/compat.h> /* is_compat_task */
-
 #include "gpu_hwcnt.h"
 
 mali_error exynos_gpu_hwcnt_update(struct kbase_device *kbdev)
@@ -215,7 +212,7 @@ void exynos_hwcnt_init(struct kbase_device *kbdev)
 	struct kbase_uk_mem_alloc mem;
 	struct kbase_va_region *reg;
 
-	kctx = kbase_create_context(kbdev, is_compat_task());
+	kctx = kbase_create_context(kbdev);
 
 	if (kctx) {
 		kbdev->hwcnt.kctx = kctx;

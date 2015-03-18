@@ -117,8 +117,6 @@ DHDCFLAGS += -DUSE_INITIAL_SHORT_DWELL_TIME
 # SKB TAILPAD to avoid out of boundary memory access
 DHDCFLAGS += -DDHDENABLE_TAILPAD
 
-DHDCFLAGS += -DSUPPORT_P2P_GO_PS
-
 ##############################
 # Android Platform Definition
 ##############################
@@ -191,6 +189,7 @@ ifeq ($(CONFIG_BCM4354),y)
   DRIVER_TYPE = y
 endif
   DHDCFLAGS += -DCUSTOM_PSPRETEND_THR=30
+  DHDCFLAGS += -DSUPPORT_P2P_GO_PS
 endif
 
 ifneq ($(CONFIG_BCM4339),)
@@ -333,7 +332,6 @@ endif
   DHDCFLAGS :=$(filter-out -DROAM_AP_ENV_DETECTION,$(DHDCFLAGS))
   DHDCFLAGS :=$(filter-out -DDHD_USE_IDLECOUNT,$(DHDCFLAGS))
   DHDCFLAGS :=$(filter-out -DDISABLE_11H_SOFTAP,$(DHDCFLAGS))
-  DHDCFLAGS :=$(filter-out -DSUPPORT_P2P_GO_PS,$(DHDCFLAGS))
 endif
 
 ifneq ($(CONFIG_BCM4330),)
@@ -353,7 +351,6 @@ endif
   DHDCFLAGS :=$(filter-out -DROAM_AP_ENV_DETECTION,$(DHDCFLAGS))
   DHDCFLAGS :=$(filter-out -DDHD_USE_IDLECOUNT,$(DHDCFLAGS))
   DHDCFLAGS :=$(filter-out -DDISABLE_11H_SOFTAP,$(DHDCFLAGS))
-  DHDCFLAGS :=$(filter-out -DSUPPORT_P2P_GO_PS,$(DHDCFLAGS))
 endif
 
 ifneq ($(CONFIG_BCM43241),)
@@ -411,10 +408,6 @@ DHDCFLAGS += -DDHD_OF_SUPPORT
 endif
 ifneq ($(CONFIG_MACH_UNIVERSAL5422),)
 obj-$(CONFIG_MACH_UNIVERSAL5422) += dhd_custom_exynos.o
-DHDCFLAGS += -DDHD_OF_SUPPORT
-endif
-ifneq ($(CONFIG_MACH_UNIVERSAL5433),)
-obj-$(CONFIG_MACH_UNIVERSAL5433) += dhd_custom_exynos.o
 DHDCFLAGS += -DDHD_OF_SUPPORT
 endif
 endif

@@ -221,14 +221,6 @@ static int read_or_initialize_metadata(struct dentry *dentry)
 	if (!rc)
 		goto out;
 
-#ifdef CONFIG_SDP
-	/*
-	 * no passthrough/xattr for sensitive files
-	 */
-	if ((rc) && crypt_stat->flags & ECRYPTFS_DEK_IS_SENSITIVE)
-		goto out;
-#endif
-
 	if (mount_crypt_stat->flags & ECRYPTFS_PLAINTEXT_PASSTHROUGH_ENABLED) {
 		crypt_stat->flags &= ~(ECRYPTFS_I_SIZE_INITIALIZED
 				       | ECRYPTFS_ENCRYPTED);
@@ -246,25 +238,6 @@ static int read_or_initialize_metadata(struct dentry *dentry)
 	rc = -EIO;
 out:
 	mutex_unlock(&crypt_stat->cs_mutex);
-#ifdef CONFIG_SDP
-	if(!rc)
-	{
-		/*
-		 * SDP v2.0 : sensitive directory (SDP vault)
-		 * Files under sensitive directory automatically becomes sensitive
-		 */
-		struct dentry *p = dentry->d_parent;
-		struct inode *parent_inode = p->d_inode;
-		struct ecryptfs_crypt_stat *parent_crypt_stat =
-				&ecryptfs_inode_to_private(parent_inode)->crypt_stat;
-
-		if (!(crypt_stat->flags & ECRYPTFS_DEK_IS_SENSITIVE) &&
-				((S_ISDIR(parent_inode->i_mode)) &&
-						(parent_crypt_stat->flags & ECRYPTFS_DEK_IS_SENSITIVE))) {
-			ecryptfs_sdp_set_sensitive(dentry);
-		}
-	}
-#endif
 	return rc;
 }
 
@@ -334,13 +307,6 @@ static int ecryptfs_open(struct inode *inode, struct file *file)
 	ecryptfs_set_file_lower(
 		file, ecryptfs_inode_to_private(inode)->lower_file);
 	if (S_ISDIR(ecryptfs_dentry->d_inode->i_mode)) {
-#ifdef CONFIG_SDP
-		/*
-		 * it's possible to have a sensitive directory. (vault)
-		 */
-		if (mount_crypt_stat->flags & ECRYPTFS_MOUNT_SDP_ENABLED)
-			crypt_stat->flags |= ECRYPTFS_DEK_SDP_ENABLED;
-#endif
 		ecryptfs_printk(KERN_DEBUG, "This is a directory\n");
 		mutex_lock(&crypt_stat->cs_mutex);
 		crypt_stat->flags &= ~(ECRYPTFS_ENCRYPTED);
@@ -355,7 +321,6 @@ static int ecryptfs_open(struct inode *inode, struct file *file)
 	if (crypt_stat->flags & ECRYPTFS_DEK_IS_SENSITIVE) {
 		if (ecryptfs_is_persona_locked(crypt_stat->userid)) {
 			ecryptfs_printk(KERN_INFO, "ecryptfs_open: persona is locked, rc=%d\n", rc);
-#if 0
 			if (file->f_flags & O_SDP) {
 				ecryptfs_printk(KERN_INFO, "ecryptfs_open: O_SDP is set, allow open, rc=%d\n", rc);
 				mutex_lock(&crypt_stat->cs_mutex);
@@ -368,23 +333,16 @@ static int ecryptfs_open(struct inode *inode, struct file *file)
 				rc = -EACCES;
 				goto out_put;
 			}
-#endif
 		} else {
 			int dek_type = crypt_stat->sdp_dek.type;
 
 			ecryptfs_printk(KERN_INFO, "ecryptfs_open: persona is unlocked, rc=%d\n", rc);
 			if(dek_type != DEK_TYPE_AES_ENC) {
-				ecryptfs_printk(KERN_DEBUG, "converting dek...\n");
-				rc = ecryptfs_sdp_convert_dek(ecryptfs_dentry);
-				ecryptfs_printk(KERN_DEBUG, "conversion ready, rc=%d\n", rc);
-				rc = 0; // TODO: Do we need to return error if conversion fails?
-				/*
 				if(!(file->f_flags & O_SDP)){
-					ecryptfs_printk(KERN_WARNING, "Busy sensitive file (try again later)\n");
+					ecryptfs_printk(KERN_INFO, "Busy sensitive file (try again later)\n");
 					rc = -EBUSY;
 					goto out_put;
 				}
-				*/
 			}
 		}
 	}
@@ -426,7 +384,8 @@ static int ecryptfs_release(struct inode *inode, struct file *file)
 
 	crypt_stat = &ecryptfs_inode_to_private(inode)->crypt_stat;
 
-	if(crypt_stat->flags & ECRYPTFS_DEK_IS_SENSITIVE) {
+	if((crypt_stat->flags & ECRYPTFS_DEK_IS_SENSITIVE) &&
+			ecryptfs_is_persona_locked(crypt_stat->userid)) {
 #if 0
 #ifdef SYNC_ONLY_CURRENT_SB
 		struct super_block *sb = inode->i_sb;
@@ -436,7 +395,7 @@ static int ecryptfs_release(struct inode *inode, struct file *file)
 #else
 		sys_sync();
 #endif
-		DEK_LOGD("%s() sensitive inode being closed. [ino:%lu, state:%lu ref_count:%d efs_flag:0x%0.8x]\n",
+		printk("%s() sensitive inode being closed. [ino:%lu, state:%lu ref_count:%d efs_flag:0x%0.8x]\n",
 				__func__, inode->i_ino,  inode->i_state, atomic_read(&inode->i_count),
 				crypt_stat->flags);
 
@@ -451,13 +410,7 @@ static int ecryptfs_release(struct inode *inode, struct file *file)
 		}
 		spin_unlock(&inode->i_lock);
 #else
-		DEK_LOGD("%s() sensitive inode being closed. [ino:%lu, state:%lu ref_count:%d]\n",
-				__func__, inode->i_ino,  inode->i_state, atomic_read(&inode->i_count));
-
-		ecryptfs_clean_sdp_dek(crypt_stat);
-
-		if(ecryptfs_is_persona_locked(crypt_stat->userid))
-			ecryptfs_mm_drop_cache(crypt_stat->userid);
+		ecryptfs_mm_drop_cache(crypt_stat->userid);
 	}
 #endif
 #endif
@@ -585,7 +538,8 @@ int is_file_name_match(struct ecryptfs_mount_crypt_stat *mcs,
 	for (i = 0; i < ENC_NAME_FILTER_MAX_INSTANCE; i++) {
 		int len = 0;
 		struct dentry *p = fp_dentry;
-		if (!strlen(mcs->enc_filter_name[i]))
+		if (!mcs->enc_filter_name[i] ||
+			 !strlen(mcs->enc_filter_name[i]))
 			break;
 
 		while (1) {
@@ -635,7 +589,7 @@ int is_file_ext_match(struct ecryptfs_mount_crypt_stat *mcs, char *str)
 		return 0;
 
 	for (i = 0; i < ENC_EXT_FILTER_MAX_INSTANCE; i++) {
-		if (!strlen(mcs->enc_filter_ext[i]))
+		if (!mcs->enc_filter_ext[i] || !strlen(mcs->enc_filter_ext[i]))
 			return 0;
 		if (strlen(ext) != strlen(mcs->enc_filter_ext[i]))
 			continue;

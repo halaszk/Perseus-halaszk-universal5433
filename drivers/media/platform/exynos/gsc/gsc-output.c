@@ -39,6 +39,19 @@ int gsc_out_hw_reset_off(struct gsc_dev *gsc)
 	return 0;
 }
 
+void gsc_out_add_active_buf(struct gsc_dev *gsc)
+{
+	struct gsc_input_buf *buf;
+	unsigned long flags;
+	spin_lock_irqsave(&gsc->slock, flags);
+	if (!list_empty(&gsc->out.pending_buf_q)) {
+		buf = pending_q_pop(&gsc->out);
+		active_q_push(&gsc->out, buf);
+		gsc_hw_set_input_addr_fixed(gsc, &buf->addr);
+	}
+	spin_unlock_irqrestore(&gsc->slock, flags);
+}
+
 int gsc_out_hw_set(struct gsc_ctx *ctx)
 {
 	struct gsc_dev *gsc = ctx->gsc_dev;
@@ -306,6 +319,7 @@ static long gsc_subdev_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg
 
 	switch (cmd) {
 	case GSC_SFR_UPDATE:
+		gsc_out_add_active_buf(gsc);
 		gsc_hw_set_sfr_update(ctx);
 		gsc->wq_cnt++;
 		break;
@@ -526,6 +540,13 @@ static int gsc_output_streamon(struct file *file, void *priv,
 	 */
 	gsc->out.ctx->out_path = GSC_FIMD;
 
+	ret = media_entity_pipeline_start(&gsc->out.vfd->entity,
+					gsc->pipeline.pipe);
+	if (ret) {
+		gsc_err("media entity pipeline start fail");
+		return ret;
+	}
+
 	ret = vb2_streamon(&gsc->out.vbq, type);
 
 	return ret;
@@ -538,6 +559,9 @@ static int gsc_output_streamoff(struct file *file, void *priv,
 	int ret = 0;
 
 	ret = vb2_streamoff(&gsc->out.vbq, type);
+	if (!ret)
+		media_entity_pipeline_stop(&gsc->out.vfd->entity);
+
 	return ret;
 }
 
@@ -558,20 +582,7 @@ static int gsc_output_dqbuf(struct file *file, void *priv,
 			   struct v4l2_buffer *buf)
 {
 	struct gsc_dev *gsc = video_drvdata(file);
-	unsigned long flags;
 	int ret = 0;
-
-	spin_lock_irqsave(&gsc->slock, flags);
-	if (list_empty(&gsc->out.vbq.done_list)) {
-		struct gsc_input_buf *q_buf;
-		if (!list_empty(&gsc->out.active_buf_q)) {
-			q_buf = active_queue_pop(&gsc->out, gsc);
-			vb2_buffer_done(&q_buf->vb, VB2_BUF_STATE_DONE);
-			list_del(&q_buf->list);
-			gsc_info("Done list empty");
-		}
-	}
-	spin_unlock_irqrestore(&gsc->slock, flags);
 
 	ret = vb2_dqbuf(&gsc->out.vbq, buf,
 			 file->f_flags & O_NONBLOCK);
@@ -668,8 +679,26 @@ static int gsc_out_start_streaming(struct vb2_queue *q, unsigned int count)
 {
 	struct gsc_ctx *ctx = q->drv_priv;
 	struct gsc_dev *gsc = ctx->gsc_dev;
+	unsigned long flags;
+
+	spin_lock_irqsave(&gsc->slock, flags);
+	if (!list_empty(&gsc->out.pending_buf_q)) {
+		/*
+		 * Gscaler starts standalone in case of first frame, So
+		 * before starting gscaer, base address should be set.
+		 * Unless, page-fault will be occured.
+		 */
+		struct gsc_input_buf *buf =
+			list_first_entry(&gsc->out.pending_buf_q,
+					struct gsc_input_buf, list);
+		gsc_hw_set_input_addr_fixed(gsc, &buf->addr);
+	} else {
+		gsc_err("Before StreamON, 1 Qbuf should be called at least");
+		return -EINVAL;
+	}
 
 	set_bit(DEBUG_STREAMON, &gsc->state);
+	spin_unlock_irqrestore(&gsc->slock, flags);
 
 	return 0;
 }
@@ -679,23 +708,30 @@ static int gsc_out_stop_streaming(struct vb2_queue *q)
 	struct gsc_ctx *ctx = q->drv_priv;
 	struct gsc_dev *gsc = ctx->gsc_dev;
 	int ret = 0;
-
+	unsigned long flags;
 	ret = wait_event_timeout(gsc->irq_queue,
 		!test_bit(ST_OUTPUT_STREAMON, &gsc->state),
 		msecs_to_jiffies(2000));
 	if (ret == 0)
 		gsc_warn("wait timeout");
 
+	spin_lock_irqsave(&gsc->slock, flags);
 	while(!list_empty(&gsc->out.active_buf_q)) {
 		struct gsc_input_buf *done_buf;
-		done_buf = active_queue_pop(&gsc->out, gsc);
+		done_buf = active_q_pop(&gsc->out);
 		vb2_buffer_done(&done_buf->vb, VB2_BUF_STATE_ERROR);
-		list_del(&done_buf->list);
 	}
 
+	while(!list_empty(&gsc->out.pending_buf_q)) {
+		struct gsc_input_buf *buf;
+		buf = pending_q_pop(&gsc->out);
+	}
+
+	INIT_LIST_HEAD(&gsc->out.pending_buf_q);
 	INIT_LIST_HEAD(&gsc->out.active_buf_q);
 
 	clear_bit(DEBUG_STREAMON, &gsc->state);
+	spin_unlock_irqrestore(&gsc->slock, flags);
 
 	return 0;
 }
@@ -729,7 +765,7 @@ static int gsc_out_queue_setup(struct vb2_queue *vq, const struct v4l2_format *f
 	return 0;
 }
 
-int gsc_out_set_in_addr(struct gsc_dev *gsc, struct gsc_ctx *ctx,
+int gsc_out_add_pending_buf(struct gsc_dev *gsc, struct gsc_ctx *ctx,
 			struct gsc_input_buf *buf, int index)
 {
 	int ret;
@@ -745,9 +781,8 @@ int gsc_out_set_in_addr(struct gsc_dev *gsc, struct gsc_ctx *ctx,
 		return -EINVAL;
 	}
 	buf->addr = ctx->s_frame.addr;
-	active_queue_push(&gsc->out, buf, gsc);
-	gsc_hw_set_input_addr_fixed(gsc, &buf->addr);
 	buf->idx = index;
+	pending_q_push(&gsc->out, buf);
 
 	return 0;
 }
@@ -767,18 +802,6 @@ static void gsc_out_buffer_queue(struct vb2_buffer *vb)
 		return;
 	}
 
-	if (vb->acquire_fence) {
-		ret = sync_fence_wait(vb->acquire_fence, 1000);
-		if (ret == -ETIME) {
-			gsc_warn("sync_fence_wait() timeout");
-			ret = sync_fence_wait(vb->acquire_fence, 10 * MSEC_PER_SEC);
-		}
-		if (ret)
-			gsc_warn("sync_fence_wait() error");
-		sync_fence_put(vb->acquire_fence);
-		vb->acquire_fence = NULL;
-	}
-
 	if (!q->streaming) {
 		gsc_hw_set_sw_reset(gsc);
 		ret = gsc_wait_reset(gsc);
@@ -792,7 +815,8 @@ static void gsc_out_buffer_queue(struct vb2_buffer *vb)
 
 	spin_lock_irqsave(&gsc->slock, flags);
 	if (gsc->out.req_cnt >= atomic_read(&q->queued_count)) {
-		ret = gsc_out_set_in_addr(gsc, ctx, buf, vb->v4l2_buf.index);
+		ret = gsc_out_add_pending_buf(gsc, ctx, buf,
+				vb->v4l2_buf.index);
 		if (ret) {
 			gsc_err("Failed to prepare G-Scaler address");
 		}
@@ -913,12 +937,6 @@ static int gsc_output_open(struct file *file)
 
 	bts_otf_initialize(gsc->id, true);
 
-	ret = media_entity_pipeline_start(&gsc->out.vfd->entity,
-					gsc->pipeline.pipe);
-	if (ret) {
-		gsc_err("media entity pipeline start fail");
-		return ret;
-	}
 
 	return ret;
 }
@@ -938,9 +956,9 @@ static int gsc_output_close(struct file *file)
 		gsc_set_protected_content(gsc, false);
 	}
 
-	media_entity_pipeline_stop(&gsc->out.vfd->entity);
 	if (test_bit(ST_OUTPUT_STREAMON, &gsc->state)) {
 		gsc_info("driver is closed by force");
+		media_entity_pipeline_stop(&gsc->out.vfd->entity);
 		gsc_ctx_state_lock_clear(GSC_SRC_FMT | GSC_DST_FMT |
 				GSC_DST_CROP, gsc->out.ctx);
 
@@ -954,12 +972,6 @@ static int gsc_output_close(struct file *file)
 
 	if (q->streaming)
 		gsc_out_stop_streaming(q);
-
-	if (gsc->pipeline.disp != NULL) {
-		gsc_dbg("LINK Disable(%d)", gsc->id);
-		gsc->pipeline.disp = NULL;
-		gsc->out.ctx->out_path = 0;
-	}
 
 	ret = wait_event_timeout(gsc->irq_queue,
 		!test_bit(ST_OUTPUT_STREAMON, &gsc->state),
@@ -1143,6 +1155,7 @@ int gsc_register_output_device(struct gsc_dev *gsc)
 	gsc_out->vfd = vfd;
 
 	INIT_LIST_HEAD(&gsc_out->active_buf_q);
+	INIT_LIST_HEAD(&gsc_out->pending_buf_q);
 	spin_lock_init(&ctx->slock);
 	gsc_out->ctx = ctx;
 

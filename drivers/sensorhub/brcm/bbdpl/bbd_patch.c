@@ -22,22 +22,28 @@
 
 #include "bbd_internal.h"
 
+static unsigned char bbd_patch[] =
+{
+#include "bbd_patch_file.h"
+};
+
+#ifdef SUPORT_MCU_HOST_WAKE
 static unsigned char bbd_new_patch[] =
 {
-#ifdef SUPPORT_MCU_HOST_WAKE
 #include "bbd_new_patch_file.h"
-#elif defined(CONFIG_SENSORHUB_S333)
-#include "bbd_s333_patch_file.h"
-#else
-#include "bbd_patch_file.h"
-#endif
 };
+#endif
 
 void bbd_patch_init_vars(struct bbd_device *dev, int* result)
 {
+#ifdef SUPORT_MCU_HOST_WAKE
+	if(gpbbd_dev->hw_rev >= BBD_NEW_HW_REV)
 		printk(KERN_INFO "BBD:%s() %u\n", __func__, sizeof(bbd_new_patch));
+	else
+#endif
+		printk(KERN_INFO "BBD:%s() %u\n", __func__, sizeof(bbd_patch));
 
-      dev->bbd_ptr[BBD_MINOR_PATCH] = 0;
+        dev->bbd_ptr[BBD_MINOR_PATCH] = 0;
 }
 
 int bbd_patch_uninit(void)
@@ -47,7 +53,12 @@ int bbd_patch_uninit(void)
 
 int bbd_patch_open(struct inode *inode, struct file *filp)
 {
-	printk(KERN_INFO "BBD:%s() %u\n", __func__, sizeof(bbd_new_patch));
+#ifdef SUPORT_MCU_HOST_WAKE
+	if(gpbbd_dev->hw_rev >= BBD_NEW_HW_REV)
+		printk(KERN_INFO "BBD:%s() %u\n", __func__, sizeof(bbd_new_patch));
+	else
+#endif
+		printk(KERN_INFO "BBD:%s() %u\n", __func__, sizeof(bbd_patch));
 
 	if (!gpbbd_dev)
 		return -EFAULT;
@@ -69,15 +80,34 @@ ssize_t bbd_patch_read( struct file *filp,
         ssize_t rd_size = size;
         size_t  offset = filp->f_pos;
 
-	     if (offset >= sizeof(bbd_new_patch)) {       /* signal EOF */
-            *ppos = 0;
-            return 0;
-        }
-        if (offset+size > sizeof(bbd_new_patch))
-            rd_size = sizeof(bbd_new_patch) - offset;
-        if (copy_to_user(buf, bbd_new_patch + offset, rd_size))
-            rd_size = -EFAULT;
-        else
-            *ppos = filp->f_pos + rd_size;
+#ifdef SUPORT_MCU_HOST_WAKE
+	if(gpbbd_dev->hw_rev >= BBD_NEW_HW_REV) {
+	        if (offset > sizeof(bbd_new_patch)) {       /* signal EOF */
+	                *ppos = 0;
+	                return 0;
+	        }
+	        if (offset+size > sizeof(bbd_new_patch))
+	                rd_size = sizeof(bbd_new_patch) - offset;
+	        if (copy_to_user(buf, bbd_new_patch + offset, rd_size))
+	                rd_size = -EFAULT;
+	        else
+	                *ppos = filp->f_pos + rd_size;
+	}
+	else {
+#endif
+	        if (offset > sizeof(bbd_patch)) {       /* signal EOF */
+	                *ppos = 0;
+	                return 0;
+	        }
+	        if (offset+size > sizeof(bbd_patch))
+	                rd_size = sizeof(bbd_patch) - offset;
+	        if (copy_to_user(buf, bbd_patch + offset, rd_size))
+	                rd_size = -EFAULT;
+	        else
+	                *ppos = filp->f_pos + rd_size;
+#ifdef SUPORT_MCU_HOST_WAKE
+	}
+#endif
+		
         return rd_size;
 }

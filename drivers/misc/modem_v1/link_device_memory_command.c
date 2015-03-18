@@ -166,9 +166,9 @@ static void cmd_crash_reset_handler(struct mem_link_device *mld)
 	ld->state = LINK_STATE_OFFLINE;
 	spin_unlock_irqrestore(&ld->lock, flags);
 
-	mif_err("%s<-%s: ERR! CP_CRASH_RESET\n", ld->name, mc->name);
+	evt_log(0, "%s<-%s: ERR! CP_CRASH_RESET\n", ld->name, mc->name);
 
-	modemctl_notify_event(MDM_EVENT_CP_FORCE_CRASH);
+	mem_handle_cp_crash(mld, STATE_CRASH_RESET);
 }
 
 static void cmd_crash_exit_handler(struct mem_link_device *mld)
@@ -184,9 +184,17 @@ static void cmd_crash_exit_handler(struct mem_link_device *mld)
 	if (timer_pending(&mc->crash_ack_timer))
 		del_timer(&mc->crash_ack_timer);
 
-	mif_err("%s<-%s: ERR! CP_CRASH_EXIT\n", ld->name, mc->name);
+	if (atomic_read(&mc->forced_cp_crash))
+		evt_log(0, "%s<-%s: CP_CRASH_ACK\n", ld->name, mc->name);
+	else
+		evt_log(0, "%s<-%s: ERR! CP_CRASH_EXIT\n", ld->name, mc->name);
 
-	modemctl_notify_event(MDM_EVENT_CP_FORCE_CRASH);
+#ifdef DEBUG_MODEM_IF
+	if (!atomic_read(&mc->forced_cp_crash))
+		queue_work(system_nrt_wq, &mld->dump_work);
+#endif
+
+	mem_handle_cp_crash(mld, STATE_CRASH_EXIT);
 }
 
 /**
