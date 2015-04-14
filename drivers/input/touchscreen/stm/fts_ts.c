@@ -677,6 +677,9 @@ void fts_release_all_key(struct fts_ts_info *info)
 		input_sync(info->input_dev);
 
 		info->tsp_keystatus = TOUCH_KEY_NULL;
+#if defined (CONFIG_INPUT_BOOSTER)
+		input_booster_send_event(BOOSTER_DEVICE_TOUCHKEY, BOOSTER_MODE_OFF);
+#endif
 	}
 }
 #endif
@@ -896,6 +899,11 @@ static unsigned char fts_event_handler_type_b(struct fts_ts_info *info,
 						tsp_debug_info(true, &info->client->dev, "[TSP_KEY] BACK %s\n" , key_state != 0 ? "P" : "R");
 					}
 
+#if defined (CONFIG_INPUT_BOOSTER)
+					if ((change_keys & key_recent)||(change_keys & key_back)) {
+						input_booster_send_event(BOOSTER_DEVICE_TOUCHKEY, (key_state != 0 ? KEY_PRESS : KEY_RELEASE));
+					}
+#endif
 					input_sync(info->input_dev);
 				}
 
