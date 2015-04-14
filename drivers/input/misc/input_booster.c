@@ -15,16 +15,42 @@
 #include "input_booster.h"
 
 static const char * const booster_device_name[BOOSTER_DEVICE_MAX] = {
+	"key",
+	"touchkey",
 	"touch",
 	"pen",
 };
 
 static unsigned int dbg_level;
+static s32 sysfs_level=BOOSTER_LEVEL2;	//default level
+static s32 sysfs_head_time, head_cpu_freq, head_kfc_freq, head_mif_freq, head_int_freq, head_hmp_boost;
+static s32 sysfs_tail_time, tail_cpu_freq, tail_kfc_freq, tail_mif_freq, tail_int_freq, tail_hmp_boost;
+
 static struct input_booster *g_data;
 
 #ifdef CONFIG_USE_VSYNC_SKIP
 void s3c_fb_extra_vsync_wait_set(int);
 #endif
+
+static void input_booster_sysfs_freqs(struct booster_dvfs *dvfs)
+{
+//	struct input_booster *data = dev_get_drvdata(dvfs->parent_dev);
+
+	dvfs->level = sysfs_level;
+	dvfs->times[BOOSTER_LEVEL2].head_time = sysfs_head_time;
+	dvfs->freqs[BOOSTER_LEVEL2].cpu_freq = head_cpu_freq;
+	dvfs->freqs[BOOSTER_LEVEL2].kfc_freq = head_kfc_freq;
+	dvfs->freqs[BOOSTER_LEVEL2].mif_freq = head_mif_freq;
+	dvfs->freqs[BOOSTER_LEVEL2].int_freq = head_int_freq;
+	dvfs->freqs[BOOSTER_LEVEL2].hmp_boost = head_hmp_boost;
+
+	dvfs->times[BOOSTER_LEVEL2].tail_time = sysfs_tail_time;
+	dvfs->freqs[BOOSTER_LEVEL2_CHG].cpu_freq = tail_cpu_freq;
+	dvfs->freqs[BOOSTER_LEVEL2_CHG].kfc_freq = tail_kfc_freq;
+	dvfs->freqs[BOOSTER_LEVEL2_CHG].mif_freq = tail_mif_freq;
+	dvfs->freqs[BOOSTER_LEVEL2_CHG].int_freq = tail_int_freq;
+	dvfs->freqs[BOOSTER_LEVEL2_CHG].hmp_boost = tail_hmp_boost;
+}
 
 #ifdef USE_HMP_BOOST
 static void input_booster_set_hmp_boost(struct input_booster *data, enum booster_device_type device_type, bool enable)
@@ -64,6 +90,189 @@ static void input_booster_set_hmp_boost(struct input_booster *data, enum booster
 }
 #endif
 
+/* Key */
+DECLARE_DVFS_DELAYED_WORK_FUNC(CHG, KEY)
+{
+	struct booster_dvfs *dvfs =
+		container_of(work, struct booster_dvfs, dvfs_chg_work.work);
+	struct input_booster *data = dev_get_drvdata(dvfs->parent_dev);
+
+	mutex_lock(&dvfs->lock);
+
+	remove_qos(&dvfs->cpu_qos);
+	SET_HMP(data, BOOSTER_DEVICE_KEY, false);
+
+	dvfs->lock_status = false;
+	DVFS_DEV_DBG(DBG_DVFS, data->dev, "%s : DVFS OFF\n", __func__);
+
+	mutex_unlock(&dvfs->lock);
+}
+
+DECLARE_DVFS_DELAYED_WORK_FUNC(OFF, KEY)
+{
+	struct booster_dvfs *dvfs =
+		container_of(work, struct booster_dvfs, dvfs_off_work.work);
+	struct input_booster *data = dev_get_drvdata(dvfs->parent_dev);
+
+	mutex_lock(&dvfs->lock);
+
+	remove_qos(&dvfs->cpu_qos);
+	SET_HMP(data, BOOSTER_DEVICE_KEY, false);
+
+	dvfs->lock_status = false;
+	DVFS_DEV_DBG(DBG_DVFS, data->dev, "%s : DVFS OFF\n", __func__);
+
+	mutex_unlock(&dvfs->lock);
+}
+
+DECLARE_DVFS_WORK_FUNC(SET, KEY)
+{
+	struct input_booster *data = (struct input_booster *)booster_data;
+	struct booster_dvfs *dvfs = data->dvfses[BOOSTER_DEVICE_KEY];
+
+	if (!dvfs || !dvfs->initialized) {
+		dev_err(data->dev, "%s: Dvfs is not initialized\n",	__func__);
+		return;
+	}
+
+	mutex_lock(&dvfs->lock);
+
+	if ((!dvfs->level)&&(!dvfs->lock_status)) {
+		dev_err(data->dev, "%s : Skip to set booster due to level 0\n", __func__);
+		goto out;
+	}
+
+	switch (booster_mode) {
+	case BOOSTER_MODE_ON:
+		cancel_delayed_work(&dvfs->dvfs_off_work);
+		cancel_delayed_work(&dvfs->dvfs_chg_work);
+
+		SET_HMP(data, BOOSTER_DEVICE_KEY, dvfs->freqs[BOOSTER_LEVEL1].hmp_boost);
+		set_qos(&dvfs->cpu_qos, PM_QOS_CPU_FREQ_MIN, dvfs->freqs[BOOSTER_LEVEL1].cpu_freq);
+
+		DVFS_DEV_DBG(DBG_DVFS, data->dev, "%s : DVFS ON [level %d->1][start time [%d]]\n",
+			__func__, dvfs->level, dvfs->times[BOOSTER_LEVEL1].head_time);
+
+		schedule_delayed_work(&dvfs->dvfs_chg_work,
+			msecs_to_jiffies(dvfs->times[BOOSTER_LEVEL1].head_time));
+		dvfs->lock_status = true;
+	break;
+	case BOOSTER_MODE_OFF:
+		if (dvfs->lock_status)
+			schedule_delayed_work(&dvfs->dvfs_off_work,
+							msecs_to_jiffies(dvfs->times[BOOSTER_LEVEL1].tail_time));
+	break;
+	case BOOSTER_MODE_FORCE_OFF:
+		if (dvfs->lock_status) {
+			cancel_delayed_work(&dvfs->dvfs_chg_work);
+			cancel_delayed_work(&dvfs->dvfs_off_work);
+			schedule_work(&dvfs->dvfs_off_work.work);
+		}
+	break;
+	default:
+	break;
+	}
+
+out:
+	mutex_unlock(&dvfs->lock);
+	return;
+}
+
+/* Touchkey */
+DECLARE_DVFS_DELAYED_WORK_FUNC(CHG, TOUCHKEY)
+{
+	struct booster_dvfs *dvfs =
+		container_of(work, struct booster_dvfs, dvfs_chg_work.work);
+	//struct input_booster *data = dev_get_drvdata(dvfs->parent_dev);
+
+	mutex_lock(&dvfs->lock);
+
+	dvfs->lock_status = true;
+	dvfs->short_press = false;
+
+	mutex_unlock(&dvfs->lock);
+}
+
+DECLARE_DVFS_DELAYED_WORK_FUNC(OFF, TOUCHKEY)
+{
+	struct booster_dvfs *dvfs =
+		container_of(work, struct booster_dvfs, dvfs_off_work.work);
+	struct input_booster *data = dev_get_drvdata(dvfs->parent_dev);
+
+	mutex_lock(&dvfs->lock);
+
+	remove_qos(&dvfs->cpu_qos);
+	SET_HMP(data, BOOSTER_DEVICE_KEY, false);
+
+	dvfs->lock_status = false;
+	dvfs->short_press = false;
+
+	DVFS_DEV_DBG(DBG_DVFS, data->dev, "%s : DVFS OFF\n", __func__);
+
+	mutex_unlock(&dvfs->lock);
+}
+
+DECLARE_DVFS_WORK_FUNC(SET, TOUCHKEY)
+{
+	struct input_booster *data = (struct input_booster *)booster_data;
+	struct booster_dvfs *dvfs = data->dvfses[BOOSTER_DEVICE_TOUCHKEY];
+
+	if (!dvfs || !dvfs->initialized) {
+		dev_err(data->dev, "%s: Dvfs is not initialized\n",	__func__);
+		return;
+	}
+
+	mutex_lock(&dvfs->lock);
+
+	if (!dvfs->level) {
+		dev_err(data->dev, "%s : Skip to set booster due to level 0\n", __func__);
+		goto out;
+	}
+
+	switch (booster_mode) {
+	case BOOSTER_MODE_ON:
+		cancel_delayed_work(&dvfs->dvfs_off_work);
+		if (!dvfs->lock_status && !dvfs->short_press) {
+			schedule_delayed_work(&dvfs->dvfs_chg_work,
+				msecs_to_jiffies(dvfs->times[BOOSTER_LEVEL1].head_time));
+			dvfs->short_press = true;
+			DVFS_DEV_DBG(DBG_DVFS, data->dev, "%s : DVFS init \n", __func__);
+		}
+	break;
+	case BOOSTER_MODE_OFF:
+		dvfs->lock_status = true;
+		SET_HMP(data, BOOSTER_DEVICE_KEY, dvfs->freqs[BOOSTER_LEVEL1].hmp_boost);
+		set_qos(&dvfs->cpu_qos, PM_QOS_CPU_FREQ_MIN, dvfs->freqs[BOOSTER_LEVEL1].cpu_freq);
+		DVFS_DEV_DBG(DBG_DVFS, data->dev, "%s : DVFS ON [level %d->1][start time [%d]]\n",
+			__func__, dvfs->level, dvfs->times[BOOSTER_LEVEL1].tail_time);
+
+		if (dvfs->short_press) {
+			cancel_delayed_work(&dvfs->dvfs_chg_work);
+			schedule_work(&dvfs->dvfs_chg_work.work);
+			schedule_delayed_work(&dvfs->dvfs_off_work,
+							msecs_to_jiffies(dvfs->times[BOOSTER_LEVEL1].tail_time));
+			goto out;
+		}
+		if (dvfs->lock_status)
+			schedule_delayed_work(&dvfs->dvfs_off_work,
+							msecs_to_jiffies(dvfs->times[BOOSTER_LEVEL1].tail_time));
+	break;
+	case BOOSTER_MODE_FORCE_OFF:
+		if (dvfs->lock_status) {
+			cancel_delayed_work(&dvfs->dvfs_chg_work);
+			cancel_delayed_work(&dvfs->dvfs_off_work);
+			schedule_work(&dvfs->dvfs_off_work.work);
+		}
+	break;
+	default:
+	break;
+	}
+
+out:
+	mutex_unlock(&dvfs->lock);
+	return;
+}
+
 /* Touch */
 DECLARE_DVFS_DELAYED_WORK_FUNC(CHG, TOUCH)
 {
@@ -79,7 +288,6 @@ DECLARE_DVFS_DELAYED_WORK_FUNC(CHG, TOUCH)
 	switch (dvfs->level) {
 	case BOOSTER_LEVEL0:
 	case BOOSTER_LEVEL1:
-	case BOOSTER_LEVEL3:
 		remove_qos(&dvfs->cpu_qos);
 		remove_qos(&dvfs->kfc_qos);
 		remove_qos(&dvfs->mif_qos);
@@ -90,43 +298,23 @@ DECLARE_DVFS_DELAYED_WORK_FUNC(CHG, TOUCH)
 		DVFS_DEV_DBG(DBG_DVFS, data->dev, "%s : DVFS OFF\n", __func__);
 	break;
 	case BOOSTER_LEVEL2:
-		set_qos(&dvfs->kfc_qos, PM_QOS_KFC_FREQ_MIN, dvfs->freqs[BOOSTER_LEVEL2].kfc_freq);
-		set_qos(&dvfs->int_qos, PM_QOS_DEVICE_THROUGHPUT, dvfs->freqs[BOOSTER_LEVEL2].int_freq);
-		set_qos(&dvfs->mif_qos, PM_QOS_BUS_THROUGHPUT, dvfs->freqs[BOOSTER_LEVEL2].mif_freq);
-		remove_qos(&dvfs->cpu_qos);
-		SET_HMP(data, BOOSTER_DEVICE_TOUCH, false);
-
-		DVFS_DEV_DBG(DBG_DVFS, data->dev, "%s : DVFS CHANGED [level %d]\n", __func__, dvfs->level);
-	break;
-	case BOOSTER_LEVEL4:
-		DVFS_DEV_DBG(DBG_DVFS, data->dev, "%s : DVFS CHANGED [level %d]\n", __func__, dvfs->level);
-	break;
-	case BOOSTER_LEVEL5:
-		if (dvfs->phase_excuted) {
-			remove_qos(&dvfs->cpu_qos);
-			remove_qos(&dvfs->kfc_qos);
-			remove_qos(&dvfs->mif_qos);
-			remove_qos(&dvfs->int_qos);
-			SET_HMP(data, BOOSTER_DEVICE_TOUCH, false);
-			dvfs->lock_status = false;
-			dvfs->phase_excuted = false;
-
-			DVFS_DEV_DBG(DBG_DVFS, data->dev, "%s : DVFS OFF\n", __func__);
-		} else {
-			set_qos(&dvfs->cpu_qos, PM_QOS_CPU_FREQ_MIN, dvfs->freqs[BOOSTER_LEVEL5].cpu_freq);
-			schedule_delayed_work(&dvfs->dvfs_chg_work,
-				msecs_to_jiffies(dvfs->times[BOOSTER_LEVEL5].head_time - dvfs->times[BOOSTER_LEVEL5].phase_time));
-			dvfs->phase_excuted = true;
-			DVFS_DEV_DBG(DBG_DVFS, data->dev, "%s : DVFS CHANGED [level %d, start time[%d]]\n",
-				__func__, dvfs->level, dvfs->times[BOOSTER_LEVEL5].head_time - dvfs->times[BOOSTER_LEVEL5].phase_time);
-		}
-	break;
-	case BOOSTER_LEVEL9:
-		SET_HMP(data, BOOSTER_DEVICE_TOUCH, dvfs->freqs[BOOSTER_LEVEL9_CHG].hmp_boost);
-		set_qos(&dvfs->kfc_qos, PM_QOS_KFC_FREQ_MIN, dvfs->freqs[BOOSTER_LEVEL9_CHG].kfc_freq);
-		set_qos(&dvfs->int_qos, PM_QOS_DEVICE_THROUGHPUT, dvfs->freqs[BOOSTER_LEVEL9_CHG].int_freq);
-		set_qos(&dvfs->cpu_qos, PM_QOS_CPU_FREQ_MIN, dvfs->freqs[BOOSTER_LEVEL9_CHG].cpu_freq);
-		set_qos(&dvfs->mif_qos, PM_QOS_BUS_THROUGHPUT, dvfs->freqs[BOOSTER_LEVEL9_CHG].mif_freq);
+		SET_HMP(data, BOOSTER_DEVICE_TOUCH, dvfs->freqs[BOOSTER_LEVEL2_CHG].hmp_boost);
+		if(dvfs->freqs[BOOSTER_LEVEL2_CHG].kfc_freq==0){
+			remove_qos(&dvfs->kfc_qos);}
+		else{
+			set_qos(&dvfs->kfc_qos, PM_QOS_KFC_FREQ_MIN, dvfs->freqs[BOOSTER_LEVEL2_CHG].kfc_freq);}
+		if(dvfs->freqs[BOOSTER_LEVEL2_CHG].int_freq==0){
+			remove_qos(&dvfs->int_qos);}
+		else{
+			set_qos(&dvfs->int_qos, PM_QOS_DEVICE_THROUGHPUT, dvfs->freqs[BOOSTER_LEVEL2_CHG].int_freq);}
+		if(dvfs->freqs[BOOSTER_LEVEL2_CHG].cpu_freq==0){
+			remove_qos(&dvfs->cpu_qos);}
+		else{
+			set_qos(&dvfs->cpu_qos, PM_QOS_CPU_FREQ_MIN, dvfs->freqs[BOOSTER_LEVEL2_CHG].cpu_freq);}
+		if(dvfs->freqs[BOOSTER_LEVEL2_CHG].mif_freq==0){
+			remove_qos(&dvfs->mif_qos);}
+		else{
+			set_qos(&dvfs->mif_qos, PM_QOS_BUS_THROUGHPUT, dvfs->freqs[BOOSTER_LEVEL2_CHG].mif_freq);}
 
 		DVFS_DEV_DBG(DBG_DVFS, data->dev, "%s : DVFS CHANGED [level %d]\n", __func__, dvfs->level);
 	break;
@@ -174,7 +362,9 @@ DECLARE_DVFS_WORK_FUNC(SET, TOUCH)
 
 	mutex_lock(&dvfs->lock);
 
-	if (!dvfs->level) {
+	input_booster_sysfs_freqs(dvfs);
+
+	if ((!dvfs->level)&&(!dvfs->lock_status)) {
 		dev_err(data->dev, "%s : Skip to set booster due to level 0\n", __func__);
 		goto out;
 	}
@@ -188,39 +378,30 @@ DECLARE_DVFS_WORK_FUNC(SET, TOUCH)
 		cancel_delayed_work(&dvfs->dvfs_chg_work);
 		switch (dvfs->level) {
 		case BOOSTER_LEVEL1:
+			SET_HMP(data, BOOSTER_DEVICE_TOUCH, dvfs->freqs[BOOSTER_LEVEL2].hmp_boost);
+			set_qos(&dvfs->kfc_qos, PM_QOS_KFC_FREQ_MIN, dvfs->freqs[BOOSTER_LEVEL2].kfc_freq);
+			set_qos(&dvfs->int_qos, PM_QOS_DEVICE_THROUGHPUT, dvfs->freqs[BOOSTER_LEVEL2].int_freq);
+			set_qos(&dvfs->cpu_qos, PM_QOS_CPU_FREQ_MIN, dvfs->freqs[BOOSTER_LEVEL2].cpu_freq);
+			set_qos(&dvfs->mif_qos, PM_QOS_BUS_THROUGHPUT, dvfs->freqs[BOOSTER_LEVEL2].mif_freq);
+		break;
 		case BOOSTER_LEVEL2:
-			SET_HMP(data, BOOSTER_DEVICE_TOUCH, dvfs->freqs[BOOSTER_LEVEL1].hmp_boost);
-			set_qos(&dvfs->kfc_qos, PM_QOS_KFC_FREQ_MIN, dvfs->freqs[BOOSTER_LEVEL1].kfc_freq);
-			set_qos(&dvfs->int_qos, PM_QOS_DEVICE_THROUGHPUT, dvfs->freqs[BOOSTER_LEVEL1].int_freq);
-			set_qos(&dvfs->cpu_qos, PM_QOS_CPU_FREQ_MIN, dvfs->freqs[BOOSTER_LEVEL1].cpu_freq);
-			set_qos(&dvfs->mif_qos, PM_QOS_BUS_THROUGHPUT, dvfs->freqs[BOOSTER_LEVEL1].mif_freq);
-		break;
-		case BOOSTER_LEVEL3:
-			set_qos(&dvfs->kfc_qos, PM_QOS_KFC_FREQ_MIN, dvfs->freqs[BOOSTER_LEVEL3].kfc_freq);
-			set_qos(&dvfs->int_qos, PM_QOS_DEVICE_THROUGHPUT, dvfs->freqs[BOOSTER_LEVEL3].int_freq);
-			set_qos(&dvfs->mif_qos, PM_QOS_BUS_THROUGHPUT, dvfs->freqs[BOOSTER_LEVEL3].mif_freq);
-			remove_qos(&dvfs->cpu_qos);
-			SET_HMP(data, BOOSTER_DEVICE_TOUCH, dvfs->freqs[BOOSTER_LEVEL3].hmp_boost);
-		break;
-		case BOOSTER_LEVEL4:
-			set_qos(&dvfs->kfc_qos, PM_QOS_KFC_FREQ_MIN, dvfs->freqs[BOOSTER_LEVEL4].kfc_freq);
-			set_qos(&dvfs->int_qos, PM_QOS_DEVICE_THROUGHPUT, dvfs->freqs[BOOSTER_LEVEL4].int_freq);
-			set_qos(&dvfs->mif_qos, PM_QOS_BUS_THROUGHPUT, dvfs->freqs[BOOSTER_LEVEL4].mif_freq);
-			remove_qos(&dvfs->cpu_qos);
-			SET_HMP(data, BOOSTER_DEVICE_TOUCH, dvfs->freqs[BOOSTER_LEVEL4].hmp_boost);
-		break;
-		case BOOSTER_LEVEL5:
-			SET_HMP(data, BOOSTER_DEVICE_TOUCH, dvfs->freqs[BOOSTER_LEVEL5].hmp_boost);
-			set_qos(&dvfs->kfc_qos, PM_QOS_KFC_FREQ_MIN, dvfs->freqs[BOOSTER_LEVEL5].kfc_freq);
-			set_qos(&dvfs->int_qos, PM_QOS_DEVICE_THROUGHPUT, dvfs->freqs[BOOSTER_LEVEL5].int_freq);
-			set_qos(&dvfs->mif_qos, PM_QOS_BUS_THROUGHPUT, dvfs->freqs[BOOSTER_LEVEL5].mif_freq);
-		break;
-		case BOOSTER_LEVEL9:
-			SET_HMP(data, BOOSTER_DEVICE_TOUCH, dvfs->freqs[BOOSTER_LEVEL9].hmp_boost);
-			set_qos(&dvfs->kfc_qos, PM_QOS_KFC_FREQ_MIN, dvfs->freqs[BOOSTER_LEVEL9].kfc_freq);
-			set_qos(&dvfs->int_qos, PM_QOS_DEVICE_THROUGHPUT, dvfs->freqs[BOOSTER_LEVEL9].int_freq);
-			set_qos(&dvfs->cpu_qos, PM_QOS_CPU_FREQ_MIN, dvfs->freqs[BOOSTER_LEVEL9].cpu_freq);
-			set_qos(&dvfs->mif_qos, PM_QOS_BUS_THROUGHPUT, dvfs->freqs[BOOSTER_LEVEL9].mif_freq);
+			SET_HMP(data, BOOSTER_DEVICE_TOUCH, dvfs->freqs[BOOSTER_LEVEL2].hmp_boost);
+			if(dvfs->freqs[BOOSTER_LEVEL2].kfc_freq==0){
+				remove_qos(&dvfs->kfc_qos);}
+			else{
+				set_qos(&dvfs->kfc_qos, PM_QOS_KFC_FREQ_MIN, dvfs->freqs[BOOSTER_LEVEL2].kfc_freq);}
+			if(dvfs->freqs[BOOSTER_LEVEL2].int_freq==0){
+				remove_qos(&dvfs->int_qos);}
+			else{
+				set_qos(&dvfs->int_qos, PM_QOS_DEVICE_THROUGHPUT, dvfs->freqs[BOOSTER_LEVEL2].int_freq);}
+			if(dvfs->freqs[BOOSTER_LEVEL2].cpu_freq==0){
+				remove_qos(&dvfs->cpu_qos);}
+			else{
+				set_qos(&dvfs->cpu_qos, PM_QOS_CPU_FREQ_MIN, dvfs->freqs[BOOSTER_LEVEL2].cpu_freq);}
+			if(dvfs->freqs[BOOSTER_LEVEL2].mif_freq==0){
+				remove_qos(&dvfs->mif_qos);}
+			else{
+				set_qos(&dvfs->mif_qos, PM_QOS_BUS_THROUGHPUT, dvfs->freqs[BOOSTER_LEVEL2].mif_freq);}
 		break;
 		default:
 			dev_err(data->dev, "%s : Undefined type passed[%d]\n", __func__, dvfs->level);
@@ -479,6 +660,12 @@ static void input_booster_event_work(struct work_struct *work)
 			i, booster_device_name[event.device_type], event.mode);
 
 		switch (event.device_type) {
+		case BOOSTER_DEVICE_KEY:
+			DVFS_WORK_FUNC(SET, KEY)(data, event.mode);
+		break;
+		case BOOSTER_DEVICE_TOUCHKEY:
+			DVFS_WORK_FUNC(SET, TOUCHKEY)(data, event.mode);
+		break;
 		case BOOSTER_DEVICE_TOUCH:
 			DVFS_WORK_FUNC(SET, TOUCH)(data, event.mode);
 		break;
@@ -629,17 +816,110 @@ static ssize_t input_booster_get_debug_level(struct class *dev,
 static ssize_t input_booster_set_debug_level(struct class *dev,
 		struct class_attribute *attr, const char *buf, size_t count)
 {
-	unsigned long val;
+	unsigned int val;
 
-	if (kstrtoul(buf, 0, &val) < 0)
+	if (kstrtouint(buf, 0, &val) < 0)
 		return -EINVAL;
 
-	dbg_level = (unsigned int)val;
+	dbg_level = val;
 
 	return count;
 }
 
+static ssize_t input_booster_get_head(struct class *dev,
+		struct class_attribute *attr, char *buf)
+{
+
+	return sprintf(buf, "%d %d %d %d %d %d \n",\
+		sysfs_head_time, head_cpu_freq, head_kfc_freq, head_mif_freq, head_int_freq, head_hmp_boost);
+}
+
+static ssize_t input_booster_set_head(struct class *dev,
+		struct class_attribute *attr, const char *buf, size_t count)
+{
+	unsigned long cpu_freq, kfc_freq, mif_freq, int_freq, hmp_boost;
+	unsigned long head_time;
+
+	if (sscanf(buf, "%lu%lu%lu%lu%lu%lu",
+		&head_time,&cpu_freq, &kfc_freq, &mif_freq, &int_freq, &hmp_boost) != 6) {
+		printk("### Keep this format : [head_time cpu_freq kfc_freq mif_freq int_freq hmp_boost] (Ex: 1600000 0 1500000 667000 333000 1###\n");
+		goto out;
+	}
+
+	sysfs_head_time = head_time;
+	head_cpu_freq = cpu_freq;
+	head_kfc_freq = kfc_freq;
+	head_mif_freq = mif_freq;
+	head_int_freq = int_freq;
+	head_hmp_boost = hmp_boost;
+
+out:
+	return count;
+}
+
+static ssize_t input_booster_get_tail(struct class *dev,
+		struct class_attribute *attr, char *buf)
+{
+
+	return sprintf(buf, "%d %d %d %d %d %d \n",\
+		sysfs_tail_time, tail_cpu_freq, tail_kfc_freq, tail_mif_freq, tail_int_freq, tail_hmp_boost);
+}
+
+static ssize_t input_booster_set_tail(struct class *dev,
+		struct class_attribute *attr, const char *buf, size_t count)
+{
+	unsigned long cpu_freq, kfc_freq, mif_freq, int_freq, hmp_boost;
+	unsigned long tail_time;
+
+	if (sscanf(buf, "%lu%lu%lu%lu%lu%lu",
+		&tail_time,&cpu_freq, &kfc_freq, &mif_freq, &int_freq, &hmp_boost) != 6) {
+		printk("### Keep this format : [tail_time cpu_freq kfc_freq mif_freq int_freq hmp_boost] (Ex: 1600000 0 1500000 667000 333000 1###\n");
+		goto out;
+	}
+	sysfs_tail_time = tail_time;
+	tail_cpu_freq = cpu_freq;
+	tail_kfc_freq = kfc_freq;
+	tail_mif_freq = mif_freq;
+	tail_int_freq = int_freq;
+	tail_hmp_boost = hmp_boost;
+
+out:
+	return count;
+}
+
+static ssize_t input_booster_get_level(struct class *dev,
+		struct class_attribute *attr, char *buf)
+{
+
+	return sprintf(buf, "%d\n", sysfs_level);
+}
+
+static ssize_t input_booster_set_level(struct class *dev,
+		struct class_attribute *attr, const char *buf, size_t count)
+{
+	int val, type;
+
+	if (sscanf(buf,"%d",&val) != 1) {
+		return count;
+	}
+
+	if(val<0){
+		for (type = 0; type < g_data->ndevices; type++) {
+			input_booster_send_event(type, BOOSTER_MODE_FORCE_OFF);
+			//printk( "%s: type = %s BOOSTER_MODE_FORCE_OFF\n",__func__, booster_device_name[type]);
+		}
+	}
+	else
+		sysfs_level = val;
+
+	return count;
+}
+
+
 static CLASS_ATTR(debug_level, S_IRUGO | S_IWUSR, input_booster_get_debug_level, input_booster_set_debug_level);
+static CLASS_ATTR(head, S_IRUGO | S_IWUSR, input_booster_get_head, input_booster_set_head);
+static CLASS_ATTR(tail, S_IRUGO | S_IWUSR, input_booster_get_tail, input_booster_set_tail);
+static CLASS_ATTR(level, S_IRUGO | S_IWUSR, input_booster_get_level, input_booster_set_level);
 
 static ssize_t input_booster_get_dvfs_level(struct device *dev,
 		struct device_attribute *attr, char *buf)
@@ -654,12 +934,12 @@ static ssize_t input_booster_set_dvfs_level(struct device *dev,
 {
 	struct booster_dvfs *dvfs = dev_get_drvdata(dev);
 	struct input_booster *data = dev_get_drvdata(dvfs->parent_dev);
-	unsigned long val;
+	unsigned int val;
 
-	if (kstrtoul(buf, 0, &val) < 0)
+	if (kstrtouint(buf, 0, &val) < 0)
 		return -EINVAL;
 
-	dvfs->level = (unsigned int)val;
+	dvfs->level = val;
 
 	dev_info(data->dev, "%s: %s's LEVEL [%d]\n",
 			__func__, dvfs->name, dvfs->level);
@@ -765,6 +1045,9 @@ static struct attribute_group dvfs_attr_group = {
 static void input_booster_free_sysfs(struct input_booster *data)
 {
 	class_remove_file(data->class, &class_attr_debug_level);
+	class_remove_file(data->class, &class_attr_head);
+	class_remove_file(data->class, &class_attr_tail);
+	class_remove_file(data->class, &class_attr_level);
 	class_destroy(data->class);
 }
 
@@ -784,6 +1067,22 @@ static int input_booster_init_sysfs(struct input_booster *data)
 		dev_err(data->dev, "Failed to create class\n");
 		goto err_create_class_file;
 	}
+	ret = class_create_file(data->class, &class_attr_head);
+	if (ret) {
+		dev_err(data->dev, "Failed to create class\n");
+		goto err_create_class_file;
+	}
+	ret = class_create_file(data->class, &class_attr_tail);
+	if (ret) {
+		dev_err(data->dev, "Failed to create class\n");
+		goto err_create_class_file;
+	}
+	ret = class_create_file(data->class, &class_attr_level);
+	if (ret) {
+		dev_err(data->dev, "Failed to create class\n");
+		goto err_create_class_file;
+	}
+
 
 	return 0;
 
@@ -876,6 +1175,16 @@ static int input_booster_init_dvfs(struct input_booster *data, struct booster_de
 	}
 
 	switch (device_type) {
+	case BOOSTER_DEVICE_KEY:
+		INIT_DELAYED_WORK(&dvfs->dvfs_chg_work, DVFS_WORK_FUNC(CHG, KEY));
+		INIT_DELAYED_WORK(&dvfs->dvfs_off_work, DVFS_WORK_FUNC(OFF, KEY));
+		dvfs->set_dvfs_lock = DVFS_WORK_FUNC(SET, KEY);
+	break;
+	case BOOSTER_DEVICE_TOUCHKEY:
+		INIT_DELAYED_WORK(&dvfs->dvfs_chg_work, DVFS_WORK_FUNC(CHG, TOUCHKEY));
+		INIT_DELAYED_WORK(&dvfs->dvfs_off_work, DVFS_WORK_FUNC(OFF, TOUCHKEY));
+		dvfs->set_dvfs_lock = DVFS_WORK_FUNC(SET, TOUCHKEY);
+	break;
 	case BOOSTER_DEVICE_TOUCH:
 		INIT_DELAYED_WORK(&dvfs->dvfs_chg_work, DVFS_WORK_FUNC(CHG, TOUCH));
 		INIT_DELAYED_WORK(&dvfs->dvfs_off_work, DVFS_WORK_FUNC(OFF, TOUCH));
@@ -1027,6 +1336,22 @@ static int input_booster_parse_dt(struct device *dev)
 		booster_device->freq_table = pdata->freq_tables[device_type];
 		booster_device->time_table = pdata->time_tables[device_type];
 
+		if(device_type==BOOSTER_DEVICE_TOUCH){
+			sysfs_head_time = booster_device->time_table[BOOSTER_LEVEL2].head_time;
+			head_cpu_freq = booster_device->freq_table[BOOSTER_LEVEL2].cpu_freq;
+			head_kfc_freq = booster_device->freq_table[BOOSTER_LEVEL2].kfc_freq;
+			head_mif_freq = booster_device->freq_table[BOOSTER_LEVEL2].mif_freq;
+			head_int_freq = booster_device->freq_table[BOOSTER_LEVEL2].int_freq;
+			head_hmp_boost = booster_device->freq_table[BOOSTER_LEVEL2].hmp_boost;
+
+			sysfs_tail_time = booster_device->time_table[BOOSTER_LEVEL2].tail_time;
+			tail_cpu_freq = booster_device->freq_table[BOOSTER_LEVEL2_CHG].cpu_freq;
+			tail_kfc_freq = booster_device->freq_table[BOOSTER_LEVEL2_CHG].kfc_freq;
+			tail_mif_freq = booster_device->freq_table[BOOSTER_LEVEL2_CHG].mif_freq;
+			tail_int_freq = booster_device->freq_table[BOOSTER_LEVEL2_CHG].int_freq;
+			tail_hmp_boost = booster_device->freq_table[BOOSTER_LEVEL2_CHG].hmp_boost;
+		}
+
 #ifdef BOOSTER_DEBUG
 		dev_info(dev, "device_type:%d, label :%s, type: 0x%02x, num_level[%d]\n",
 			device_type, booster_device->desc, booster_device->type, num_level);
@@ -1108,6 +1433,7 @@ static int input_booster_probe(struct platform_device *pdev)
 	data->ndevices = pdata->ndevices;
 	data->dev = &pdev->dev;
 	g_data = data;
+	g_data->ndevices = pdata->ndevices;
 
 #ifdef BOOSTER_SYSFS
 	ret = input_booster_init_sysfs(data);

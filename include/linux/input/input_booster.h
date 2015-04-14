@@ -22,6 +22,7 @@ enum booster_level {
 	BOOSTER_LEVEL0 = 0,
 	BOOSTER_LEVEL1,
 	BOOSTER_LEVEL2,
+	BOOSTER_LEVEL2_CHG,
 	BOOSTER_LEVEL3,
 	BOOSTER_LEVEL4,
 	BOOSTER_LEVEL5,
@@ -35,6 +36,8 @@ enum booster_level {
  * If you want to add booster device, add it this after PEN type
  */
 enum booster_device_type {
+	BOOSTER_DEVICE_KEY,
+	BOOSTER_DEVICE_TOUCHKEY,
 	BOOSTER_DEVICE_TOUCH,
 	BOOSTER_DEVICE_PEN,
 	BOOSTER_DEVICE_MAX,
