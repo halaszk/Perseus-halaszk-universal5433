@@ -2295,6 +2295,12 @@ static int s3c_fb_set_win_config(struct s3c_fb *sfb,
 			regs->h[i] = config->h;
 			enabled = 1;
 			color_map = 0;
+			if (config->fence_fd >= 0) {
+				regs->fence = sync_fence_fdget(win_config->fence_fd);
+				if (!regs->fence) {
+					dev_err(sfb->dev, "failed to import OTF fence fd\n");
+				}
+			}
 		}
 		if (enabled)
 			regs->wincon[i] |= WINCONx_ENWIN;
@@ -2488,14 +2494,14 @@ err:
 #endif
 }
 
-static int gsc_subdev_set_sfr_update(struct s3c_fb *sfb, int i)
+static int gsc_subdev_set_sfr_update(struct s3c_fb *sfb, int i, bool enable)
 {
 	int ret = 0;
 #ifdef CONFIG_FB_EXYNOS_FIMD_MC
 	int gsc_id = sfb->md->gsc_sd[i]->grp_id;
 
 	ret = v4l2_subdev_call(sfb->md->gsc_sd[gsc_id], core, ioctl,
-			GSC_SFR_UPDATE, NULL);
+			GSC_SFR_UPDATE, (unsigned long *)enable);
 	if (ret)
 		dev_err(sfb->dev, "GSC_SFR_UPDATE failed\n");
 #endif
@@ -2508,11 +2514,17 @@ static int gsc_subdev_wait_stop(struct s3c_fb *sfb, int i)
 	int ret = 0;
 	int gsc_id = sfb->md->gsc_sd[i]->grp_id;
 	struct display_driver *dispdrv;
+	int default_win = sfb->pdata->default_win;
+	struct fb_info *info = sfb->windows[default_win]->fbinfo;
 
 	dispdrv = get_display_driver();
 
-	ret = v4l2_subdev_call(sfb->md->gsc_sd[gsc_id], core, ioctl,
-			GSC_WAIT_STOP, NULL);
+	if (info->flags & FBINFO_MISC_ESD_DETECTED)
+		ret = v4l2_subdev_call(sfb->md->gsc_sd[gsc_id], core,
+			ioctl, GSC_WAIT_STOP, (int *)info->flags);
+	else
+		ret = v4l2_subdev_call(sfb->md->gsc_sd[gsc_id], core,
+				ioctl, GSC_WAIT_STOP, NULL);
 	if (ret)
 		pr_err("GSC_WAIT_STOP failed\n");
 
@@ -2679,7 +2691,10 @@ static void __s3c_fb_update_regs(struct s3c_fb *sfb, struct s3c_reg_data *regs)
 	struct decon_regs_data win_regs;
 	struct decon_psr_info psr;
 	int errwin[S3C_FB_MAX_WIN];
+	struct display_driver *dispdrv;
 
+	dispdrv = get_display_driver();
+ 
 	if (sfb->trig_mode == DECON_HW_TRIG)
 		decon_reg_set_trigger(sfb->trig_mode, DECON_TRIG_DISABLE);
 
@@ -2723,8 +2738,6 @@ static void __s3c_fb_update_regs(struct s3c_fb *sfb, struct s3c_reg_data *regs)
 					errwin[i] = 1;
 					continue;
 				}
-				clear_bit(S3C_FB_READY_TO_LOCAL,
-					&sfb->windows[i]->state);
 				set_bit(S3C_FB_LOCAL,
 					&sfb->windows[i]->state);
 				clear_bit(S3C_FB_DMA,
@@ -2751,15 +2764,24 @@ static void __s3c_fb_update_regs(struct s3c_fb *sfb, struct s3c_reg_data *regs)
 		dev_err(sfb->dev, "Error:0x%x, irq_ref: %d\n",
 				readl(sfb->regs + DECON_UPDATE_SHADOW),
 				irq_ref);
-	}
-
-	for (i = 0; i < sfb->variant.nr_windows; i++) {
-		if (!WIN_CONFIG_DMA(i) && !errwin[i]) {
-			ret = gsc_subdev_set_sfr_update(sfb, i);
-			if (ret)
-				dev_err(sfb->dev, "failed set sfr update\n");
+		if (!WIN_CONFIG_DMA(0)) {
+			decon_dump_registers(dispdrv);
+			v4l2_subdev_call(sfb->md->gsc_sd[0], core, ioctl,
+					GSC_SFR_DUMP, NULL);
+			BUG();
 		}
 	}
+
+	if (!WIN_CONFIG_DMA(0) && !errwin[0]) {
+		if (test_and_clear_bit(S3C_FB_READY_TO_LOCAL,
+			&sfb->windows[0]->state))
+			ret = gsc_subdev_set_sfr_update(sfb, 0, false);
+		else
+			ret = gsc_subdev_set_sfr_update(sfb, 0, true);
+
+		if (ret)
+			dev_err(sfb->dev, "failed set sfr update\n");
+ 	}
 
 	s3c_fb_to_psr_info(sfb, &psr);
 	s3c_fb_vidout_start(&psr);
@@ -2829,8 +2851,15 @@ static void s3c_fb_update_regs(struct s3c_fb *sfb, struct s3c_reg_data *regs)
 			if (regs->dma_buf_data[i].fence)
 				s3c_fd_fence_wait(sfb,
 			regs->dma_buf_data[i].fence);
-		} else
+		} else {
+			if (regs->fence) {
+				s3c_fd_fence_wait(sfb, regs->fence);
+				sync_fence_put(regs->fence);
+				regs->fence = NULL;
+			}
+
 			local_cnt++;
+		}
 	}
 	decon_set_protected_content(sfb, !!protection);
 #if defined(CONFIG_DECON_DEVFREQ)

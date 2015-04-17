@@ -473,7 +473,7 @@ int __init exynos5433_pmu_init(void)
 
 	/* UP Scheduler Enable */
 	tmp = __raw_readl(EXYNOS5_UP_SCHEDULER);
-	tmp |= ENABLE_EAGLE_CPU;
+	tmp |= (ENABLE_EAGLE_CPU | ENABLE_KFC_CPU);
 	__raw_writel(tmp, EXYNOS5_UP_SCHEDULER);
 
 	/*

@@ -133,6 +133,11 @@ void gsc_op_timer_handler(unsigned long arg)
 	struct gsc_ctx *ctx = v4l2_m2m_get_curr_priv(gsc->m2m.m2m_dev);
 	struct vb2_buffer *src_vb, *dst_vb;
 
+	if (!test_bit(ST_M2M_RUN, &gsc->state)) {
+		gsc_warn("gsc state is 0x%lx", gsc->state);
+		return;
+	}
+
 	gsc_dump_registers(gsc);
 
 	clear_bit(ST_M2M_RUN, &gsc->state);

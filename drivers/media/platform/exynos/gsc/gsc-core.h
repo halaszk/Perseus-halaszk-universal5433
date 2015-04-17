@@ -386,9 +386,14 @@ struct gsc_output_device {
 	struct vb2_queue	vbq;
 	struct media_pad	vd_pad;
 	struct media_pad	sd_pads[GSC_PADS_NUM];
+	struct list_head	pending_buf_q;
 	struct list_head	active_buf_q;
 	int			req_cnt;
 	unsigned int		pending_mask;
+	unsigned long long	q_time[50];
+	unsigned long long	dq_time[50];
+	unsigned long long	wq_time[50];
+	unsigned long long	isr_time[50];
 };
 
 /**
@@ -570,6 +575,7 @@ struct gsc_dev {
 	u32				dq_cnt;
 	u32				isr_cnt;
 	u32				wq_cnt;
+	u32				real_isr_cnt;
 };
 
 /**
@@ -769,20 +775,38 @@ static inline struct gsc_frame *ctx_get_frame(struct gsc_ctx *ctx,
 	return frame;
 }
 
-static inline struct gsc_input_buf *
-active_queue_pop(struct gsc_output_device *vid_out, struct gsc_dev *dev)
+static inline struct gsc_input_buf *active_q_pop(struct gsc_output_device *out)
 {
 	struct gsc_input_buf *buf;
 
-	buf = list_entry(vid_out->active_buf_q.next, struct gsc_input_buf, list);
+	buf = list_first_entry(&out->active_buf_q, struct gsc_input_buf,
+				list);
+	list_del(&buf->list);
 
 	return buf;
 }
 
-static inline void active_queue_push(struct gsc_output_device *vid_out,
-			     struct gsc_input_buf *buf, struct gsc_dev *dev)
+static inline void active_q_push(struct gsc_output_device *out,
+				     struct gsc_input_buf *buf)
 {
-	list_add_tail(&buf->list, &vid_out->active_buf_q);
+	list_add_tail(&buf->list, &out->active_buf_q);
+}
+
+static inline struct gsc_input_buf *pending_q_pop(struct gsc_output_device *out)
+{
+	struct gsc_input_buf *buf;
+
+	buf = list_first_entry(&out->pending_buf_q, struct gsc_input_buf,
+				list);
+	list_del(&buf->list);
+
+	return buf;
+}
+
+static inline void pending_q_push(struct gsc_output_device *out,
+				     struct gsc_input_buf *buf)
+{
+	list_add_tail(&buf->list, &out->pending_buf_q);
 }
 
 static inline struct gsc_dev *entity_to_gsc(struct media_entity *me)

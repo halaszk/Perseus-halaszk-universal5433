@@ -524,4 +524,15 @@
 
 #define WINCON_SHADOW(x)			(WINCON(x) + 0x4000)
 #define DECON_UPDATE_SHADOW			(DECON_UPDATE + 0x4000)
+#define VIDOSD_A_SHADOW(_win)			(VIDOSD_BASE + ((_win) * OSD_STRIDE) + 0x00 + 0x4000)
+#define VIDOSD_B_SHADOW(_win)			(VIDOSD_BASE + ((_win) * OSD_STRIDE) + 0x04 + 0x4000)
+#define VIDOSD_C_SHADOW(_win)			(VIDOSD_BASE + ((_win) * OSD_STRIDE) + 0x08 + 0x4000)
+#define VIDOSD_D_SHADOW(_win)			(VIDOSD_BASE + ((_win) * OSD_STRIDE) + 0x0C + 0x4000)
+#define VIDOSD_E_SHADOW(_win)			(VIDOSD_BASE + ((_win) * OSD_STRIDE) + 0x10 + 0x4000)
+#define LOCAL_SIZE_SHADOW(_x)			(0x214 + (_x) * 0x4 + 0x4000)
+#define VIDTCON00_SHADOW			(0x2010 + 0x4000)
+#define VIDTCON01_SHADOW			(0x2014 + 0x4000)
+#define VIDTCON10_SHADOW			(0x2018 + 0x4000)
+#define VIDTCON11_SHADOW			(0x201c + 0x4000)
+#define VIDTCON2_SHADOW				(0x2028 + 0x4000)
 #endif /* _REGS_DECON_H */

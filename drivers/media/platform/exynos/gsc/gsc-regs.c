@@ -957,13 +957,20 @@ void gsc_hw_set_sfr_update(struct gsc_ctx *ctx)
 	struct gsc_dev *dev = ctx->gsc_dev;
 	u32 cfg;
 	ktime_t start = ktime_get();
+	bool frame_done = false;
 
 	do {
 		cfg = readl(dev->regs + GSC_ENABLE);
-		if (!(cfg & GSC_ENABLE_SFR_UPDATE))
+		if (!(cfg & GSC_ENABLE_SFR_UPDATE)) {
+			frame_done = true;
 			break;
+		}
 		udelay(1);
 	} while(ktime_us_delta(ktime_get(), start) < 20000);
+
+	if (!frame_done)
+		gsc_warn("SFR_UPDATE bit is not clear(%d)",
+				readl(dev->regs + GSC_ENABLE));
 
 	cfg |= GSC_ENABLE_SFR_UPDATE;
 	writel(cfg, dev->regs + GSC_ENABLE);

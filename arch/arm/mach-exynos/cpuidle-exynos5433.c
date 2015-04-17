@@ -396,6 +396,11 @@ static int exynos_check_enter_mode(void)
 		return EXYNOS_CHECK_DIDLE;
 #endif
 
+#ifdef CONFIG_PWM_SAMSUNG
+	if(pwm_check_enable_cnt())
+		return EXYNOS_CHECK_DIDLE;
+#endif
+
 	/* Check power domain for DSTOP */
 	if (exynos_check_reg_status(exynos5_dstop_power_domain,
 			    ARRAY_SIZE(exynos5_dstop_power_domain))) {
@@ -1108,19 +1113,21 @@ static int exynos_cpuidle_notifier_event(struct notifier_block *this,
 {
 	switch (event) {
 	case PM_SUSPEND_PREPARE:
+#ifdef CONFIG_EXYNOS_IDLE_CLOCK_DOWN
 		/* To enter sleep mode quickly, disable idle clock down  */
 		exynos_idle_clock_down(false, ARM);
 		exynos_idle_clock_down(false, KFC);
-
+#endif
 		cpu_idle_poll_ctrl(true);
 		pr_debug("PM_SUSPEND_PREPARE for CPUIDLE\n");
 		return NOTIFY_OK;
 	case PM_POST_RESTORE:
 	case PM_POST_SUSPEND:
+#ifdef CONFIG_EXYNOS_IDLE_CLOCK_DOWN
 		/* Enable idle clock down after wakeup from skeep mode */
 		exynos_idle_clock_down(true, ARM);
 		exynos_idle_clock_down(true, KFC);
-
+#endif
 		cpu_idle_poll_ctrl(false);
 		pr_debug("PM_POST_SUSPEND for CPUIDLE\n");
 		return NOTIFY_OK;

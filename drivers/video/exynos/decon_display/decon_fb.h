@@ -253,6 +253,7 @@ struct s3c_reg_data {
 	u32 		h[S3C_FB_MAX_WIN + 1];
 	bool		need_update;
 	bool		protection[S3C_FB_MAX_WIN];
+	struct sync_fence *fence;
 };
 #endif
 
