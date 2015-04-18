@@ -404,7 +404,7 @@ static void __init set_volt_table_CA15(void)
 		max_support_idx_CA15 = L7;	/* 1.8 GHz */
 		break;
 	default :
-		max_support_idx_CA15 = L5;	/* 2.0 GHz */
+		max_support_idx_CA15 = L4;	/* 2.1 GHz */
 	}
 
 	if (is_max_limit_sample() == 1)
