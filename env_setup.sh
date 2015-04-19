@@ -39,11 +39,10 @@ export USER=`whoami`;
 export TMPFILE=`mktemp -t`;
 
 # system compiler
-#export CROSS_COMPILE=/home/serg/AK-sabermod-arm-eabi-4.9-master/bin/arm-eabi-;
-export CROSS_COMPILE=/home/dev/KERNEL/arm-eabi-4.9.x/bin/arm-linux-gnueabihf-
-# export CROSS_COMPILE=/home/serg/arm-eabi-4.9-master/bin/arm-eabi-;
-# export CROSS_COMPILE=/home/serg/arm-cortex_a15-linux-gnueabihf-linaro_4.9.3-2014.11/bin/arm-cortex_a15-linux-gnueabihf-;
+#export CROSS_COMPILE=/home/dev/KERNEL/arm-eabi-4.9.x/bin/arm-linux-gnueabihf-
+export CROSS_COMPILE=/home/dev/KERNEL/arm-cortex-linux-gnueabi-linaro_4.9/bin/arm-cortex-linux-gnueabi-
 
+#CPU Core
 export NUMBEROFCPUS=`grep 'processor' /proc/cpuinfo | wc -l`;
 
 # Colorize and add text parameters
