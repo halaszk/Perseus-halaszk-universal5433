@@ -154,7 +154,6 @@ ENTRY(cpu_v6_do_resume)
 	mcr	p15, 0, ip, c7, c14, 0	@ clean+invalidate D cache
 	mcr	p15, 0, ip, c7, c5, 0	@ invalidate I cache
 	mcr	p15, 0, ip, c7, c15, 0	@ clean+invalidate cache
-	mcr	p15, 0, ip, c7, c10, 4	@ drain write buffer
 	mcr	p15, 0, ip, c13, c0, 1	@ set reserved context ID
 	ldmia	r0, {r4 - r9}
 	mcr	p15, 0, r4, c13, c0, 0	@ FCSE/PID
