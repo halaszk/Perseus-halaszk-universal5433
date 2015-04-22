@@ -54,6 +54,17 @@ echo "0" > $TMPFILE;
 	# remove more from from tmp-initramfs ...
 	rm -f $INITRAMFS_TMP/update* >> /dev/null;
 
+	# generate ramdisk modules
+	make -j5 modules  || exit 1; 
+	
+	for i in $(find "$KERNELDIR" -name '*.ko'); do
+		cp -av "$i" $INITRAMFS_TMP/lib/modules/;
+	done;
+
+	chmod 755 $INITRAMFS_TMP/lib/modules/*
+	${CROSS_COMPILE}strip --strip-debug $INITRAMFS_TMP/lib/modules/*.ko 
+	${CROSS_COMPILE}strip --strip-unneeded $INITRAMFS_TMP/lib/modules/* 
+
 	./utilities/mkbootfs $INITRAMFS_TMP | gzip > ramdisk.gz
 
 	echo "1" > $TMPFILE;
