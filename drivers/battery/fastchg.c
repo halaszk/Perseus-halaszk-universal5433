@@ -40,7 +40,7 @@
  *
  * /sys/kernel/fast_charge/ac_charge_level (rw)
  *
- *   rate at which to charge when on AC (1.0A/h to 2.1A/h)
+ *   rate at which to charge when on AC (1.0A/h to 3.0A/h)
  *
  * /sys/kernel/fast_charge/usb_charge_level (r/w)
  *
@@ -52,7 +52,7 @@
  *
  * /sys/kernel/fast_charge/failsafe (rw)
  *
- *   0 - disabled - allow anything up to 2.1A/h to be used as AC / USB custom current
+ *   0 - disabled - allow anything up to 3.0A/h to be used as AC / USB custom current
  *   1 - enabled  - behaviour as described above (default)
  *
  * /sys/kernel/fast_charge/ac_levels (ro)
@@ -62,7 +62,6 @@
  * /sys/kernel/fast_charge/usb_levels (ro)
  *
  *   display available levels for USB (for failsafe enabled mode)
- *
  *
  * /sys/kernel/fast_charge/wireless_levels (ro)
  *
@@ -222,6 +221,15 @@ static ssize_t ac_charge_level_store(struct kobject *kobj,
 			case AC_CHARGE_1900:
 			case AC_CHARGE_2000:
 			case AC_CHARGE_2100:
+			case AC_CHARGE_2200:
+			case AC_CHARGE_2300:
+			case AC_CHARGE_2400:
+			case AC_CHARGE_2500:
+			case AC_CHARGE_2600:
+			case AC_CHARGE_2700:
+			case AC_CHARGE_2800:
+			case AC_CHARGE_2900:
+			case AC_CHARGE_3000:
 				ac_charge_level = new_ac_charge_level;
 				return count;
 			default:
@@ -309,7 +317,8 @@ static ssize_t wireless_charge_level_store(struct kobject *kobj, struct kobj_att
 
 	sscanf(buf, "%du", &new_wireless_charge_level);
 
-	if (failsafe == FAIL_SAFE_DISABLED && new_wireless_charge_level <= MAX_CHARGE_LEVEL) {
+	if (failsafe == FAIL_SAFE_DISABLED &&
+		new_wireless_charge_level <= MAX_CHARGE_LEVEL) {
 
 		wireless_charge_level = new_wireless_charge_level;
 		return count;
@@ -324,9 +333,11 @@ static ssize_t wireless_charge_level_store(struct kobject *kobj, struct kobj_att
 			case WIRELESS_CHARGE_900:
 			case WIRELESS_CHARGE_1000:
 			case WIRELESS_CHARGE_1100:
-			case WIRELESS_CHARGE_1200:	wireless_charge_level = new_wireless_charge_level;
-							return count;
-			default:			return -EINVAL;
+			case WIRELESS_CHARGE_1200:
+				wireless_charge_level = new_wireless_charge_level;
+				return count;
+			default:
+				return -EINVAL;
 		}
 
 	}
@@ -361,6 +372,7 @@ static ssize_t failsafe_store(struct kobject *kobj,
 		case FAIL_SAFE_ENABLED:
 			usb_charge_level = USB_CHARGE_460;
 			ac_charge_level = AC_CHARGE_2100;
+			wireless_charge_level = WIRELESS_CHARGE_650;
 			failsafe = new_failsafe;
 			return count;
 		case FAIL_SAFE_DISABLED:
