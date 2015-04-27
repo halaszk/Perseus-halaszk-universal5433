@@ -32,6 +32,7 @@
 
 #include "mali_kbase_platform.h"
 #include "gpu_dvfs_handler.h"
+#include "gpu_dvfs_governor.h"
 #include "gpu_control.h"
 
 extern struct kbase_device *pkbdev;
@@ -52,7 +53,7 @@ static gpu_dvfs_info gpu_dvfs_table_default[] = {
 	{500, 1075000, 0, 98,  99, 1, 0, 825000, 400000, 1300000, 1800000},
 	{420, 1025000, 0, 80,  99, 1, 0, 667000, 200000,  900000, 1800000},
 	{350, 1025000, 0, 80,  90, 1, 0, 543000, 160000,       0, CPU_MAX},
-	{266, 1000000, 0, 80,  90, 3, 0, 413000, 133000,       0, CPU_MAX},
+	{266, 1000000, 0, 80,  90, 1, 0, 413000, 133000,       0, CPU_MAX},
 	{160, 1000000, 0, 80,  90, 1, 0, 272000, 133000,       0, CPU_MAX},
 	{100, 1000000, 0,  0,  90, 1, 0, 272000, 133000,       0, CPU_MAX},
 };
@@ -66,15 +67,22 @@ static gpu_attribute gpu_config_attributes[] = {
         {GPU_MIN_CLOCK_LIMIT, 100},
 	{GPU_DVFS_START_CLOCK, 266},
 	{GPU_DVFS_BL_CONFIG_CLOCK, 266},
+	{GPU_GOVERNOR_TYPE, G3D_DVFS_GOVERNOR_INTERACTIVE},
 	{GPU_GOVERNOR_START_CLOCK_DEFAULT, 266},
+	{GPU_GOVERNOR_START_CLOCK_INTERACTIVE, 266},
 	{GPU_GOVERNOR_START_CLOCK_STATIC, 266},
 	{GPU_GOVERNOR_START_CLOCK_BOOSTER, 266},
 	{GPU_GOVERNOR_TABLE_DEFAULT, (uintptr_t)&gpu_dvfs_table_default},
+	{GPU_GOVERNOR_TABLE_INTERACTIVE, (uintptr_t)&gpu_dvfs_table_default},
 	{GPU_GOVERNOR_TABLE_STATIC, (uintptr_t)&gpu_dvfs_table_default},
 	{GPU_GOVERNOR_TABLE_BOOSTER, (uintptr_t)&gpu_dvfs_table_default},
 	{GPU_GOVERNOR_TABLE_SIZE_DEFAULT, GPU_DVFS_TABLE_LIST_SIZE(gpu_dvfs_table_default)},
+	{GPU_GOVERNOR_TABLE_SIZE_INTERACTIVE, GPU_DVFS_TABLE_LIST_SIZE(gpu_dvfs_table_default)},
 	{GPU_GOVERNOR_TABLE_SIZE_STATIC, GPU_DVFS_TABLE_LIST_SIZE(gpu_dvfs_table_default)},
 	{GPU_GOVERNOR_TABLE_SIZE_BOOSTER, GPU_DVFS_TABLE_LIST_SIZE(gpu_dvfs_table_default)},
+	{GPU_GOVERNOR_INTERACTIVE_HIGHSPEED_CLOCK, 420},
+	{GPU_GOVERNOR_INTERACTIVE_HIGHSPEED_LOAD, 95},
+	{GPU_GOVERNOR_INTERACTIVE_HIGHSPEED_DELAY, 0},
 	{GPU_DEFAULT_VOLTAGE, 937500},
 	{GPU_COLD_MINIMUM_VOL, 0},
 	{GPU_VOLTAGE_OFFSET_MARGIN, 37500},

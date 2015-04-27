@@ -20,6 +20,7 @@
 
 typedef enum {
     G3D_DVFS_GOVERNOR_DEFAULT = 0,
+	G3D_DVFS_GOVERNOR_INTERACTIVE,
     G3D_DVFS_GOVERNOR_STATIC,
     G3D_DVFS_GOVERNOR_BOOSTER,
     G3D_MAX_GOVERNOR_NUM,
@@ -31,6 +32,6 @@ void gpu_dvfs_update_table_size(int governor_type, int size);
 void *gpu_dvfs_get_governor_info(void);
 int gpu_dvfs_decide_next_freq(struct kbase_device *kbdev, int utilization);
 int gpu_dvfs_governor_setting(struct exynos_context *platform, int governor_type);
-int gpu_dvfs_governor_init(struct kbase_device *kbdev, int governor_type);
+int gpu_dvfs_governor_init(struct kbase_device *kbdev);
 
 #endif /* _GPU_DVFS_GOVERNOR_H_ */

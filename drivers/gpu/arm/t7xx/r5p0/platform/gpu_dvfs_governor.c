@@ -31,6 +31,7 @@ typedef void (*GET_NEXT_LEVEL)(struct exynos_context *platform, int utilization)
 GET_NEXT_LEVEL gpu_dvfs_get_next_level;
 
 static int gpu_dvfs_governor_default(struct exynos_context *platform, int utilization);
+static int gpu_dvfs_governor_interactive(struct exynos_context *platform, int utilization);
 static int gpu_dvfs_governor_static(struct exynos_context *platform, int utilization);
 static int gpu_dvfs_governor_booster(struct exynos_context *platform, int utilization);
 
@@ -39,6 +40,12 @@ static gpu_dvfs_governor_info governor_info[G3D_MAX_GOVERNOR_NUM] = {
 		G3D_DVFS_GOVERNOR_DEFAULT,
 		"Default",
 		gpu_dvfs_governor_default,
+		NULL
+	},
+	{
+		G3D_DVFS_GOVERNOR_INTERACTIVE,
+		"Interactive",
+		gpu_dvfs_governor_interactive,
 		NULL
 	},
 	{
@@ -82,18 +89,55 @@ static int gpu_dvfs_governor_default(struct exynos_context *platform, int utiliz
 	if ((platform->step > gpu_dvfs_get_level(platform->gpu_max_clock)) &&
 			(utilization > platform->table[platform->step].max_threshold)) {
 		platform->step--;
-/*		if ((!platform->hwcnt_bt_clk) && (platform->table[platform->step].clock > platform->gpu_max_clock_limit))
-			platform->step = gpu_dvfs_get_level(platform->gpu_max_clock_limit);*/
-		platform->down_requirement = platform->table[platform->step].stay_count;
+		platform->down_requirement = platform->table[platform->step].down_staycount;
 	} else if ((platform->step < gpu_dvfs_get_level(platform->gpu_min_clock)) && (utilization < platform->table[platform->step].min_threshold)) {
 		platform->down_requirement--;
 		if (platform->down_requirement == 0) {
 			platform->step++;
-			platform->down_requirement = platform->table[platform->step].stay_count;
+			platform->down_requirement = platform->table[platform->step].down_staycount;
 		}
 	} else {
-		platform->down_requirement = platform->table[platform->step].stay_count;
+		platform->down_requirement = platform->table[platform->step].down_staycount;
 	}
+	DVFS_ASSERT((platform->step >= gpu_dvfs_get_level(platform->gpu_max_clock))
+					&& (platform->step <= gpu_dvfs_get_level(platform->gpu_min_clock)));
+
+	return 0;
+}
+
+static int gpu_dvfs_governor_interactive(struct exynos_context *platform, int utilization)
+{
+	DVFS_ASSERT(platform);
+
+	if ((platform->step > gpu_dvfs_get_level(platform->gpu_max_clock))
+			&& (utilization > platform->table[platform->step].max_threshold)) {
+		int highspeed_level = gpu_dvfs_get_level(platform->interactive.highspeed_clock);
+		if ((highspeed_level > 0) && (platform->step > highspeed_level)
+				&& (utilization > platform->interactive.highspeed_load)) {
+			if (platform->interactive.delay_count == platform->interactive.highspeed_delay) {
+				platform->step = highspeed_level;
+				platform->interactive.delay_count = 0;
+			} else {
+				platform->interactive.delay_count++;
+			}
+		} else {
+			platform->step--;
+			platform->interactive.delay_count = 0;
+		}
+		platform->down_requirement = platform->table[platform->step].down_staycount;
+	} else if ((platform->step < gpu_dvfs_get_level(platform->gpu_min_clock))
+			&& (utilization < platform->table[platform->step].min_threshold)) {
+		platform->interactive.delay_count = 0;
+		platform->down_requirement--;
+		if (platform->down_requirement == 0) {
+			platform->step++;
+			platform->down_requirement = platform->table[platform->step].down_staycount;
+		}
+	} else {
+		platform->interactive.delay_count = 0;
+		platform->down_requirement = platform->table[platform->step].down_staycount;
+	}
+
 	DVFS_ASSERT((platform->step >= gpu_dvfs_get_level(platform->gpu_max_clock))
 					&& (platform->step <= gpu_dvfs_get_level(platform->gpu_min_clock)));
 
@@ -147,21 +191,21 @@ static int gpu_dvfs_governor_booster(struct exynos_context *platform, int utiliz
 	if ((platform->step >= dvfs_table_lock+2) &&
 			((cur_weight - weight) > booster_threshold)) {
 		platform->step -= 2;
-		platform->down_requirement = platform->table[platform->step].stay_count;
+		platform->down_requirement = platform->table[platform->step].down_staycount;
 		GPU_LOG(DVFS_WARNING, DUMMY, 0u, 0u, "Booster Governor: G3D level 2 step\n");
 	} else if ((platform->step > gpu_dvfs_get_level(platform->gpu_max_clock)) &&
 			(utilization > platform->table[platform->step].max_threshold)) {
 		platform->step--;
-		platform->down_requirement = platform->table[platform->step].stay_count;
+		platform->down_requirement = platform->table[platform->step].down_staycount;
 	} else if ((platform->step < gpu_dvfs_get_level(platform->gpu_min_clock)) &&
 			(utilization < platform->table[platform->step].min_threshold)) {
 		platform->down_requirement--;
 		if (platform->down_requirement == 0) {
 			platform->step++;
-			platform->down_requirement = platform->table[platform->step].stay_count;
+			platform->down_requirement = platform->table[platform->step].down_staycount;
 		}
 	} else {
-		platform->down_requirement = platform->table[platform->step].stay_count;
+		platform->down_requirement = platform->table[platform->step].down_staycount;
 	}
 
 	DVFS_ASSERT((platform->step >= gpu_dvfs_get_level(platform->gpu_max_clock))
@@ -265,12 +309,16 @@ int gpu_dvfs_governor_setting(struct exynos_context *platform, int governor_type
 	return 0;
 }
 
-int gpu_dvfs_governor_init(struct kbase_device *kbdev, int governor_type)
+int gpu_dvfs_governor_init(struct kbase_device *kbdev)
 {
+	int governor_type = G3D_DVFS_GOVERNOR_DEFAULT;
 	struct exynos_context *platform = (struct exynos_context *) kbdev->platform_context;
 
 	DVFS_ASSERT(platform);
 
+#ifdef CONFIG_MALI_DVFS
+	governor_type = platform->governor_type;
+#endif /* CONFIG_MALI_DVFS */
 	if (gpu_dvfs_governor_setting(platform, governor_type) < 0) {
 		GPU_LOG(DVFS_WARNING, DUMMY, 0u, 0u, "%s: fail to initialize governor\n", __func__);
 		return -1;

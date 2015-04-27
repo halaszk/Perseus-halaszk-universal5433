@@ -100,15 +100,22 @@ typedef enum {
 	GPU_MIN_CLOCK_LIMIT,
 	GPU_DVFS_START_CLOCK,
 	GPU_DVFS_BL_CONFIG_CLOCK,
+	GPU_GOVERNOR_TYPE,
 	GPU_GOVERNOR_START_CLOCK_DEFAULT,
+	GPU_GOVERNOR_START_CLOCK_INTERACTIVE,
 	GPU_GOVERNOR_START_CLOCK_STATIC,
 	GPU_GOVERNOR_START_CLOCK_BOOSTER,
 	GPU_GOVERNOR_TABLE_DEFAULT,
+	GPU_GOVERNOR_TABLE_INTERACTIVE,
 	GPU_GOVERNOR_TABLE_STATIC,
 	GPU_GOVERNOR_TABLE_BOOSTER,
 	GPU_GOVERNOR_TABLE_SIZE_DEFAULT,
+	GPU_GOVERNOR_TABLE_SIZE_INTERACTIVE,
 	GPU_GOVERNOR_TABLE_SIZE_STATIC,
 	GPU_GOVERNOR_TABLE_SIZE_BOOSTER,
+	GPU_GOVERNOR_INTERACTIVE_HIGHSPEED_CLOCK,
+	GPU_GOVERNOR_INTERACTIVE_HIGHSPEED_LOAD,
+	GPU_GOVERNOR_INTERACTIVE_HIGHSPEED_DELAY,
 	GPU_DEFAULT_VOLTAGE,
 	GPU_COLD_MINIMUM_VOL,
 	GPU_VOLTAGE_OFFSET_MARGIN,
@@ -148,7 +155,7 @@ typedef struct _gpu_dvfs_info {
 	int asv_abb;
 	int min_threshold;
 	int max_threshold;
-	int stay_count;
+	int down_staycount;
 	unsigned long long time;
 	int mem_freq;
 	int int_freq;
@@ -203,6 +210,14 @@ struct exynos_context {
 	int governor_type;
 	bool wakeup_lock;
 	int dvfs_pending;
+	
+	/* For the interactive governor */
+	struct {
+		int highspeed_clock;
+		int highspeed_load;
+		int highspeed_delay;
+		int delay_count;
+	} interactive;
 #ifdef CONFIG_CPU_THERMAL_IPA
 	int norm_utilisation;
 	int freq_for_normalisation;

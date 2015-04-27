@@ -41,24 +41,25 @@ static int gpu_check_target_clock(struct exynos_context *platform, int clock)
 
 	DVFS_ASSERT(platform);
 
-	if (gpu_dvfs_get_level(clock) < 0)
+	if (gpu_dvfs_get_level(target_clock) < 0)
 		return -1;
 
 #ifdef CONFIG_MALI_DVFS
 	if (!platform->dvfs_status)
-		return clock;
+		return target_clock;
 
 	GPU_LOG(DVFS_DEBUG, DUMMY, 0u, 0u, "clock: %d, min: %d, max: %d\n", clock, platform->min_lock, platform->max_lock);
 
 	if ((platform->min_lock > 0) &&
-			((clock < platform->min_lock) || (platform->cur_clock < platform->min_lock)))
+			((target_clock < platform->min_lock) || (platform->cur_clock < platform->min_lock)))
 		target_clock = platform->min_lock;
 
-	if ((platform->max_lock > 0) &&
-			((target_clock > platform->max_lock) || (platform->cur_clock > platform->max_lock)))
+	if ((platform->max_lock > 0) && (target_clock > platform->max_lock))
 		target_clock = platform->max_lock;
 #endif /* CONFIG_MALI_DVFS */
 
+	platform->step = gpu_dvfs_get_level(target_clock);
+	
 	return target_clock;
 }
 
@@ -73,7 +74,9 @@ static int gpu_update_cur_level(struct exynos_context *platform)
 	if (level >= 0) {
 		spin_lock_irqsave(&platform->gpu_dvfs_spinlock, flags);
 		if (platform->step != level)
-			platform->down_requirement = platform->table[level].stay_count;
+			platform->down_requirement = platform->table[level].down_staycount;
+		if (platform->step < level)
+		platform->interactive.delay_count = 0;
 		platform->step = level;
 		spin_unlock_irqrestore(&platform->gpu_dvfs_spinlock, flags);
 	} else {
@@ -185,22 +188,20 @@ int gpu_dvfs_boost_lock(gpu_dvfs_boost_command boost_command)
 
 	switch (boost_command) {
 	case GPU_DVFS_BOOST_SET:
+			platform->boost_is_enabled = true;
 		if (platform->boost_gpu_min_lock)
 			gpu_dvfs_clock_lock(GPU_DVFS_MIN_LOCK, BOOST_LOCK, platform->boost_gpu_min_lock);
-		if (platform->boost_egl_min_lock) {
-			platform->boost_is_enabled = true;
+		if (platform->boost_egl_min_lock) 
 			gpu_pm_qos_command(platform, GPU_CONTROL_PM_QOS_EGL_SET);
-		}
 		GPU_LOG(DVFS_INFO, DUMMY, 0u, 0u, "%s: boost mode is enabled (CPU: %d, GPU %d)\n",
 				__func__, platform->boost_egl_min_lock, platform->boost_gpu_min_lock);
 		break;
 	case GPU_DVFS_BOOST_UNSET:
+			platform->boost_is_enabled = false;
 		if (platform->boost_gpu_min_lock)
 			gpu_dvfs_clock_lock(GPU_DVFS_MIN_UNLOCK, BOOST_LOCK, 0);
-		if (platform->boost_egl_min_lock) {
-			platform->boost_is_enabled = false;
+		if (platform->boost_egl_min_lock)
 			gpu_pm_qos_command(platform, GPU_CONTROL_PM_QOS_EGL_RESET);
-		}
 		GPU_LOG(DVFS_INFO, DUMMY, 0u, 0u, "%s: boost mode is disabled (CPU: %d, GPU %d)\n",
 				__func__, platform->boost_egl_min_lock, platform->boost_gpu_min_lock);
 		break;
@@ -366,7 +367,8 @@ static void gpu_dvfs_timer_control(bool enable)
 		add_timer_on(&kbdev->pm.metrics.tlist, 0);
 #endif /* SLSI_SUBSTITUTE */
 		spin_lock_irqsave(&platform->gpu_dvfs_spinlock, flags);
-		platform->down_requirement = platform->table[platform->step].stay_count;
+		platform->down_requirement = platform->table[platform->step].down_staycount;
+		platform->interactive.delay_count = 0;
 		spin_unlock_irqrestore(&platform->gpu_dvfs_spinlock, flags);
 	}
 

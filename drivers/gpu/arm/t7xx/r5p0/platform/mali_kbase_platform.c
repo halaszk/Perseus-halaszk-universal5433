@@ -142,6 +142,9 @@ static int gpu_validate_attrib_data(struct exynos_context *platform)
 #endif /* CONFIG_CPU_THERMAL_IPA */
 	data = gpu_get_attrib_data(attrib, GPU_DEFAULT_WAKEUP_LOCK);
 	platform->wakeup_lock = data == 0 ? 0 : (u32) data;
+	
+	data = gpu_get_attrib_data(attrib, GPU_GOVERNOR_TYPE);
+	platform->governor_type = data == 0 ? 0 : (u32) data;
 
 	data = gpu_get_attrib_data(attrib, GPU_GOVERNOR_START_CLOCK_DEFAULT);
 	gpu_dvfs_update_start_clk(G3D_DVFS_GOVERNOR_DEFAULT, data == 0 ? 266 : (u32) data);
@@ -163,6 +166,19 @@ static int gpu_validate_attrib_data(struct exynos_context *platform)
 	gpu_dvfs_update_table(G3D_DVFS_GOVERNOR_BOOSTER, (gpu_dvfs_info *) data);
 	data = gpu_get_attrib_data(attrib, GPU_GOVERNOR_TABLE_SIZE_BOOSTER);
 	gpu_dvfs_update_table_size(G3D_DVFS_GOVERNOR_BOOSTER, (u32) data);
+	
+	data = gpu_get_attrib_data(attrib, GPU_GOVERNOR_START_CLOCK_INTERACTIVE);
+	gpu_dvfs_update_start_clk(G3D_DVFS_GOVERNOR_INTERACTIVE, data == 0 ? 266 : (u32) data);
+	data = gpu_get_attrib_data(attrib, GPU_GOVERNOR_TABLE_INTERACTIVE);
+	gpu_dvfs_update_table(G3D_DVFS_GOVERNOR_INTERACTIVE, (gpu_dvfs_info *) data);
+	data = gpu_get_attrib_data(attrib, GPU_GOVERNOR_TABLE_SIZE_INTERACTIVE);
+	gpu_dvfs_update_table_size(G3D_DVFS_GOVERNOR_INTERACTIVE, (u32) data);
+	data = gpu_get_attrib_data(attrib, GPU_GOVERNOR_INTERACTIVE_HIGHSPEED_CLOCK);
+	platform->interactive.highspeed_clock = data == 0 ? 500 : (u32) data;
+	data = gpu_get_attrib_data(attrib, GPU_GOVERNOR_INTERACTIVE_HIGHSPEED_LOAD);
+	platform->interactive.highspeed_load = data == 0 ? 100 : (u32) data;
+	data = gpu_get_attrib_data(attrib, GPU_GOVERNOR_INTERACTIVE_HIGHSPEED_DELAY);
+	platform->interactive.highspeed_delay = data == 0 ? 0 : (u32) data;
 
 	data = gpu_get_attrib_data(attrib, GPU_DVFS_POLLING_TIME);
 	platform->polling_speed = data == 0 ? 100 : (u32) data;
@@ -264,7 +280,7 @@ static mali_bool kbase_platform_exynos5_init(struct kbase_device *kbdev)
 	gpu_dvfs_utilization_init(kbdev);
 
 	/* dvfs governor init */
-	gpu_dvfs_governor_init(kbdev, G3D_DVFS_GOVERNOR_DEFAULT);
+	gpu_dvfs_governor_init(kbdev);
 
 #ifdef CONFIG_MALI_DVFS
 	/* dvfs handler init */
