@@ -176,7 +176,7 @@ void exfat_time_fat2unix(struct exfat_sb_info *sbi, struct timespec *ts,
 
 	ts->tv_sec =  tp->Second  + tp->Minute * SECS_PER_MIN
 			+ tp->Hour * SECS_PER_HOUR
-			+ (year * 365 + ld + accum_days_in_year[(tp->Month)] 
+			+ (year * 365 + ld + accum_days_in_year[(tp->Month)]
 			+ (tp->Day - 1) + DAYS_DELTA_DECADE) * SECS_PER_DAY;
 
 	if(!sbi->options.tz_utc)
@@ -317,7 +317,7 @@ static void exfat_mnt_msg(struct super_block *sb, int mount, int prev_err, const
 {
 	exfat_msg(sb, KERN_INFO, "%s %s",
 			msg, prev_err ? "(with previous I/O errors)" : "");
-	ST_LOG("[EXFAT] (%s[%d:%d]):%s %s",sb->s_id, MAJOR(sb->s_dev),MINOR(sb->s_dev), 
+	ST_LOG("[EXFAT] (%s[%d:%d]):%s %s",sb->s_id, MAJOR(sb->s_dev),MINOR(sb->s_dev),
 			msg, prev_err ? "(with previous I/O errors)" : "");
 }
 
