@@ -20,12 +20,12 @@
 #include <linux/backing-dev.h>
 #include <linux/atomic.h>
 #include <linux/scatterlist.h>
+#include <mach/smc.h>
 #include <asm/page.h>
 #include <asm/unaligned.h>
 #include <crypto/hash.h>
 #include <crypto/md5.h>
 #include <crypto/algapi.h>
-#include <mach/smc.h>
 #include <mach/regs-clock.h>
 
 #include <linux/device-mapper.h>
@@ -977,7 +977,7 @@ static int kcryptd_io_rw(struct dm_crypt_io *io, gfp_t gfp)
 	crypt_inc_pending(io);
 
 	clone_init(io, clone);
-#ifdef CONFIG_MMC_DW_FMP_DM_CRYPT
+#if defined(CONFIG_MMC_DW_FMP_DM_CRYPT) || defined(CONFIG_UFS_FMP_DM_CRYPT)
 	clone->bi_sensitive_data = 1;
 #endif
 	clone->bi_sector = cc->start + io->sector;
@@ -1314,6 +1314,7 @@ static int crypt_setkey_allcpus(struct crypt_config *cc)
 		for (i = 0; i < cc->key_size; i++)
 			key_storage[i] = cc->key[i];
 
+#ifndef CONFIG_64BIT
 		if (soc_is_exynos5422())
 			r = exynos_smc(SMC_CMD_FMP, FMP_MMC_KEY_SET,
 				EXYNOS5422_PA_SYSRAM_NS + FMP_KEY_STORAGE_OFFSET,
@@ -1322,10 +1323,19 @@ static int crypt_setkey_allcpus(struct crypt_config *cc)
 			r = exynos_smc(SMC_CMD_FMP, FMP_MMC_KEY_SET,
 				EXYNOS5430_PA_SYSRAM_NS + FMP_KEY_STORAGE_OFFSET,
 				cc->key_size);
-		else if (soc_is_exynos5433())
+#else
+#ifndef CONFIG_SOC_EXYNOS7420
+		if (soc_is_exynos5433())
 			r = exynos_smc(SMC_CMD_FMP, FMP_MMC_KEY_SET,
 				EXYNOS5433_PA_SYSRAM_NS + FMP_KEY_STORAGE_OFFSET,
 				cc->key_size);
+#else
+		if(soc_is_exynos7420())
+			r = exynos_smc(SMC_CMD_FMP, FMP_KEY_STORE,
+				EXYNOS7420_PA_SYSRAM_NS + FMP_KEY_STORAGE_OFFSET,
+				cc->key_size);
+#endif
+#endif
 		else {
 			pr_err("dm-crypt: unsupported SoC type\n");
 			return -EINVAL;
@@ -1500,8 +1510,9 @@ static int crypt_ctr_cipher(struct dm_target *ti,
 		(strcmp(cipher, "aes") == 0) &&
 		(strcmp(ivmode, "fmp") == 0)) {
 		pr_info("%s: H/W FMP disk encryption\n", __func__);
-#ifndef CONFIG_MMC_DW_FMP_DM_CRYPT
+#if !defined(CONFIG_MMC_DW_FMP_DM_CRYPT) && !defined(CONFIG_UFS_FMP_DM_CRYPT)
 		ti->error = "Error decoding xts-aes-fmp";
+		ret = -EINVAL;
 		goto bad;
 #endif
 		cc->hw_fmp = 1;
@@ -1605,6 +1616,7 @@ static int crypt_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 	unsigned int key_size, opt_params;
 	unsigned long long tmpll;
 	int ret;
+	size_t iv_size_padding;
 	struct dm_arg_set as;
 	const char *opt_string;
 	char dummy;
@@ -1643,12 +1655,23 @@ static int crypt_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 	if (cc->hw_fmp == 0) {
 		cc->dmreq_start = sizeof(struct ablkcipher_request);
 		cc->dmreq_start += crypto_ablkcipher_reqsize(any_tfm(cc));
-		cc->dmreq_start = ALIGN(cc->dmreq_start, crypto_tfm_ctx_alignment());
-		cc->dmreq_start += crypto_ablkcipher_alignmask(any_tfm(cc)) &
-				   ~(crypto_tfm_ctx_alignment() - 1);
+		cc->dmreq_start = ALIGN(cc->dmreq_start, __alignof__(struct dm_crypt_request));
+
+		if (crypto_ablkcipher_alignmask(any_tfm(cc)) < CRYPTO_MINALIGN) {
+			/* Allocate the padding exactly */
+			iv_size_padding = -(cc->dmreq_start + sizeof(struct dm_crypt_request))
+					& crypto_ablkcipher_alignmask(any_tfm(cc));
+		} else {
+			/*
+			 * If the cipher requires greater alignment than kmalloc
+			 * alignment, we don't know the exact position of the
+			 * initialization vector. We must assume worst case.
+			 */
+			iv_size_padding = crypto_ablkcipher_alignmask(any_tfm(cc));
+		}
 
 		cc->req_pool = mempool_create_kmalloc_pool(MIN_IOS, cc->dmreq_start +
-				sizeof(struct dm_crypt_request) + cc->iv_size);
+				sizeof(struct dm_crypt_request) + iv_size_padding + cc->iv_size);
 		if (!cc->req_pool) {
 			ti->error = "Cannot allocate crypt request mempool";
 			goto bad;
@@ -1943,3 +1966,4 @@ module_exit(dm_crypt_exit);
 MODULE_AUTHOR("Christophe Saout <christophe@saout.de>");
 MODULE_DESCRIPTION(DM_NAME " target for transparent encryption / decryption");
 MODULE_LICENSE("GPL");
+
