@@ -30,6 +30,9 @@
    descriptor */
 #define USB_QUIRK_DELAY_INIT		0x00000040
 
+/* device generates spurious wakeup, ignore remote wakeup capability */
+#define USB_QUIRK_IGNORE_REMOTE_WAKEUP	0x00000200
+
 /* device does not need GET_STATUS request after reset_resume */
 #define USB_QUIRK_NO_GET_STATUS		0x00000100
 
