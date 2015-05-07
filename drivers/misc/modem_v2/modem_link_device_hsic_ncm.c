@@ -123,12 +123,19 @@ static inline struct sk_buff *prepare_skb(struct if_usb_devdata *pipe_data,
 		struct urb *urb)
 {
 	struct sk_buff *skb;
-	unsigned int alloc_size = pipe_data->rx_buf_size;
+	unsigned int alloc_size = pipe_data->rx_buf_setup;
 
 	if (pipe_data->idx < pipe_data->usb_ld->max_acm_ch) {
+retry_alloc:
 		skb = alloc_skb(alloc_size, GFP_ATOMIC | GFP_DMA);
-		if (unlikely(!skb))
-			mif_err("Failed to alloc skb\n");
+		if (unlikely(!skb)) {
+			alloc_size = alloc_size / 2 - 256;
+			if (alloc_size >= PAGE_SIZE - 512) {
+				mif_err("re-try to alloc skb %d\n", alloc_size);
+				goto retry_alloc;
+			}
+		}
+		pipe_data->rx_buf_size = alloc_size;
 	} else {
 		skb = (struct sk_buff *)urb->context;
 	}
@@ -1522,7 +1529,7 @@ static int __devinit if_usb_probe(struct usb_interface *intf,
 			pipe_data->net_connected = true;
 			pipe_data->iod =
 				link_get_iod_with_format(&usb_ld->ld, IPC_BOOT);
-			pipe_data->rx_buf_size = (16 * 1024);
+			pipe_data->rx_buf_size = 15872;	/* 15.5KB */
 		} else if (info->flags & FLAG_IPC_CHANNEL) {
 			dev_index = intf->altsetting->desc.bInterfaceNumber / 2;
 			if (dev_index >= usb_ld->max_acm_ch) {
@@ -1539,9 +1546,12 @@ static int __devinit if_usb_probe(struct usb_interface *intf,
 					&usb_ld->ld, SIPC_CH_ID_CPLOG1);
 			else
 				pipe_data->iod = link_get_iod_with_format(
-							&usb_ld->ld, dev_index);
+						&usb_ld->ld, dev_index);
 			pipe_data->rx_buf_size = (0xE00); /* 3.5KB */
 		}
+
+		/* backup rx_buf_size */
+		pipe_data->rx_buf_setup = pipe_data->rx_buf_size;
 
 		/* prepare rx_urb for ACM */
 		urb = usb_alloc_urb(0, GFP_KERNEL);
@@ -1555,10 +1565,6 @@ static int __devinit if_usb_probe(struct usb_interface *intf,
 
 	if (!pipe_data)
 		return -EINVAL;
-
-	/* override modem specific buffer size from usb_id_info */
-	if (info->rx_buf_size)
-		pipe_data->rx_buf_size = info->rx_buf_size;
 
 	pipe_data->info = info;
 	atomic_set(&pipe_data->kill_urb, 0);

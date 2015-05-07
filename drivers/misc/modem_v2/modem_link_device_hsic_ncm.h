@@ -90,6 +90,7 @@ struct if_usb_devdata {
 
 	struct urb *intr_urb;
 	unsigned int rx_buf_size;
+	unsigned int rx_buf_setup;
 	enum ch_state state;
 
 	struct usb_id_info *info;

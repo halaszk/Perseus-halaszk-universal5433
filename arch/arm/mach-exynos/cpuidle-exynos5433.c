@@ -401,6 +401,11 @@ static int exynos_check_enter_mode(void)
 		return EXYNOS_CHECK_DIDLE;
 #endif
 
+#ifdef CONFIG_PWM_SAMSUNG
+	if(pwm_check_enable_cnt())
+		return EXYNOS_CHECK_DIDLE;
+#endif
+
 	/* Check power domain for DSTOP */
 	if (exynos_check_reg_status(exynos5_dstop_power_domain,
 			    ARRAY_SIZE(exynos5_dstop_power_domain))) {
