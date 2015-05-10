@@ -4753,7 +4753,7 @@ select_task_rq_fair(struct task_struct *p, int sd_flag, int wake_flags)
 
 #ifdef CONFIG_SCHED_HMP
 	/* always put non-kernel forking tasks on a big domain */
-	if (hmp_fork_migrate_big && p->mm && (sd_flag & SD_BALANCE_FORK)) {
+	if (hmp_fork_migrate_big && unlikely(sd_flag & SD_BALANCE_FORK) && hmp_task_should_forkboost(p)) {
 		new_cpu = hmp_select_faster_cpu(p, prev_cpu);
 		if (new_cpu != NR_CPUS) {
 			hmp_next_up_delay(&p->se, new_cpu);
