@@ -3906,6 +3906,9 @@ static struct sched_entity *hmp_get_lightest_task(struct sched_entity* se, int m
 static int hmp_boostpulse_duration = 1000000; /* microseconds */
 static u64 hmp_boostpulse_endtime;
 static int hmp_boost_val;
+#ifdef CONFIG_SCHED_HMP_LITTLE_PACKING
+static int hmp_packing_enable_val;
+#endif
 static int hmp_semiboost_val;
 static int hmp_boostpulse;
 static int hmp_active_down_migration;
@@ -3913,6 +3916,9 @@ static int hmp_aggressive_up_migration;
 static int hmp_aggressive_yield;
 static int hmp_fork_migrate_big = 0;
 static DEFINE_RAW_SPINLOCK(hmp_boost_lock);
+#ifdef CONFIG_SCHED_HMP_LITTLE_PACKING
+static DEFINE_RAW_SPINLOCK(hmp_packing_enable_lock);
+#endif
 static DEFINE_RAW_SPINLOCK(hmp_semiboost_lock);
 static DEFINE_RAW_SPINLOCK(hmp_sysfs_lock);
 
@@ -3926,7 +3932,6 @@ unsigned int hmp_next_up_threshold = 4096;
 unsigned int hmp_next_down_threshold = 4096;
 
 #ifdef CONFIG_SCHED_HMP_LITTLE_PACKING
-unsigned int hmp_packing_enabled = 1;
 #ifdef CONFIG_SOC_EXYNOS5433
 unsigned int hmp_full_threshold = 575; /* Exynos 5433 has overdrive bend at 900MHz */
 #else
@@ -3955,6 +3960,24 @@ static inline int hmp_boost(void)
 
 	return ret;
 }
+
+#ifdef CONFIG_SCHED_HMP_LITTLE_PACKING
+static inline int hmp_packing_enable(void)
+{
+	u64 now = ktime_to_us(ktime_get());
+	int ret;
+	unsigned long flags;
+
+	raw_spin_lock_irqsave(&hmp_packing_enable_lock, flags);
+	if (hmp_packing_enable_val)
+		ret = 1;
+	else
+		ret = 0;
+	raw_spin_unlock_irqrestore(&hmp_packing_enable_lock, flags);
+
+	return ret;
+}
+#endif
 
 static inline int hmp_semiboost(void)
 {
@@ -4066,7 +4089,7 @@ static inline unsigned int hmp_best_little_cpu(struct task_struct *tsk,
 	struct sched_avg *avg;
 	struct cpumask allowed_hmp_cpus;
 
-	if(!hmp_packing_enabled ||
+	if(!hmp_packing_enable() ||
 			tsk->se.avg.load_avg_ratio > ((NICE_0_LOAD * 90)/100))
 		return hmp_select_slower_cpu(tsk, cpu);
 
@@ -4303,6 +4326,28 @@ static int hmp_boost_from_sysfs(int value)
 	return ret;
 }
 
+#ifdef CONFIG_SCHED_HMP_LITTLE_PACKING
+static int hmp_packing_enable_from_sysfs(int value)
+{
+	unsigned long flags;
+	int ret = 0;
+
+	raw_spin_lock_irqsave(&hmp_packing_enable_lock, flags);
+	if (value == 1)
+		hmp_packing_enable_val++;
+	else if (value == 0)
+		if (hmp_packing_enable_val >= 1)
+			hmp_packing_enable_val--;
+		else
+			ret = -EINVAL;
+	else
+		ret = -EINVAL;
+	raw_spin_unlock_irqrestore(&hmp_packing_enable_lock, flags);
+
+	return ret;
+}
+#endif
+
 static int hmp_semiboost_from_sysfs(int value)
 {
 	unsigned long flags;
@@ -4408,6 +4453,13 @@ int set_hmp_boost(int enable)
 	return hmp_boost_from_sysfs(enable);
 }
 
+#ifdef CONFIG_SCHED_HMP_LITTLE_PACKING
+int set_hmp_packing_enable(int enable)
+{
+	return hmp_packing_enable_from_sysfs(enable);
+}
+#endif
+
 int set_hmp_semiboost(int enable)
 {
 	return hmp_semiboost_from_sysfs(enable);
@@ -4455,6 +4507,13 @@ int get_hmp_boost(void)
 {
 	return hmp_boost();
 }
+
+#ifdef CONFIG_SCHED_HMP_LITTLE_PACKING
+int get_hmp_packing_enable(void)
+{
+	return hmp_packing_enable();
+}
+#endif
 
 int get_hmp_semiboost(void)
 {
@@ -4558,7 +4617,7 @@ static int hmp_attr_init(void)
 		&hmp_boost_val,
 		NULL,
 		hmp_boost_from_sysfs);
-
+		
 	hmp_attr_add("active_down_migration",
 		&hmp_active_down_migration,
 		NULL,
@@ -4589,9 +4648,9 @@ static int hmp_attr_init(void)
 #endif
 #ifdef CONFIG_SCHED_HMP_LITTLE_PACKING
 	hmp_attr_add("packing_enable",
-		&hmp_packing_enabled,
+		&hmp_packing_enable_val,
 		NULL,
-		hmp_freqinvar_from_sysfs);
+		hmp_packing_enable_from_sysfs);
 	hmp_attr_add("packing_limit",
 		&hmp_full_threshold,
 		NULL,
@@ -7330,7 +7389,7 @@ static unsigned int hmp_down_migration(int cpu, struct sched_entity *se)
 
 	if (hmp_cpu_is_slowest(cpu)) {
 #ifdef CONFIG_SCHED_HMP_LITTLE_PACKING
-		if(hmp_packing_enabled)
+		if(hmp_packing_enable())
 			return 1;
 		else
 #endif
