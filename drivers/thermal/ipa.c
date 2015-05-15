@@ -39,7 +39,7 @@
 #define KHZ_TO_MHZ(freq) ((freq) / 1000)
 
 #define NUM_CLUSTERS CA_END
-#define MAX_GPU_FREQ 533
+#define MAX_GPU_FREQ 800
 
 struct mali_utilisation_stats {
 	int utilisation;
