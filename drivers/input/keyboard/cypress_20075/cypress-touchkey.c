@@ -47,6 +47,10 @@
 #include <linux/sec_sysfs.h>
 #include <linux/sec_batt.h>
 
+#ifdef CONFIG_INPUT_BOOSTER
+#include <linux/input/input_booster.h>
+#endif
+
 #include "cypress_touchkey.h"
 
 #ifdef  TK_HAS_FIRMWARE_UPDATE
@@ -1062,6 +1066,9 @@ static irqreturn_t touchkey_interrupt(int irq, void *dev_id)
 
 	input_report_key(tkey_i2c->input_dev,
 			 touchkey_keycode[keycode_type], pressed);
+#if defined(CONFIG_INPUT_BOOSTER)
+				input_booster_send_event(BOOSTER_DEVICE_TOUCHKEY, keycode_type);
+#endif
 	input_sync(tkey_i2c->input_dev);
 #if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
 	tk_debug_info(true, &tkey_i2c->client->dev, "keycode:%d pressed:%d %#x, %#x %d\n",
@@ -1096,6 +1103,9 @@ static int touchkey_stop(struct touchkey_i2c *tkey_i2c)
 		input_report_key(tkey_i2c->input_dev,
 				 touchkey_keycode[i], 0);
 	}
+#if defined(CONFIG_INPUT_BOOSTER)
+	input_booster_send_event(BOOSTER_DEVICE_TOUCHKEY, BOOSTER_MODE_FORCE_OFF);
+#endif
 	input_sync(tkey_i2c->input_dev);
 
 #if defined(CONFIG_GLOVE_TOUCH)
