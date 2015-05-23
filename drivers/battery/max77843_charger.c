@@ -969,12 +969,6 @@ static bool check_fastcharge(struct max77843_charger_data *charger)
 				charge_current = USB_CHARGE_1000;
 				ret = true;
 				break;
-                        case POWER_SUPPLY_TYPE_WIRELESS:
-			/* We are in basic Fast Charge mode, so we substitute AC to WIRELESS levels */
-				charger->charging_current_max = WIRELESS_CHARGE_1000;
-				charger->charging_current = WIRELESS_CHARGE_1000 + 100;
-                                ret = true;
-                                break;
 
 		}
 	/* We are in advanced Fast Charge mode, so we apply custom charging
@@ -996,16 +990,9 @@ static bool check_fastcharge(struct max77843_charger_data *charger)
 			   for all of them */
 			case POWER_SUPPLY_TYPE_MAINS:
 				/* but never go above 2.2A */
-				charger->charging_current_max = ac_charge_level;
 				charge_current = min(ac_charge_level, MAX_CHARGE_LEVEL);
 				ret = true;
 				break;
-			case POWER_SUPPLY_TYPE_WIRELESS:
-			/* We are in custom current Fast Charge mode for WIRELESS */
-				charger->charging_current_max = wireless_charge_level;
-				charger->charging_current = min(wireless_charge_level+100, MAX_CHARGE_LEVEL);
-                                ret = true;
-                                break;
 			/* Don't do anything for any other kind of connections
 			   and don't touch when type is unknown */
 			default:
