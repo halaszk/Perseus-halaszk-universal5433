@@ -721,14 +721,6 @@ config MACH_UNIVERSAL5433
 	  Machine support for Samsung EXYNOS5433 machine with device tree enabled.
 	  Select this if a fdt blob is available for the EXYNOS5433 SoC based board.
 
-config FORCE_FAST_CHARGE
-       bool "Force fast charging (AC/USB) by Yank555.lu"
-       default y
-       help
-        A simple sysfs interface to force adapters that
-         are detected as USB to charge as AC (1A/h) or to set
-         custom charging currents for AC and USB.
-
 if ARCH_EXYNOS4
 
 comment "Configuration for HSMMC 8-bit bus width"
