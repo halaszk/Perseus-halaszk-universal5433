@@ -297,4 +297,5 @@ extern void adc_init(struct platform_device *pdev, struct sec_battery_info *batt
 extern void adc_exit(struct sec_battery_info *battery);
 #endif
 
+void charger_control_init(struct sec_battery_info *info);
 #endif /* __SEC_BATTERY_H */
