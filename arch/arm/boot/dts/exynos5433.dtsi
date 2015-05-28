@@ -2026,27 +2026,27 @@
 
 		throttle_table {
 			throttle_tab_0 {
-				temp = <80>;
-				freq_clip_max = <1700000>;
+				temp = <85>;
+				freq_clip_max = <1900000>;
 				freq_clip_max_kfc = <1300000>;
 			};
 			throttle_tab_1 {
-				temp = <85>;
-				freq_clip_max = <1700000>;
+				temp = <90>;
+				freq_clip_max = <1800000>;
 				freq_clip_max_kfc = <1300000>;
 			};
 			throttle_tab_2 {
-				temp = <90>;
-				freq_clip_max = <1500000>;
+				temp = <95>;
+				freq_clip_max = <1700000>;
 				freq_clip_max_kfc = <1300000>;
 			};
 			throttle_tab_3 {
-				temp = <95>;
+				temp = <100>;
 				freq_clip_max = <900000>;
 				freq_clip_max_kfc = <1000000>;
 			};
 			throttle_tab_4 {
-				temp = <100>;
+				temp = <105>;
 				freq_clip_max = <800000>;
 				freq_clip_max_kfc = <400000>;
 			};
