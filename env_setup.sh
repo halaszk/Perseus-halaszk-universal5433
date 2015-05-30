@@ -1,12 +1,23 @@
 #!/bin/bash
 
-# location
-if [ "${1}" != "" ]; then
-	export KERNELDIR=`readlink -f ${1}`;
+TARGET=$1
+if [ "$TARGET" != "" ]; then
+        echo "starting your build for $TARGET"
 else
-	export KERNELDIR=`readlink -f .`;
-fi;
+        echo ""
+        echo "you need to define your device target!"
+        echo "example: build_kernel.sh N910C"
+        exit 1
+fi
 
+# location
+#if [ "${1}" != "" ]; then
+#	export KERNELDIR=`readlink -f ${1}`;
+#else
+	export KERNELDIR=`readlink -f .`;
+#fi;
+
+export INITRAMFS_VARIANT=`readlink -f $KERNELDIR/../ramdisk_boot_files/$TARGET`;
 export PARENT_DIR=`readlink -f ${KERNELDIR}/..`;
 export INITRAMFS_SOURCE=`readlink -f $KERNELDIR/../initramfs`;
 export INITRAMFS_TMP=${KERNELDIR}/tmp/initramfs_source;
@@ -32,7 +43,13 @@ fi
 # kernel
 export ARCH=arm;
 export SUB_ARCH=arm;
+if [ "$TARGET" = "N910C" ] ; then
 export KERNEL_CONFIG="halaszk_trelte_defconfig";
+fi;
+
+if [ "$TARGET" = "N910U" ] ; then
+export KERNEL_CONFIG="halaszk_trhplte_defconfig";
+fi;
 
 # build script
 export USER=`whoami`;

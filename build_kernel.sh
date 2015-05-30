@@ -38,6 +38,8 @@ echo "0" > $TMPFILE;
 
 	mkdir -p $INITRAMFS_TMP;
 	cp -ax $INITRAMFS_SOURCE/* $INITRAMFS_TMP;
+	echo "${bldcya}***** Generating variant device boot files to ramfs *****${txtrst}"
+	cp -ax $INITRAMFS_VARIANT/* $INITRAMFS_TMP;
 	# clear git repository from tmp-initramfs
 	if [ -d $INITRAMFS_TMP/.git ]; then
 		rm -rf $INITRAMFS_TMP/.git;
@@ -110,10 +112,20 @@ done;
 echo "${bldcya}***** Compiling kernel *****${txtrst}"
 if [ $USER != "root" ]; then
 #	make CONFIG_NO_ERROR_ON_MISMATCH=y -j5 zImage
+if [ "$TARGET" = "N910C" ] ; then
 	make exynos5433-tre_eur_open_16.dtb
+fi;
+if [ "$TARGET" = "N910U" ] ; then
+	make exynos5433-trlte_eur_open_12.dtb
+fi;
 	make CONFIG_DEBUG_SECTION_MISMATCH=y -j5 zImage
 else
+if [ "$TARGET" = "N910C" ] ; then
 	make exynos5433-tre_eur_open_16.dtb
+fi;
+if [ "$TARGET" = "N910U" ] ; then
+	make exynos5433-trlte_eur_open_12.dtb
+fi;
 	nice -n -15 make -j5 zImage
 fi;
 
@@ -134,7 +146,12 @@ if [ -e $KERNELDIR/arch/arm/boot/zImage ]; then
 	stat ${KERNELDIR}/boot.img
 	cp ${KERNELDIR}/boot.img /${KERNELDIR}/READY/boot/
 	cd ${KERNELDIR}/READY/
+if [ "$TARGET" = "N910C" ] ; then
 	zip -r Kernel_${GETVER}-`date +"[%H-%M]-[%d-%m]-SM-N910C-PWR-CORE"`.zip .
+fi;
+if [ "$TARGET" = "N910U" ] ; then
+        zip -r Kernel_${GETVER}-`date +"[%H-%M]-[%d-%m]-SM-N910U-PWR-CORE"`.zip .
+fi;
 	rm ${KERNELDIR}/boot.img
 	rm ${KERNELDIR}/READY/boot/boot.img
 	rm ${KERNELDIR}/READY/.config
@@ -153,9 +170,14 @@ if [ -e $KERNELDIR/arch/arm/boot/zImage ]; then
 #                echo "${GETVER}" > ${KERNELDIR}/N910C/latest_version.txt;
 #        fi;
 		echo "Uploading kernel to FTP server";
+if [ "$TARGET" = "N910C" ] ; then
 		mv ${KERNELDIR}/READY/Kernel_* ${KERNELDIR}/N910C/
 		ncftpput -f /home/dev/login.cfg -V -R / ${KERNELDIR}/N910C/
-#		rm ${KERNELDIR}/N910C/Kernel_*
+fi;
+if [ "$TARGET" = "N910U" ] ; then
+                mv ${KERNELDIR}/READY/Kernel_* ${KERNELDIR}/N910U/
+                ncftpput -f /home/dev/login.cfg -V -R / ${KERNELDIR}/N910U/
+fi;
 		echo "Uploading kernel to FTP server DONE";
 	fi;
 	exit 0;
