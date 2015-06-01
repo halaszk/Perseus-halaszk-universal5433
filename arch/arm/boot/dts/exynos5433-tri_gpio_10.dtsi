@@ -174,7 +174,7 @@
 		PIN_SLP(gpf0-2, INPUT, DOWN);	/* MHL_INT */
 		PIN_SLP(gpf0-3, INPUT, NONE);	/* OCP_FLAG */
 		PIN_SLP(gpf0-4, INPUT, DOWN);	/* CP_WAKEUP */
-		PIN_SLP(gpf0-5, PREV, NONE);	/* HOST_ACTIVE */
+		PIN_SLP(gpf0-5, OUT0, NONE);	/* HOST_ACTIVE */
 		PIN_SLP(gpf0-6, PREV, NONE);	/* CP_PMU_RST */
 		PIN_SLP(gpf0-7, OUT0, NONE);	/* LDO17_EN */
 	};
@@ -199,6 +199,7 @@
 		PIN_IN(gpc3-5, NONE, LV1);	/* HW_REV(1) */
 		PIN_IN(gpc3-6, NONE, LV1);	/* HW_REV(2) */
 		PIN_IN(gpc3-7, NONE, LV1);	/* HW_REV(3) */
+		PIN_OUT_SET(gpd4-1, 0, LV1);    /* COVER_3.3V_EN  */
 	};
 	sleep8: sleep-state {
 		PIN_SLP(gpv7-0, INPUT, DOWN);	/* MHL_RST */
@@ -267,7 +268,7 @@
 		PIN_SLP(gpd2-7, INPUT, DOWN);	/* MHLC_I2C_SCL */
 
 		PIN_SLP(gpd4-0, PREV, UP);	/* BT_EN */
-		PIN_SLP(gpd4-1, OUT0, NONE);	/* COVER_3.3V_EN  */
+		PIN_SLP(gpd4-1, PREV, NONE);    /* COVER_3.3V_EN  */
 		PIN_SLP(gpd4-2, INPUT, DOWN);	/* NC */
 		PIN_SLP(gpd4-3, INPUT, DOWN);	/* TDMB_reserved */
 		PIN_SLP(gpd4-4, INPUT, DOWN);	/* VT_CAM_ID */

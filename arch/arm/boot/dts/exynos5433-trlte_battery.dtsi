@@ -178,3 +178,4 @@
 		battery,chg_float_voltage = <4400>;
 	};
 };
+
