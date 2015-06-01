@@ -506,7 +506,7 @@ static void exynos_check_gpu_noti_state(int temp)
 #if defined(CONFIG_ARM_EXYNOS5430_BUS_DEVFREQ)
 		mif_thermal_gpu_state = GPU_THROTTLING3;
 #else
-		mif_thermal_gpu_state = GPU_THROTTLING3;
+		mif_thermal_gpu_state = GPU_THROTTLING4;
 #endif
 		break;
 	case MIF_THROTTLING2:
@@ -514,7 +514,7 @@ static void exynos_check_gpu_noti_state(int temp)
 #if defined(CONFIG_ARM_EXYNOS5430_BUS_DEVFREQ)
 		mif_thermal_gpu_state = GPU_THROTTLING4;
 #else
-		mif_thermal_gpu_state = GPU_THROTTLING4;
+		mif_thermal_gpu_state = GPU_TRIPPING;
 #endif
 		break;
 	}
@@ -1422,7 +1422,7 @@ static struct exynos_tmu_platform_data exynos5430_tmu_data = {
 #ifdef CONFIG_SOC_EXYNOS5430_L
 		.freq_clip_max = 1800 * 1000,
 #else
-		.freq_clip_max = 2200 * 1000,
+		.freq_clip_max = 1900 * 1000,
 #endif
 #ifdef CONFIG_ARM_EXYNOS_MP_CPUFREQ
 #ifdef CONFIG_SOC_EXYNOS5430_L
@@ -1438,7 +1438,7 @@ static struct exynos_tmu_platform_data exynos5430_tmu_data = {
 #endif
 	},
 	.freq_tab[1] = {
-		.freq_clip_max = 2000 * 1000,
+		.freq_clip_max = 1800 * 1000,
 #ifdef CONFIG_ARM_EXYNOS_MP_CPUFREQ
 #ifdef CONFIG_SOC_EXYNOS5430_L
 		.freq_clip_max_kfc = 1300 * 1000,
@@ -1453,7 +1453,7 @@ static struct exynos_tmu_platform_data exynos5430_tmu_data = {
 #endif
 	},
 	.freq_tab[2] = {
-		.freq_clip_max = 1700 * 1000,
+		.freq_clip_max = 1500 * 1000,
 #ifdef CONFIG_ARM_EXYNOS_MP_CPUFREQ
 #ifdef CONFIG_SOC_EXYNOS5430_L
 		.freq_clip_max_kfc = 1300 * 1000,
@@ -1468,7 +1468,7 @@ static struct exynos_tmu_platform_data exynos5430_tmu_data = {
 #endif
 	},
 	.freq_tab[3] = {
-		.freq_clip_max = 1500 * 1000,
+		.freq_clip_max = 1300 * 1000,
 #ifdef CONFIG_ARM_EXYNOS_MP_CPUFREQ
 #ifdef CONFIG_SOC_EXYNOS5430_L
 		.freq_clip_max_kfc = 1300 * 1000,
@@ -1483,7 +1483,7 @@ static struct exynos_tmu_platform_data exynos5430_tmu_data = {
 #endif
 	},
 	.freq_tab[4] = {
-		.freq_clip_max = 1100 * 1000,
+		.freq_clip_max = 900 * 1000,
 #ifdef CONFIG_ARM_EXYNOS_MP_CPUFREQ
 		.freq_clip_max_kfc = 1200 * 1000,
 #endif
