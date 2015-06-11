@@ -938,6 +938,10 @@ copy_one_pte(struct mm_struct *dst_mm, struct mm_struct *src_mm,
 				rss[MM_LOW_FILEPAGES]++;
 #endif
 		}
+		/* Should return NULL in vm_normal_page() */
+		uksm_bugon_zeropage(pte);
+	} else {
+		uksm_map_zero_page(pte);
 	}
 
 out_set_pte:
@@ -2898,7 +2902,9 @@ gotten:
 					inc_mm_counter_fast(mm, MM_LOW_ANONPAGES);
 #endif
 			}
+			uksm_bugon_zeropage(orig_pte);
 		} else {
+			uksm_unmap_zero_page(orig_pte);
 			inc_mm_counter_fast(mm, MM_ANONPAGES);
 #ifdef CONFIG_ZOOM_KILLER
 			if (!PageHighMem(new_page))
