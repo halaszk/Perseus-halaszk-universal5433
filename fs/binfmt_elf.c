@@ -457,7 +457,7 @@ static unsigned long load_elf_interp(struct elfhdr *interp_elf_ex,
 
 	total_size = total_mapping_size(elf_phdata, interp_elf_ex->e_phnum);
 	if (!total_size) {
-		error = -EINVAL;
+		retval = -EINVAL;
 		goto out_close;
 	}
 
