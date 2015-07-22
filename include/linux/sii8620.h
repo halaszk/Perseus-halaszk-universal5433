@@ -118,7 +118,7 @@ struct sii8620_platform_data {
 	void (*link_monitor)(u8 cmd_value);
 #endif
 };
-extern int system_rev;
+extern unsigned int system_rev;
 int acc_register_notifier(struct notifier_block *nb);
 #endif /* __SII8620_H__ */
 
