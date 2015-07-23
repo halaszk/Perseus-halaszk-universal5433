@@ -1042,6 +1042,8 @@ static void setup_sysfs(struct arbiter_data *arb)
 	}
 }
 
+static struct cpu_cluster_efficiency *c_eff = NULL;
+
 static void ipa_setup_power_tables(void)
 {
 	struct cpu_power_info t;
@@ -1049,18 +1051,42 @@ static void ipa_setup_power_tables(void)
 
 	t.load[0] = 100; t.load[1] = t.load[2] = t.load[3] = 0;
 	t.cluster = CA7;
+
+	if (c_eff == NULL) {
+		c_eff = kzalloc(sizeof(struct cpu_cluster_efficiency) * (CA15 + 1), GFP_KERNEL);
+	
+		c_eff[CA7].arch_efficiency = 100;
+		c_eff[CA7].n_p_states = NR_A7_COEFFS;
+		c_eff[CA7].p_states = kzalloc(sizeof(struct cpu_p_state) * NR_A7_COEFFS, GFP_KERNEL);
+		
+		c_eff[CA15].arch_efficiency = 208;
+		c_eff[CA15].n_p_states = NR_A15_COEFFS;
+		c_eff[CA15].p_states = kzalloc(sizeof(struct cpu_p_state) * NR_A15_COEFFS, GFP_KERNEL);
+	}
+
 	for (i = 0; i < NR_A7_COEFFS; i++) {
-		t.freq = MHZ_TO_KHZ(a7_cpu_coeffs[i].frequency);
-		a7_cpu_coeffs[i].power = get_power_value(&t);
+		c_eff[CA7].p_states[i].freq = t.freq = MHZ_TO_KHZ(a7_cpu_coeffs[i].frequency);
+		c_eff[CA7].p_states[i].power = a7_cpu_coeffs[i].power = get_power_value(&t);
+		c_eff[CA7].p_states[i].capacity = (t.freq / 1000) * c_eff[CA7].arch_efficiency;
+		c_eff[CA7].p_states[i].efficiency = 
+			((c_eff[CA7].p_states[i].freq / 1000) * c_eff[CA7].arch_efficiency)
+			/ c_eff[CA7].p_states[i].power;
 		pr_info("cluster: %d freq: %d power=%d\n", CA7, t.freq, a7_cpu_coeffs[i].power);
 	}
 
 	t.cluster = CA15;
 	for (i = 0; i < NR_A15_COEFFS; i++) {
-		t.freq = MHZ_TO_KHZ(a15_cpu_coeffs[i].frequency);
-		a15_cpu_coeffs[i].power = get_power_value(&t);
+		c_eff[CA15].p_states[i].freq = t.freq = MHZ_TO_KHZ(a15_cpu_coeffs[i].frequency);
+		c_eff[CA15].p_states[i].power = a15_cpu_coeffs[i].power = get_power_value(&t);
+		c_eff[CA15].p_states[i].capacity = (t.freq / 1000) * c_eff[CA15].arch_efficiency;
+		c_eff[CA15].p_states[i].efficiency = 
+			((c_eff[CA15].p_states[i].freq / 1000) * c_eff[CA15].arch_efficiency)
+			/ c_eff[CA15].p_states[i].power;
 		pr_info("cluster: %d freq: %d power=%d\n", CA15, t.freq, a15_cpu_coeffs[i].power);
 	}
+
+	sched_update_cpu_efficiency_table(&c_eff[CA7], CA7);
+	sched_update_cpu_efficiency_table(&c_eff[CA15], CA15);
 }
 
 static void ipa_setup_max_limits(void)
