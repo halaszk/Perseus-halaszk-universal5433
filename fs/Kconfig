@@ -311,4 +311,9 @@ config DYNAMIC_FSYNC
 	help
 	An experimental file sync control using Android's power suspend / late resume drivers
 
+
+config ASYNC_FSYNC
+	bool "asynchronous fsync"
+	default y
+
 endmenu
