@@ -1687,8 +1687,8 @@
 			input_booster,int_freqs = <0 0 0>;
 
 			/* Time table */
-			input_booster,head_times = <130 130 0>;
-			input_booster,tail_times = <500 500 0>;
+			input_booster,head_times = <0 0 0>;
+			input_booster,tail_times = <200 200 0>;
 			input_booster,phase_times = <0 0 0>;
 		};
 		booster_key@2 {
@@ -1725,8 +1725,8 @@
 			input_booster,int_freqs = <0>;
 
 			/* Time table */
-			input_booster,head_times = <500>;
-			input_booster,tail_times = <500>;
+			input_booster,head_times = <0>;
+			input_booster,tail_times = <200>;
 			input_booster,phase_times = <0>;
 		};
 		booster_key@4 {

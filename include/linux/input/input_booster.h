@@ -3,11 +3,11 @@
 
 #define INPUT_BOOSTER_NAME "input_booster"
 
-#define BOOSTER_DEFAULT_HEAD_TIME	130	/* msec */
-#define BOOSTER_DEFAULT_TAIL_TIME	500	/* msec */
+#define BOOSTER_DEFAULT_HEAD_TIME	0	/* msec */
+#define BOOSTER_DEFAULT_TAIL_TIME	200	/* msec */
 
-#define BOOSTER_DEBUG_HEAD_TIME		500 /* msec */
-#define BOOSTER_DEBUG_TAIL_TIME		1000 /* msec */
+#define BOOSTER_DEBUG_HEAD_TIME		0 /* msec */
+#define BOOSTER_DEBUG_TAIL_TIME		200 /* msec */
 
 /* Booster levels are used as below comment.
  * 0	: OFF
