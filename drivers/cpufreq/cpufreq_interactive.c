@@ -670,13 +670,17 @@ static void cpufreq_interactive_timer(unsigned long data)
 		goto rearm;
 #ifdef CONFIG_MODE_AUTO_CHANGE
 	spin_lock_irqsave(&tunables->mode_lock, flags);
-
-	tunables->enforced_mode = 1;
-	new_mode = tunables->enforced_mode;
+	if (tunables->enforced_mode)
+		new_mode = tunables->enforced_mode;
+	else
+		new_mode = check_mode(data, tunables->mode, now);
 
 	if (new_mode != tunables->mode) {
 		tunables->mode = new_mode;
-		enter_mode(tunables);
+		if (new_mode & MULTI_MODE || new_mode & SINGLE_MODE)
+			enter_mode(tunables);
+		else
+			exit_mode(tunables);
 	}
 	spin_unlock_irqrestore(&tunables->mode_lock, flags);
 #endif
