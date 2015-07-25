@@ -23,13 +23,11 @@ echo "${bldcya}***** Setting up Environment *****${txtrst}";
 
 . ./env_setup.sh ${1} || exit 1;
 
-
+MKRAMDISK()
+{
 # Generate Ramdisk
 echo "${bldcya}***** Generating Ramdisk *****${txtrst}"
 echo "0" > $TMPFILE;
-
-(
-
 	# remove previous initramfs files
 	if [ -d $INITRAMFS_TMP ]; then
 		echo "${bldcya}***** Removing old temp initramfs_source *****${txtrst}";
@@ -71,8 +69,10 @@ echo "0" > $TMPFILE;
 
 	echo "1" > $TMPFILE;
 	echo "${bldcya}***** Ramdisk Generation Completed Successfully *****${txtrst}"
-)&
+}
 
+BUILD_NOW()
+{
 if [ ! -f $KERNELDIR/.config ]; then
 	echo "${bldcya}***** Writing Config *****${txtrst}";
 	cp $KERNELDIR/arch/arm/configs/$KERNEL_CONFIG .config;
@@ -102,12 +102,6 @@ rm -f $KERNELDIR/usr/initramfs_data.o >> /dev/null;
 # remove all old modules before compile
 find $KERNELDIR -name "*.ko" | parallel rm -rf {};
 
-# wait for the successful ramdisk generation
-while [ $(cat ${TMPFILE}) == 0 ]; do
-	sleep 2;
-	echo "${bldblu}Waiting for Ramdisk generation completion.${txtrst}";
-done;
-
 # make zImage
 echo "${bldcya}***** Compiling kernel *****${txtrst}"
 if [ $USER != "root" ]; then
@@ -133,10 +127,19 @@ if [ -e $KERNELDIR/arch/arm/boot/zImage ]; then
 	echo "${bldcya}***** Final Touch for Kernel *****${txtrst}"
 	cp $KERNELDIR/arch/arm/boot/zImage $KERNELDIR/zImage;
 	stat $KERNELDIR/zImage || exit 1;
-	
+fi;
+}	
+	BUILD_NOW;
 	echo "--- Creating dt.img ---"
 	./tools/dtbtool -o dt.img -s 2048 -p ./scripts/dtc/ ./arch/arm/boot/dts/
+
 	echo "--- Creating boot.img ---"
+	MKRAMDISK;
+# wait for the successful ramdisk generation
+while [ $(cat ${TMPFILE}) == 0 ]; do
+	sleep 2;
+	echo "${bldblu}Waiting for Ramdisk generation completion.${txtrst}";
+done;
 	# copy all needed to out kernel folder
 #	./utilities/mkbootimg --kernel zImage --ramdisk ramdisk.gz --cmdline --base 0x10000000 --name SYSMAGIC000K --page_size 2048 --kernel_offset 0x00008000 --ramdisk_offset 0x01000000 --tags_offset 0x00000100 --dt_size 1083392 --output boot.img
         ./utilities/mkbootimg --kernel zImage --dt $KERNELDIR/dt.img --ramdisk ramdisk.gz --base 0x10000000 --kernel_offset 0x10000000 --ramdisk_offset 0x10008000 --tags_offset 0x10000100 --pagesize 2048 -o boot.img
