@@ -157,9 +157,6 @@ EXPORT_SYMBOL_GPL(wm8997_irq);
 
 static const struct reg_default wm8997_reg_default[] = {
 	{ 0x00000009, 0x0001 },    /* R9     - Ctrl IF I2C1 CFG 1 */
-	{ 0x00000016, 0x0000 },    /* R22    - Write Sequencer Ctrl 0 */
-	{ 0x00000017, 0x0000 },    /* R23    - Write Sequencer Ctrl 1 */
-	{ 0x00000018, 0x0000 },    /* R24    - Write Sequencer Ctrl 2 */
 	{ 0x00000020, 0x0000 },    /* R32    - Tone Generator 1 */
 	{ 0x00000021, 0x1000 },    /* R33    - Tone Generator 2 */
 	{ 0x00000022, 0x0000 },    /* R34    - Tone Generator 3 */
@@ -846,6 +843,7 @@ static bool wm8997_readable_register(struct device *dev, unsigned int reg)
 	case ARIZONA_RATE_ESTIMATOR_3:
 	case ARIZONA_RATE_ESTIMATOR_4:
 	case ARIZONA_RATE_ESTIMATOR_5:
+	case ARIZONA_DYNAMIC_FREQUENCY_SCALING_1:
 	case ARIZONA_FLL1_CONTROL_1:
 	case ARIZONA_FLL1_CONTROL_2:
 	case ARIZONA_FLL1_CONTROL_3:
@@ -880,6 +878,7 @@ static bool wm8997_readable_register(struct device *dev, unsigned int reg)
 	case ARIZONA_FLL2_GPIO_CLOCK:
 	case ARIZONA_MIC_CHARGE_PUMP_1:
 	case ARIZONA_LDO1_CONTROL_1:
+	case ARIZONA_LDO1_CONTROL_2:
 	case ARIZONA_LDO2_CONTROL_1:
 	case ARIZONA_MIC_BIAS_CTRL_1:
 	case ARIZONA_MIC_BIAS_CTRL_2:
@@ -1469,6 +1468,9 @@ static bool wm8997_volatile_register(struct device *dev, unsigned int reg)
 	switch (reg) {
 	case ARIZONA_SOFTWARE_RESET:
 	case ARIZONA_DEVICE_REVISION:
+	case ARIZONA_WRITE_SEQUENCER_CTRL_0:
+	case ARIZONA_WRITE_SEQUENCER_CTRL_1:
+	case ARIZONA_WRITE_SEQUENCER_CTRL_2:
 	case ARIZONA_HAPTICS_STATUS:
 	case ARIZONA_SAMPLE_RATE_1_STATUS:
 	case ARIZONA_SAMPLE_RATE_2_STATUS:

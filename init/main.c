@@ -110,7 +110,10 @@ EXPORT_SYMBOL(pgt_bit_array);
 
 int boot_mode_security;
 EXPORT_SYMBOL(boot_mode_security);
-
+#ifdef CONFIG_TIMA_RKP_RO_CRED
+int rkp_cred_enable = 0;
+EXPORT_SYMBOL(rkp_cred_enable);
+#endif /*CONFIG_RKP_RO_CRED*/
 /*
  * Debug helper: via this flag we know that we are in 'early bootup code'
  * where only the boot processor is running with IRQ disabled.  This means
@@ -367,12 +370,23 @@ static void __init setup_command_line(char *command_line)
 
 #ifdef CONFIG_TIMA_RKP
 /* Block of Code for RKP initialization */
+extern unsigned long __v7_setup_stack;
 static noinline void rkp_init(void)
 {
 #ifdef CONFIG_TIMA_RKP	
 #ifdef CONFIG_TIMA_RKP_30 
+#ifdef CONFIG_SOC_EXYNOS5433
+	struct rkp_init_struct rkp_init;
+
+	rkp_init._text 	  = (unsigned long) _text;
+	rkp_init._stext   = (unsigned long) _stext;
+	rkp_init._etext   = (unsigned long) _etext;
+	rkp_init.__v7_setup_stack = (unsigned long) (& __v7_setup_stack);
+
+	tima_send_cmd5((unsigned long)&rkp_init, (unsigned long)init_mm.pgd, (unsigned long)__init_begin, (unsigned long)__init_end,(unsigned long)__pa(pgt_bit_array), 0xc);
+#else
 	tima_send_cmd5((unsigned long)_stext, (unsigned long)init_mm.pgd, (unsigned long)__init_begin, (unsigned long)__init_end,(unsigned long)__pa(pgt_bit_array), 0xc);
-	tima_send_cmd((unsigned long)__pa((unsigned long)_text),0x28);
+#endif
 #else
 	tima_send_cmd4((unsigned long)_stext, (unsigned long)init_mm.pgd, (unsigned long)__init_begin, (unsigned long)__init_end, 0xc);
 #endif
@@ -395,11 +409,10 @@ static __initdata DECLARE_COMPLETION(kthreadd_done);
 static noinline void __init_refok rest_init(void)
 {
 	int pid;
-
 #ifdef CONFIG_TIMA_RKP
-	rkp_init();
+	if (boot_mode_security)
+		rkp_init();
 #endif
-
 	rcu_scheduler_starting();
 	/*
 	 * We need to spawn init first so that it obtains pid 1, however
@@ -439,12 +452,20 @@ static int __init do_early_param(char *param, char *val, const char *unused)
 		}
 	}
 	/* We accept everything at this stage. */
+#ifdef CONFIG_SOC_EXYNOS5433
 	if ((strncmp(param, "androidboot.security_mode", 26) == 0)) {
-	        if ((strncmp(val, "1", 1) == 0)) {
+	        if ((strncmp(val, "1526595585", 10) == 0)) {
 				pr_info("Security Boot Mode \n");
 				boot_mode_security = 1;
+#ifdef CONFIG_TIMA_RKP_RO_CRED
+				rkp_cred_enable = 1;
+#endif /*CONFIG_RKP_KDP*/
 			}
 	}
+#else
+	boot_mode_security = 1;
+#endif
+
 	return 0;
 }
 

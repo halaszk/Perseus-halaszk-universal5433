@@ -153,8 +153,6 @@ struct inodes_stat_t {
 #define FIFREEZE	_IOWR('X', 119, int)	/* Freeze */
 #define FITHAW		_IOWR('X', 120, int)	/* Thaw */
 #define FITRIM		_IOWR('X', 121, struct fstrim_range)	/* Trim */
-#define FSECTRIM	_IOWR('X', 129, struct fstrim_range)	/* Secure Trim */
-
 
 #define FIDTRIM	_IOWR('f', 128, struct fstrim_range)	/* Deep discard trim */
 
@@ -167,6 +165,8 @@ struct inodes_stat_t {
 #define FS_IOC32_SETFLAGS		_IOW('f', 2, int)
 #define FS_IOC32_GETVERSION		_IOR('v', 1, int)
 #define FS_IOC32_SETVERSION		_IOW('v', 2, int)
+
+#define FS_IOC_INVAL_MAPPING		_IO('f', 13)
 
 /*
  * Inode flags (FS_IOC_GETFLAGS / FS_IOC_SETFLAGS)

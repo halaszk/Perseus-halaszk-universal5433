@@ -32,6 +32,8 @@
 #include <asm/tlbflush.h>
 #include <asm/shmparam.h>
 
+extern int boot_mode_security;
+
 struct vfree_deferred {
 	struct llist_head list;
 	struct work_struct wq;
@@ -64,7 +66,7 @@ static void vunmap_pte_range(pmd_t *pmd, unsigned long addr, unsigned long end)
 	pte = pte_offset_kernel(pmd, addr);
 	
 #ifdef CONFIG_TIMA_RKP_LAZY_MMU
-	if (tima_is_pg_protected((unsigned long)pte) == 1)
+	if (boot_mode_security && tima_is_pg_protected((unsigned long)pte) == 1)
 		do_lazy_mmu = 1;
 	if (do_lazy_mmu) {
 		spin_lock(&init_mm.page_table_lock);
@@ -148,7 +150,7 @@ static int vmap_pte_range(pmd_t *pmd, unsigned long addr,
 	if (!pte)
 		return -ENOMEM;
 #ifdef CONFIG_TIMA_RKP_LAZY_MMU
-	if (tima_is_pg_protected((unsigned long)pte) == 1)
+	if (boot_mode_security && tima_is_pg_protected((unsigned long)pte) == 1)
 		do_lazy_mmu = 1;
 	if (do_lazy_mmu) {
 		spin_lock(&init_mm.page_table_lock);

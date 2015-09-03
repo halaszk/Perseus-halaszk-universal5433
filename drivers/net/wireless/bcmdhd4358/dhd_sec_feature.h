@@ -1,7 +1,7 @@
 /*
  * Customer HW 4 dependant file
  *
- * Copyright (C) 1999-2014, Broadcom Corporation
+ * Copyright (C) 1999-2015, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -68,6 +68,10 @@
 #define READ_MACADDR
 #endif  /* CONFIG_WIFI_BROADCOM_COB */
 
+#if defined(CONFIG_WIFI_BROADCOM_COB) && defined(CONFIG_BCMDHD_PCIE)
+#define OTP_WRITE_ON
+#endif /* CONFIG_WIFI_BROADCOM_COB && CONFIG_BCMDHD_PCIE */
+
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 4, 0)) && (defined(CONFIG_BCM4334) || \
 	defined(CONFIG_BCM4334_MODULE))
 #define RXFRAME_THREAD
@@ -77,6 +81,10 @@
 #define SUPPORT_MULTIPLE_BOARD_REV
 #endif /* CONFIG_SEC_TRLTE_PROJECT */
 
+#if defined(CONFIG_MACH_UNIVERSAL7420) || defined(CONFIG_ARCH_MSM8994)
+#define SUPPORT_MULTIPLE_MODULE_CIS
+#endif /* defined(CONFIG_MACH_UNIVERSAL7420) || defined(CONFIG_ARCH_MSM8994) */
+
 /* PROJECTS START */
 
 #if defined(CONFIG_MACH_SAMSUNG_ESPRESSO) || defined(CONFIG_MACH_SAMSUNG_ESPRESSO_10)
@@ -84,7 +92,7 @@
 #define HW_OOB
 #endif /* CONFIG_MACH_SAMSUNG_ESPRESSO && CONFIG_MACH_SAMSUNG_ESPRESSO_10 */
 
-#if defined(CONFIG_MACH_UNIVERSAL5433)
+#if defined(CONFIG_MACH_UNIVERSAL5433) || defined(CONFIG_MACH_UNIVERSAL7420)
 #undef CUSTOM_SET_CPUCORE
 #define PRIMARY_CPUCORE 0
 #define DPC_CPUCORE 4
@@ -99,7 +107,7 @@
 #define MAX_RETRY_SET_CPUCORE 5
 #define DPC_CPUCORE 4
 #define RXF_CPUCORE 5
-#endif /* CONFIG_MACH_HL3G || CONFIG_MACH_HLLTE */
+#endif /* CONFIG_MACH_UNIVERSAL5433 || CONFIG_MACH_UNIVERSAL7420 */
 
 #if defined(CONFIG_ARCH_MSM)
 #if defined(CONFIG_BCMDHD_PCIE)
@@ -231,11 +239,10 @@
 
 /* REGION CODE END */
 
-#if !defined(READ_MACADDR) && !defined(WRITE_MACADDR) && !defined(RDWR_KORICS_MACADDR) \
-	&& !defined(RDWR_MACADDR)
+#if !defined(READ_MACADDR) && !defined(WRITE_MACADDR)
 #define GET_MAC_FROM_OTP
 #define SHOW_NVRAM_TYPE
-#endif /* !READ_MACADDR && !WRITE_MACADDR && !RDWR_KORICS_MACADDR && !RDWR_MACADDR */
+#endif /* !READ_MACADDR && !WRITE_MACADDR */
 
 #define WRITE_WLANINFO
 

@@ -43,6 +43,7 @@
 
 #if defined(CONFIG_DECON_MDNIE_LITE)
 #include "mdnie.h"
+#include "mdnie_lite_table_tr.h"
 #endif
 #define CONFIG_ESD_FG
 #ifdef CONFIG_ESD_FG
@@ -2337,7 +2338,7 @@ static int s6e3ha2_probe(struct mipi_dsim_device *dsim)
 	if (ret < 0)
 		dev_err(&lcd->ld->dev, "failed to add sysfs entries, %d\n", __LINE__);
 
-	ret = device_create_file(&lcd->ld->dev, &dev_attr_brightness_table);
+	ret = device_create_file(&lcd->bd->dev, &dev_attr_brightness_table);
 	if (ret < 0)
 		dev_err(&lcd->ld->dev, "failed to add sysfs entries, %d\n", __LINE__);
 
@@ -2425,7 +2426,7 @@ static int s6e3ha2_probe(struct mipi_dsim_device *dsim)
 	lcd->ldi_enable = 1;
 
 #if defined(CONFIG_DECON_MDNIE_LITE)
-	mdnie_register(&lcd->ld->dev, lcd, (mdnie_w)s6e3ha2_send_seq, (mdnie_r)s6e3ha2_read);
+	mdnie_register(&lcd->ld->dev, lcd, (mdnie_w)s6e3ha2_send_seq, (mdnie_r)s6e3ha2_read, &tune_info);
 #endif
 
 	update_brightness(lcd, 1);

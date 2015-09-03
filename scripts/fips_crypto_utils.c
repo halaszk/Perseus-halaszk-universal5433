@@ -2,13 +2,13 @@
  * Utility functions called from fips_crypto_hmac.sh.
  *
  * executed during Kernel build
+ * 
  *
- *
- * Author : Rohit Kothari (r.kothari@samsung.com)
+ * Author : Rohit Kothari (r.kothari@samsung.com) 
  * Date	  : 11 Feb 2014
  *
  * Copyright (c) 2014 Samsung Electronics
- *
+ * 
  */
 
 #include <stdio.h>
@@ -39,11 +39,11 @@ int main (int argc, char **argv)
 			printf ("\n");
 			return -1;
 		}
-
+		
 		vmlinux_file = argv[2];
 		hmac_file    = argv[3];
 		offset       = atol(argv[4]);
-
+		
 		if (!vmlinux_file || !hmac_file || !offset)
 		{
 			printf ("./fips_crypto_utils -u vmlinux_file hmac_file offset");
@@ -96,7 +96,7 @@ int main (int argc, char **argv)
 /*
  * Given a vmlinux file, dumps "size" bytes from given "offset" to output file
  * in_file      : absolute path to vmlinux file
- * section_name : Used only for printing / debugging
+ * section_name : Used only for printing / debugging 
  * offset       : offset in file from where to dump bytes
  * size         : how many bytes to dump
  * out_file     : Output file, where to dump bytes.
@@ -107,8 +107,8 @@ int main (int argc, char **argv)
  *        -1, if error
  */
 
-int
-collect_crypto_bytes (const char * in_file, const char * section_name, unsigned long offset,
+int 
+collect_crypto_bytes (const char * in_file, const char * section_name, unsigned long offset, 
                       unsigned long size, const char * out_file)
 {
 	FILE * in_fp  = NULL;
@@ -129,7 +129,7 @@ collect_crypto_bytes (const char * in_file, const char * section_name, unsigned 
 	{
 		printf ("Unable to open file : %s", in_file);
 		return -1;
-	}
+	}	
 
 	if (fseek (in_fp, offset, SEEK_SET) != 0 )
 	{
@@ -144,7 +144,7 @@ collect_crypto_bytes (const char * in_file, const char * section_name, unsigned 
 		printf ("Unable to open file : %s", out_file);
 		fclose(in_fp);
 		return -1;
-	}
+	}	
 
 	for (i = 1; i <= size; i++)
 	{
@@ -179,8 +179,8 @@ collect_crypto_bytes (const char * in_file, const char * section_name, unsigned 
 
 #define SHA256_DIGEST_SIZE 32
 
-/*
- * Given a vmlinux file, overwrites bytes at given offset with hmac bytes, available in
+/*  
+ * Given a vmlinux file, overwrites bytes at given offset with hmac bytes, available in 
  * hmac file.
  * Return 0, if Success
  *       -1, if Error
@@ -190,7 +190,7 @@ update_crypto_hmac (const char * vmlinux_path, const char * hmac_path, unsigned 
 {
 	FILE * vmlinux_fp = NULL;
 	FILE * hmac_fp = NULL;
-	//int i = 0, j = 0;
+	int i = 0, j = 0;
 	unsigned char hmac[SHA256_DIGEST_SIZE];
 
 	if (!vmlinux_path || !hmac_path || !offset)
@@ -204,18 +204,18 @@ update_crypto_hmac (const char * vmlinux_path, const char * hmac_path, unsigned 
 	{
 		printf ("Unable to open vmlinux file ");
 		return -1;
-	}
+	}	
 
-	hmac_fp = fopen (hmac_path, "rb");
+	hmac_fp = fopen (hmac_path, "rb"); 
 
 	if (!hmac_fp)
 	{
 		printf ("Unable to open hmac file ");
 		fclose (vmlinux_fp);
 		return -1;
-	}
+	}	
 
-	if (SHA256_DIGEST_SIZE != fread (&hmac, sizeof(unsigned char), SHA256_DIGEST_SIZE, hmac_fp))
+	if (SHA256_DIGEST_SIZE != fread (&hmac, sizeof(unsigned char), SHA256_DIGEST_SIZE, hmac_fp)) 
 	{
 		printf ("Unable to read %d bytes from hmac file", SHA256_DIGEST_SIZE);
 		fclose (hmac_fp);

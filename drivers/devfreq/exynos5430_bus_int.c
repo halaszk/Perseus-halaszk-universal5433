@@ -38,6 +38,12 @@
 #define COLD_VOLT_OFFSET	37500
 #define LIMIT_COLD_VOLTAGE	1250000
 
+#if defined(CONFIG_EXYNOS5430_FHD)
+#define MIN_COLD_VOLTAGE	(925000)
+#else
+#define MIN_COLD_VOLTAGE	(0)
+#endif
+
 #define ISP_CONSTRAINT_VOLT_BASE	(900000)
 
 enum devfreq_int_idx {
@@ -300,7 +306,18 @@ struct devfreq_clk_info aclk_gscl_333[] = {
 	{LV5,	159000000,	0,	NULL},
 	{LV6,	159000000,	0,	NULL},
 };
-#elif defined(CONFIG_EXYNOS5430_FHD) || defined(CONFIG_EXYNOS5430_WQHD)
+#elif defined(CONFIG_EXYNOS5430_FHD)
+struct devfreq_clk_info aclk_gscl_333[] = {
+	{LV0_A,	317000000,	0,	NULL},
+	{LV0,	317000000,	0,	NULL},
+	{LV1,	317000000,	0,	NULL},
+	{LV2,	317000000,	0,	NULL},
+	{LV3,	211000000,	0,	NULL},
+	{LV4,	211000000,	0,	NULL},
+	{LV5,	159000000,	0,	NULL},
+	{LV6,	159000000,	0,	NULL},
+};
+#elif defined(CONFIG_EXYNOS5430_WQHD)
 struct devfreq_clk_info aclk_gscl_333[] = {
 	{LV0_A,	317000000,	0,	NULL},
 	{LV0,	317000000,	0,	NULL},
@@ -681,6 +698,11 @@ static unsigned int get_limit_voltage(unsigned int voltage, unsigned int volt_of
 
 	if (voltage + volt_offset > LIMIT_COLD_VOLTAGE)
 		return LIMIT_COLD_VOLTAGE;
+
+#if defined(CONFIG_EXYNOS5430_FHD)
+	if (volt_offset && (voltage + volt_offset) < MIN_COLD_VOLTAGE)
+		return MIN_COLD_VOLTAGE;
+#endif
 
 	return voltage + volt_offset;
 }

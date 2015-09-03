@@ -740,6 +740,8 @@ struct input_keymap_entry {
 #define KEY_ATTENDANT_TOGGLE	0x21d	/* Attendant call on or off */
 #define KEY_LIGHTS_TOGGLE	0x21e	/* Reading light on or off */
 
+#define KEY_VOICECOMMAND		0x246	/* Listening Voice Command */
+
 #define BTN_TRIGGER_HAPPY		0x2c0
 #define BTN_TRIGGER_HAPPY1		0x2c0
 #define BTN_TRIGGER_HAPPY2		0x2c1
@@ -903,6 +905,7 @@ struct input_keymap_entry {
 #define SW_ROTATE_LOCK		0x0c  /* set = rotate locked/disabled */
 #define SW_LINEIN_INSERT	0x0d  /* set = inserted */
 
+#define SW_3D_ACC		0x12	/* set = 3d accessory */
 #define SW_PEN_INSERT	0x13	/* set = pen out */
 #define SW_FLIP			0x15	/* set = flip cover */
 #define SW_GLOVE		0x16	/* set = glove mode */
@@ -910,6 +913,7 @@ struct input_keymap_entry {
 #define SW_RIGHT_HAND	0x18	/* set = right hand*/
 #define SW_BOTH_HAND	0x19	/* set = both hand*/
 #define SW_W1			0x1A	/* set = w1 slave */
+#define	SW_CERTIFYHALL	0x1b	/* set = certify_hall... */
 
 #define SW_MAX			0x20
 #define SW_CNT			(SW_MAX+1)

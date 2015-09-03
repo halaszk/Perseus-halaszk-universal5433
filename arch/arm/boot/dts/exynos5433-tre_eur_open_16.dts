@@ -892,8 +892,13 @@
 		pinctrl-1 = <&disp_id &disp_pcd &disp_errfg &disp_teson &oled_det>;
 		pinctrl-3 = <&disp_id &disp_pcd &disp_errfg_off &disp_teson &oled_det_off>;
 
-		mipi_dsi: mipi_dsi {
-			gpios = <&gpg0 0 0x1>, <&gpf1 5 0x1>;
+		decon_board_list: decon_board_list {
+			disable_display_driver_power {
+				gpios = <&gpg0 0 0x1>, <&gpf1 5 0x1>;
+			};
+			reset_display_driver_panel {
+				gpios = <&gpg0 0 0x1>, <&gpg0 0 0x1>, <&gpg0 0 0x1>;
+			};
 		};
 	};
 

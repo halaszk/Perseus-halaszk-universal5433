@@ -41,6 +41,7 @@
 #include <linux/iio/sysfs.h>
 #include <linux/iio/trigger.h>
 #include <linux/iio/trigger_consumer.h>
+#include <linux/alarmtimer.h>
 #include "yas.h"
 
 #if defined(CONFIG_SENSORS_CORE)
@@ -181,6 +182,8 @@ static irqreturn_t yas_trigger_handler(int irq, void *p)
 	struct yas_state *st = iio_priv(indio_dev);
 	int len = 0, i, j;
 	int32_t *mag;
+	struct timespec ts;
+	s64 timestamp;
 
 	mag = (int32_t *) kmalloc(indio_dev->scan_bytes, GFP_KERNEL);
 	if (mag == NULL)
@@ -197,8 +200,15 @@ static irqreturn_t yas_trigger_handler(int irq, void *p)
 	}
 
 	/* Guaranteed to be aligned with 8 byte boundary */
-	if (indio_dev->scan_timestamp)
-		*(s64 *)((u8 *)mag + ALIGN(len, sizeof(s64))) = pf->timestamp;
+	//if (indio_dev->scan_timestamp)
+	// *(s64 *)((u8 *)mag + ALIGN(len, sizeof(s64))) = pf->timestamp;
+
+	ts = ktime_to_timespec(ktime_get_boottime());
+	timestamp = ts.tv_sec * 1000000000ULL + ts.tv_nsec;
+	*(s64 *)((u8 *)mag + ALIGN(len, sizeof(s64))) = timestamp;
+	if (timestamp <= 0)
+		pr_err("[%s] invalid time = %lld\n", __func__, timestamp);
+
 	iio_push_to_buffers(indio_dev, (u8 *)mag);
 	kfree(mag);
 done:

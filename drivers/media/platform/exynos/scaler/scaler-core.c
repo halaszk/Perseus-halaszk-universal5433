@@ -530,6 +530,11 @@ static int sc_v4l2_s_fmt_mplane(struct file *file, void *fh,
 		return -EINVAL;
 	}
 
+	if (pixm->reserved[SC_FMT_PREMULTI_FLAG] != 0)
+		frame->pre_multi = true;
+	else
+		frame->pre_multi = false;
+
 	frame->width = pixm->width;
 	frame->height = pixm->height;
 	frame->pixelformat = pixm->pixelformat;
@@ -1906,8 +1911,8 @@ static int sc_run_next_job(struct sc_dev *sc)
 
 	sc_hwset_src_image_format(sc, s_frame->sc_fmt);
 	sc_hwset_dst_image_format(sc, d_frame->sc_fmt);
-	if (ctx->pre_multi)
-		sc_hwset_pre_multi_format(sc);
+
+	sc_hwset_pre_multi_format(sc, s_frame->pre_multi, d_frame->pre_multi);
 
 	sc_hwset_src_imgsize(sc, s_frame);
 	sc_hwset_dst_imgsize(sc, d_frame);

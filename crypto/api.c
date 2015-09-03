@@ -146,12 +146,12 @@ static struct crypto_alg *crypto_larval_add(const char *name, u32 type,
 	}
 	up_write(&crypto_alg_sem);
 
-	//patch from kernel 3.13.7 (refer to https://www.kernel.org/ & https://lkml.org/lkml/2013/9/7/139)
 	if (alg != &larval->alg) {
 		kfree(larval);
 		if (crypto_is_larval(alg))
 			alg = crypto_larval_wait(alg);
 	}
+
 	return alg;
 }
 
@@ -374,7 +374,7 @@ struct crypto_tfm *__crypto_alloc_tfm(struct crypto_alg *alg, u32 type,
 		goto out_err;
 
 #if FIPS_FUNC_TEST == 4
-    g_tfm_sz = tfm_size;
+	g_tfm_sz = tfm_size;
 #endif
 	tfm->__crt_alg = alg;
 

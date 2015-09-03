@@ -6,11 +6,22 @@
 #include <linux/of_gpio.h>
 #include <mach/gpio.h>
 #include <plat/gpio-cfg.h>
+#include <linux/module.h>
 
 #include <linux/sec_sysfs.h>
 
 static struct device *gps_dev;
 static unsigned int gps_pwr_on = 0;
+
+extern unsigned int system_rev;
+
+static ssize_t hwrev_show(struct device *dev, \
+struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%x\n", system_rev);
+}
+
+static DEVICE_ATTR(hwrev, S_IRUGO, hwrev_show, NULL);
 
 int check_gps_op(void)
 {
@@ -38,6 +49,11 @@ static int __init gps_bcm4752_init(void)
 		WARN(1, "failed to get device node of bcm4752\n");
 		ret = -ENODEV;
 		goto err_sec_device_create;
+	}
+
+	if (device_create_file(gps_dev, &dev_attr_hwrev) < 0) {
+		pr_err("Failed to create device file(%s)!\n",
+		       dev_attr_hwrev.attr.name);
 	}
 
 	gps_pwr_on = of_get_gpio(root_node, 0);

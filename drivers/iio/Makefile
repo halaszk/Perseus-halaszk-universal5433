@@ -22,3 +22,4 @@ obj-y += imu/
 obj-y += inv_test/
 obj-y += light/
 obj-y += magnetometer/
+obj-y += grip/

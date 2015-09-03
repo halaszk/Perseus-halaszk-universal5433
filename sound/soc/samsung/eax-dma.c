@@ -168,18 +168,11 @@ int eax_dma_params_register(struct s3c_dma_params *dma)
 
 static void eax_dma_elapsed(int buf_idx)
 {
-	int n;
-
 	di.buf_rd_idx = buf_idx;
 
-	for (n = 0; n < DMA_PERIOD_CNT; n++) {
-		if (--buf_idx < 0)
-			buf_idx += DMA_PERIOD_CNT;
-
-		di.buf_fill[buf_idx] = false;
-		if (buf_idx == di.buf_wr_idx)
-			break;
-	}
+	if (--buf_idx < 0)
+		buf_idx += DMA_PERIOD_CNT;
+	di.buf_fill[buf_idx] = false;
 
 	di.buf_done = true;
 	if (waitqueue_active(&mixer_buf_wq))
@@ -191,8 +184,11 @@ static void eax_adma_buffdone(void *data)
 	dma_addr_t src, dst, pos;
 	int buf_idx;
 
-	if (!di.running)
+	spin_lock(&di.lock);
+	if (!di.running) {
+		spin_unlock(&di.lock);
 		return;
+	}
 
 	di.params->ops->getposition(di.params->ch, &src, &dst);
 	pos = src - di.dma_start;
@@ -205,6 +201,7 @@ static void eax_adma_buffdone(void *data)
 	di.dma_pos = pos;
 
 	eax_dma_elapsed(buf_idx);
+	spin_unlock(&di.lock);
 }
 
 static void eax_adma_hw_params(void)
@@ -304,7 +301,8 @@ out:
 
 static void eax_adma_trigger(bool on)
 {
-	spin_lock(&di.lock);
+	unsigned long flags;
+	spin_lock_irqsave(&di.lock, flags);
 
 	di.running = on;
 	if (on) {
@@ -314,7 +312,7 @@ static void eax_adma_trigger(bool on)
 		di.prepare_done = false;
 	}
 
-	spin_unlock(&di.lock);
+	spin_unlock_irqrestore(&di.lock, flags);
 }
 
 static inline void eax_dma_xfer(struct runtime_data *prtd,
@@ -333,7 +331,8 @@ static inline void eax_dma_xfer(struct runtime_data *prtd,
 		prtd->dma_pos = dma_pos;
 	}
 
-	if (prtd->running && (prtd->dma_pos % prtd->dma_period) == 0)
+	if (prtd->running &&
+		((prtd->dma_pos - prtd->dma_start) % prtd->dma_period == 0))
 		snd_pcm_period_elapsed(prtd->substream);
 }
 
@@ -612,7 +611,7 @@ static inline bool eax_mixer_any_buf_running(void)
 static void eax_mixer_prepare(void)
 {
 	struct buf_info *bi;
-	short mix_l, mix_r;
+	int mix_l, mix_r;
 	short *mix_buf;
 	short pcm_l, pcm_r;
 	int n;
@@ -635,8 +634,18 @@ static void eax_mixer_prepare(void)
 			}
 		}
 
-		*mix_buf++ = mix_l;
-		*mix_buf++ = mix_r;
+		if (mix_l > 0x7fff)
+			mix_l = 0x7fff;
+		else if (mix_l < -0x7fff)
+			mix_l = -0x7fff;
+
+		if (mix_r > 0x7fff)
+			mix_r = 0x7fff;
+		else if (mix_r < -0x7fff)
+			mix_r = -0x7fff;
+
+		*mix_buf++ = (short)mix_l;
+		*mix_buf++ = (short)mix_r;
 	}
 
 	mi.buf_fill = true;
@@ -645,6 +654,7 @@ static void eax_mixer_prepare(void)
 
 static void eax_mixer_write(void)
 {
+	unsigned long flags;
 	int ret;
 
 	spin_lock(&mi.lock);
@@ -654,8 +664,13 @@ static void eax_mixer_write(void)
 	}
 	spin_unlock(&mi.lock);
 
-	if (!di.running && di.buf_fill[DMA_START_THRESHOLD])
+	if (!di.running && di.buf_fill[DMA_START_THRESHOLD]) {
+		if (!di.prepare_done) {
+			eax_adma_hw_params();
+			eax_adma_prepare();
+		}
 		eax_adma_trigger(true);
+	}
 
 	if (di.buf_fill[di.buf_wr_idx]) {
 		if (!di.running)
@@ -671,10 +686,13 @@ static void eax_mixer_write(void)
 	memcpy(di.buf_wr_p[di.buf_wr_idx], mi.mix_buf, MIXBUF_BYTE);
 
 	mi.buf_fill = false;
+
+	spin_lock_irqsave(&di.lock, flags);
 	di.buf_fill[di.buf_wr_idx] = true;
 	di.buf_wr_idx++;
 	if (di.buf_wr_idx == DMA_PERIOD_CNT)
 		di.buf_wr_idx = 0;
+	spin_unlock_irqrestore(&di.lock, flags);
 }
 
 static int eax_mixer_kthread(void *arg)

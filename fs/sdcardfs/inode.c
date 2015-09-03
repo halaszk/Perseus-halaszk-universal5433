@@ -852,7 +852,7 @@ const struct inode_operations sdcardfs_symlink_iops = {
 	.getxattr	= sdcardfs_getxattr,
 	.listxattr	= sdcardfs_listxattr,
 	.removexattr = sdcardfs_removexattr,
-#endif // SDCARDFS_XATTR
+#endif // SDCARD_FS_XATTR
 	/* XXX Following operations are implemented, 
 	 *     but FUSE(sdcard) or FAT does not support them
 	 *     These methods are *NOT* perfectly tested. 
@@ -877,7 +877,7 @@ const struct inode_operations sdcardfs_dir_iops = {
 	.getxattr	= sdcardfs_getxattr,
 	.listxattr	= sdcardfs_listxattr,
 	.removexattr = sdcardfs_removexattr,
-#endif // SDCARDFS_XATTR
+#endif // SDCARD_FS_XATTR
 	/* XXX Following operations are implemented, 
 	 *     but FUSE(sdcard) or FAT does not support them
 	 *     These methods are *NOT* perfectly tested. 

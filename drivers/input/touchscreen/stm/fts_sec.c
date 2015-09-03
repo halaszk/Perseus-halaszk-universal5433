@@ -342,6 +342,12 @@ static ssize_t store_cmd(struct device *dev, struct device_attribute *devattr,
 		return -EINVAL;
 	}
 
+	if (count > CMD_STR_LEN) {
+		printk(KERN_ERR "%s: overflow command length\n",
+				__func__);
+		return -EINVAL;
+	}
+
 	if (info->cmd_is_running == true) {
 		tsp_debug_err(true, &info->client->dev, "ft_cmd: other cmd is running.\n");
 		if (strncmp("clear_cover_mode", buf, 16) == 0) {
@@ -355,6 +361,19 @@ static ssize_t store_cmd(struct device *dev, struct device_attribute *devattr,
 			schedule_delayed_work(&info->cover_cmd_work, msecs_to_jiffies(10));
 		}
 		return -EBUSY;
+	}
+	else if (info->reinit_done == false) {
+		tsp_debug_err(true, &info->client->dev, "ft_cmd: reinit is working\n");
+		if (strncmp("clear_cover_mode", buf, 16) == 0) {
+			cancel_delayed_work(&info->cover_cmd_work);
+			tsp_debug_err(true, &info->client->dev,
+				"[cmd is delayed] %d, param = %d, %d\n", __LINE__, buf[17]-'0', buf[19]-'0');
+			info->delayed_cmd_param[0] = buf[17]-'0';
+			if (info->delayed_cmd_param[0] > 1)
+				info->delayed_cmd_param[1] = buf[19]-'0';
+
+			if(info->delayed_cmd_param[0] == 0) schedule_delayed_work(&info->cover_cmd_work, msecs_to_jiffies(300));
+		}
 	}
 
 	/* check lock   */

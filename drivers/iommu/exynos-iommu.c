@@ -1566,9 +1566,11 @@ static int __sysmmu_unmap_user_pages(struct device *dev,
 	struct iommu_domain *domain = vmm->domain;
 	struct exynos_iommu_domain *priv = domain->priv;
 	struct vm_area_struct *vma;
-	unsigned long start, end;
+	unsigned long start = vaddr & PAGE_MASK;
+	unsigned long end = PAGE_ALIGN(vaddr + size);
 	bool is_pfnmap;
 	sysmmu_pte_t *sent, *pent;
+	int ret = 0;
 
 	down_read(&mm->mmap_sem);
 
@@ -1580,21 +1582,18 @@ static int __sysmmu_unmap_user_pages(struct device *dev,
 	vma = find_vma(mm, vaddr);
 	if (!vma) {
 		pr_err("%s: vma is null\n", __func__);
-		up_read(&mm->mmap_sem);
-		return -EINVAL;
+		ret = -EINVAL;
+		goto out_unmap;
 	}
 
 	if (vma->vm_end < (vaddr + size)) {
 		pr_err("%s: vma overflow: %#lx--%#lx, vaddr: %#lx, size: %zd\n",
 			__func__, vma->vm_start, vma->vm_end, vaddr, size);
-		up_read(&mm->mmap_sem);
-		return -EINVAL;
+		ret = -EINVAL;
+		goto out_unmap;
 	}
 
 	is_pfnmap = vma->vm_flags & VM_PFNMAP;
-
-	start = vaddr & PAGE_MASK;
-	end = PAGE_ALIGN(vaddr + size);
 
 	TRACE_LOG_DEV(dev, "%s: Unmap starts @ %#x@%#lx\n",
 			__func__, size, start);
@@ -1604,7 +1603,16 @@ static int __sysmmu_unmap_user_pages(struct device *dev,
 		int i;
 
 		sent = section_entry(priv->pgtable, start);
+		if (lv1ent_fault(sent)) {
+			ret = -EFAULT;
+			goto out_unmap;
+		}
+
 		pent = page_entry(sent, start);
+		if (lv2ent_fault(pent)) {
+			ret = -EFAULT;
+			goto out_unmap;
+		}
 
 		pent_first = pent;
 		do {
@@ -1620,11 +1628,18 @@ static int __sysmmu_unmap_user_pages(struct device *dev,
 		pgtable_flush(pent_first, pent);
 	} while (start != end);
 
-	up_read(&mm->mmap_sem);
 
 	TRACE_LOG_DEV(dev, "%s: unmap done @ %#lx\n", __func__, start);
 
-	return 0;
+out_unmap:
+	up_read(&mm->mmap_sem);
+
+	if (ret) {
+		pr_debug("%s: Ignoring unmapping for %#lx ~ %#lx\n",
+					__func__, start, end);
+	}
+
+	return ret;
 }
 
 static sysmmu_pte_t *alloc_lv2entry_fast(struct exynos_iommu_domain *priv,
@@ -1712,6 +1727,7 @@ int exynos_sysmmu_map_user_pages(struct device *dev,
 			pte_t *pte, *pte_first;
 			sysmmu_pte_t *pent, *pent_first;
 			sysmmu_pte_t *sent;
+			spinlock_t *ptl;
 
 			if (pmd_none_or_clear_bad(pmd)) {
 				ret = -EBADR;
@@ -1732,9 +1748,13 @@ int exynos_sysmmu_map_user_pages(struct device *dev,
 			}
 
 			pent_first = pent;
+			ptl = pte_lockptr(mm, pmd);
+
+			spin_lock(ptl);
 			do {
 				if (!pte_present(*pte) ||
 					(write && !pte_write(*pte))) {
+					spin_unlock(ptl);
 					ret = handle_pte_fault(mm,
 						vma, start, pte, pmd,
 						write ? FAULT_FLAG_WRITE : 0);
@@ -1742,11 +1762,13 @@ int exynos_sysmmu_map_user_pages(struct device *dev,
 						ret = -EIO;
 						goto out_unmap;
 					}
+					spin_lock(ptl);
 				}
 
 				if (!pte_present(*pte) ||
 					(write && !pte_write(*pte))) {
 					ret = -EPERM;
+					spin_unlock(ptl);
 					goto out_unmap;
 				}
 
@@ -1759,6 +1781,7 @@ int exynos_sysmmu_map_user_pages(struct device *dev,
 
 			pte_unmap(pte_first);
 			pgtable_flush(pent_first, pent);
+			spin_unlock(ptl);
 		} while (pmd++, start = pmd_next, start != pgd_next);
 
 	} while (pgd++, start = pgd_next, start != end);

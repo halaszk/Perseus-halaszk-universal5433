@@ -44,7 +44,7 @@
 #define MFC_MAX_DPBS		32
 #define MFC_INFO_INIT_FD	-1
 
-#define MFC_NUM_CONTEXTS	16
+#define MFC_NUM_CONTEXTS	32
 #define MFC_MAX_DRM_CTX		2
 /* Interrupt timeout */
 #define MFC_INT_TIMEOUT		2000
@@ -258,6 +258,7 @@ struct s5p_mfc_pm {
 	struct device	*device;
 	spinlock_t	clklock;
 
+	int clock_on_steps;
 	int clock_off_steps;
 	enum mfc_buf_usage_type base_type;
 };
@@ -1003,6 +1004,10 @@ static inline unsigned int mfc_version(struct s5p_mfc_dev *dev)
 					(dev->fw.date >= 0x130405))
 #define FW_HAS_DYNAMIC_DPB(dev)		((IS_MFCv7X(dev) || IS_MFCv8X(dev))&&	\
 					(dev->fw.date >= 0x131108))
+#define FW_HAS_NOT_CODED(dev)		((IS_MFCv7X(dev) &&		\
+					(dev->fw.date >= 0x150108)) ||	\
+					(IS_MFCv8X(dev) &&		\
+					(dev->fw.date >= 0x130105)))
 #define FW_HAS_BASE_CHANGE(dev)		((IS_MFCv7X(dev) || IS_MFCv8X(dev))&&	\
 					(dev->fw.date >= 0x131108))
 #define FW_HAS_TEMPORAL_SVC_CH(dev)	((IS_MFCv8X(dev) &&			\
@@ -1019,8 +1024,16 @@ static inline unsigned int mfc_version(struct s5p_mfc_dev *dev)
 
 #define is_h264(ctx)		((ctx->codec_mode == S5P_FIMV_CODEC_H264_DEC) ||\
 				(ctx->codec_mode == S5P_FIMV_CODEC_H264_MVC_DEC))
+#define is_mpeg4vc1(ctx)	((ctx->codec_mode == S5P_FIMV_CODEC_VC1RCV_DEC) ||\
+				(ctx->codec_mode == S5P_FIMV_CODEC_VC1_DEC) ||\
+				(ctx->codec_mode == S5P_FIMV_CODEC_MPEG4_DEC))
 #define MFC_UHD_RES		(3840*2160)
+#define MFC_HD_RES		(1280*720)
 #define is_UHD(ctx)		(((ctx)->img_width * (ctx)->img_height) == MFC_UHD_RES)
+#define under_HD(ctx)		(((ctx)->img_width * (ctx)->img_height) <= MFC_HD_RES)
+#define not_coded_cond(ctx)	is_mpeg4vc1(ctx)
+#define on_res_change(ctx)	((ctx)->state >= MFCINST_RES_CHANGE_INIT &&	\
+				(ctx)->state <= MFCINST_RES_CHANGE_END)
 
 /* Extra information for Decoder */
 #define	DEC_SET_DUAL_DPB		(1 << 0)
@@ -1076,6 +1089,8 @@ static inline int is_drm_node(enum s5p_mfc_node_type node)
 
 int s5p_mfc_dec_ctx_ready(struct s5p_mfc_ctx *ctx);
 int s5p_mfc_enc_ctx_ready(struct s5p_mfc_ctx *ctx);
+int s5p_mfc_request_sec_pgtable(struct s5p_mfc_dev *dev);
+int s5p_mfc_release_sec_pgtable(struct s5p_mfc_dev *dev);
 
 static inline int s5p_mfc_ctx_ready(struct s5p_mfc_ctx *ctx)
 {

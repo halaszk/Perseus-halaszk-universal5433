@@ -562,6 +562,7 @@ struct ssp_data {
 #endif
 	struct mutex comm_mutex;
 	struct mutex pending_mutex;
+	struct mutex enable_mutex;
 
 #if defined(CONFIG_SENSORS_SSP_YAS532)
 	s16 *static_matrix;

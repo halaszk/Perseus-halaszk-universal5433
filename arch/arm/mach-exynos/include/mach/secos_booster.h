@@ -19,6 +19,8 @@
  */
 enum secos_boost_policy {
 	MAX_PERFORMANCE,
+	MID_PERFORMANCE,
+	MIN_PERFORMANCE,
 };
 
 int secos_booster_start(enum secos_boost_policy policy);

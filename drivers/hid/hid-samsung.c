@@ -315,6 +315,10 @@ static int samsung_universal_kbd_input_mapping(struct hid_device *hdev,
 		case 0x303: samsung_kbd_mouse_map_key_clear(KEY_SYSRQ); break;
 		/* Multi Window */
 		case 0x309: samsung_kbd_mouse_map_key_clear(BTN_TRIGGER_HAPPY9); break;
+		/* TouchPad ON for TabS2*/
+		case 0x310: samsung_kbd_mouse_map_key_clear(KEY_TOUCHPAD_ON); break;
+		/* TouchPad OFF for TabS2*/
+		case 0x311: samsung_kbd_mouse_map_key_clear(KEY_TOUCHPAD_OFF); break;
 		default:
 			return 0;
 		}
@@ -349,7 +353,7 @@ static int samsung_input_mapping(struct hid_device *hdev, struct hid_input *hi,
 	else if(USB_DEVICE_ID_SAMSUNG_WIRELESS_ACTIONMOUSE == hdev->product)
 		ret = samsung_actionmouse_input_mapping(hdev,
 			hi, field, usage, bit, max);
-	else if(USB_DEVICE_ID_SAMSUNG_WIRELESS_UNIVERSAL_KBD == hdev->product)
+	else if( (USB_DEVICE_ID_SAMSUNG_WIRELESS_UNIVERSAL_KBD == hdev->product) || (USB_DEVICE_ID_SAMSUNG_WIRELESS_BOOKCOVER_TABS2 == hdev->product) )
 		ret = samsung_universal_kbd_input_mapping(hdev,
 			hi, field, usage, bit, max);
 	return ret;
@@ -393,6 +397,7 @@ static const struct hid_device_id samsung_devices[] = {
 	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_SAMSUNG_ELECTRONICS, USB_DEVICE_ID_SAMSUNG_WIRELESS_GAMEPAD) },
 	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_SAMSUNG_ELECTRONICS, USB_DEVICE_ID_SAMSUNG_WIRELESS_ACTIONMOUSE) },
 	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_SAMSUNG_ELECTRONICS, USB_DEVICE_ID_SAMSUNG_WIRELESS_UNIVERSAL_KBD) },
+    { HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_SAMSUNG_ELECTRONICS, USB_DEVICE_ID_SAMSUNG_WIRELESS_BOOKCOVER_TABS2) },
 	{ }
 };
 MODULE_DEVICE_TABLE(hid, samsung_devices);

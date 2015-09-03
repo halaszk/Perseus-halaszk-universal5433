@@ -28,3 +28,5 @@ obj-$(CONFIG_INPUT_MISC)	+= misc/
 obj-$(CONFIG_INPUT_APMPOWER)	+= apm-power.o
 obj-$(CONFIG_INPUT_KEYRESET)	+= keyreset.o
 obj-$(CONFIG_HALL)		+= hall.o
+obj-$(CONFIG_HALL_ACCESSORY)	+= hall_accessory.o
+obj-$(CONFIG_CERTIFY_HALL)	+= certify_hall.o

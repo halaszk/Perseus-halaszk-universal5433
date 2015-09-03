@@ -70,21 +70,9 @@
 #include <asm/div64.h>
 #include "internal.h"
 
-#ifdef CONFIG_SDP_CACHE_CLEANUP
-#include <linux/highmem.h>
-#define PER_USER_RANGE 100000
-#define SENSITIVITY_UNKNOWN 0
-#define SENSITIVE 1
-#define NOT_SENSITIVE 2
-#endif
-
 #ifdef CONFIG_USE_PERCPU_NUMA_NODE_ID
 DEFINE_PER_CPU(int, numa_node);
 EXPORT_PER_CPU_SYMBOL(numa_node);
-#endif
-
-#ifdef CONFIG_SDP_CACHE_CLEANUP
-extern int dek_is_sdp_uid(uid_t uid);
 #endif
 
 #ifdef CONFIG_HAVE_MEMORYLESS_NODES
@@ -136,9 +124,18 @@ static int ptrack_init_on;
 static struct ptrack **ptrack_cache;
 static unsigned ptrack_cache_table_size;
 
+#ifdef CONFIG_BUFFERED_PTRACK
+static int ptrack_log_count;
+
+#define PTRACK_LOG_COUNT (3)
+#endif
 #define PTRACK_MEGA_BYTES (1<<20)
 #define PTRACK_MEGA_PAGE_ORDERS (8)
-#define PTRACK_CACHE_ENTRY_NUM (PTRACK_MEGA_BYTES/(sizeof(struct ptrack) * 2))
+#ifdef CONFIG_BUFFERED_PTRACK
+#define PTRACK_CACHE_ENTRY_NUM (PTRACK_MEGA_BYTES/(sizeof(struct ptrack) * PTRACK_ITEM_NUM * PTRACK_LOG_COUNT))
+#else
+#define PTRACK_CACHE_ENTRY_NUM (PTRACK_MEGA_BYTES/(sizeof(struct ptrack) * PTRACK_ITEM_NUM))
+#endif
 #define PTRACK_CEIL(a, b) ((a + b - 1) / b)
 
 void __init ptrack_init(void)
@@ -165,6 +162,11 @@ void __init ptrack_init(void)
 	}
 
 	ptrack_init_on = 1;
+#ifdef CONFIG_BUFFERED_PTRACK
+	ptrack_log_count = PTRACK_LOG_COUNT;
+#endif
+
+	pr_info("%s: ptrack table size(%d)\n", __func__, ptrack_cache_table_size);
 
 	return;
 
@@ -179,7 +181,20 @@ err:
 	}
 
 	kfree(ptrack_cache);
+
+	pr_info("%s: ptrack error\n", __func__);
 }
+
+#ifdef CONFIG_BUFFERED_PTRACK
+static void ptrack_move_next(struct page *page, enum ptrack_item alloc)
+{
+	page->ptrack_curr[alloc]++;
+
+	if (page->ptrack_curr[alloc] >= PTRACK_LOG_COUNT) {
+		page->ptrack_curr[alloc] = 0;
+	}
+}
+#endif
 
 static int ptrack_check_target(struct page *page)
 {
@@ -204,11 +219,21 @@ static struct ptrack *_ptrack_alloc(struct page *page)
 
 	index = ((unsigned)page_to_phys(page) - (unsigned)virt_to_phys((void *)PAGE_OFFSET)) / PAGE_SIZE;
 	cache_idx = index / PTRACK_CACHE_ENTRY_NUM;
-	cache_offset = (index % PTRACK_CACHE_ENTRY_NUM) * 2;
+#ifdef CONFIG_BUFFERED_PTRACK
+	cache_offset = (index % PTRACK_CACHE_ENTRY_NUM) * PTRACK_ITEM_NUM * PTRACK_LOG_COUNT;
+#else
+	cache_offset = (index % PTRACK_CACHE_ENTRY_NUM) * PTRACK_ITEM_NUM;
+#endif
 
 	page->ptrack = &ptrack_cache[cache_idx][cache_offset];
 
-	memset(page->ptrack, 0x00, sizeof(struct ptrack) * 2);
+#ifdef CONFIG_BUFFERED_PTRACK
+	memset(page->ptrack, 0x00, sizeof(struct ptrack) * PTRACK_ITEM_NUM * PTRACK_LOG_COUNT);
+	page->ptrack_curr[PTRACK_ALLOC] = 0;
+	page->ptrack_curr[PTRACK_FREE] = 0;
+#else
+	memset(page->ptrack, 0x00, sizeof(struct ptrack) * PTRACK_ITEM_NUM);
+#endif
 
 	return page->ptrack;
 }
@@ -216,13 +241,28 @@ static struct ptrack *_ptrack_alloc(struct page *page)
 static struct ptrack *ptrack_get(struct page *page, enum ptrack_item alloc)
 {
 	struct ptrack *p;
+	int curr;
 
 	p = page->ptrack;
 
 	if (!p)
 		return NULL;
 
-	return p + alloc;
+#ifdef CONFIG_BUFFERED_PTRACK
+	/*
+		ptrack of a page :
+			(ptrack * PTRACK_LOG_COUNT for PTRACK_ALLOC) +
+			(ptrack * PTRACK_LOG_COUNT for PTRACK_FREE)
+	# of ptrack for a page is (PTRACK_ITEM_NUM * PTRACK_LOG_COUNT)
+	 */
+	curr = page->ptrack_curr[alloc];
+	if (alloc == PTRACK_FREE) {
+		curr += PTRACK_LOG_COUNT;
+	}
+#else
+	curr = alloc;
+#endif
+	return p + curr;
 }
 
 static void _ptrack_set(struct ptrack *p, unsigned long addr)
@@ -264,8 +304,13 @@ static void ptrack_set(struct page *page,
 	if (!p)
 		return;
 
-	if (addr)
+	if (addr) {
+#ifdef CONFIG_BUFFERED_PTRACK
+		ptrack_move_next(page, alloc);
+#endif
+		p = ptrack_get(page, alloc);
 		_ptrack_set(p, addr);
+	}
 }
 
 #endif /* CONFIG_PTRACK_DEBUG */
@@ -865,8 +910,13 @@ static void free_one_page(struct zone *zone, struct page *page, int order,
 	zone->pages_scanned = 0;
 
 	__free_one_page(page, zone, order, migratetype);
+#ifdef CONFIG_ACCURATE_FREE_PAGES_CHECK
+	if (likely(!is_migrate_isolate(migratetype)))
+		__mod_zone_freepage_state(zone, 1 << order, migratetype);
+#else
 	if (unlikely(!is_migrate_isolate(migratetype)))
 		__mod_zone_freepage_state(zone, 1 << order, migratetype);
+#endif
 	spin_unlock(&zone->lock);
 }
 
@@ -876,18 +926,6 @@ static bool free_pages_prepare(struct page *page, unsigned int order)
 	int bad = 0;
 #ifdef CONFIG_PTRACK_DEBUG
 	int page_num;
-#endif
-
-#ifdef CONFIG_SDP_CACHE_CLEANUP
-	if (PageSensitive(page)) {
-		void *kaddr;
-		ClearPageSensitive(page);
-		kaddr = kmap_atomic(page);
-		if (kaddr)
-			clear_page(kaddr);
-		kunmap_atomic(kaddr);
-		flush_dcache_page(page);
-	}
 #endif
 
 	trace_mm_page_free(page, order);
@@ -1881,7 +1919,7 @@ static int ptrack_debugfs_show(struct seq_file *s, void *data)
 					flag = 0;
 
 				seq_printf(s, "[0x%x] ALLOC(order:%d) - cpu(%d)\tpid(%04d)\twhen(0x%016llx)\taddr(0x%08x)\t%s\n",
-								(unsigned)page_address(p), i, ptrack_alloc->cpu, ptrack_alloc->pid, ptrack_alloc->when, (unsigned)ptrack_alloc->addr, state[flag]);
+							(unsigned)page_address(p), i, ptrack_alloc->cpu, ptrack_alloc->pid, ptrack_alloc->when, (unsigned)ptrack_alloc->addr, state[flag]);
 				if (track_on)
 					ptrack_debugfs_show_stack(s, ptrack_alloc);
 				seq_printf(s, "[0x%x] FREE (order:%d) - cpu(%d)\tpid(%04d)\twhen(0x%016llx)\taddr(0x%08x)\t%s\n",
@@ -1905,11 +1943,11 @@ static int ptrack_debugfs_show(struct seq_file *s, void *data)
 					flag = 0;
 
 				seq_printf(s, "[0x%x] ALLOC(order:%d) - cpu(%d)\tpid(%04d)\twhen(0x%016llx)\taddr(0x%08x)\t%s\n",
-								(unsigned)page_address(p), i, ptrack_alloc->cpu, ptrack_alloc->pid, ptrack_alloc->when, (unsigned)ptrack_alloc->addr, state[flag]);
+							(unsigned)page_address(p), i, ptrack_alloc->cpu, ptrack_alloc->pid, ptrack_alloc->when, (unsigned)ptrack_alloc->addr, state[flag]);
 				if (track_on)
 					ptrack_debugfs_show_stack(s, ptrack_alloc);
 				seq_printf(s, "[0x%x] FREE (order:%d) - cpu(%d)\tpid(%04d)\twhen(0x%016llx)\taddr(0x%08x)\t%s\n",
-								(unsigned)page_address(p), i, ptrack_free->cpu, ptrack_free->pid, ptrack_free->when, (unsigned)ptrack_free->addr, state[flag]);
+							(unsigned)page_address(p), i, ptrack_free->cpu, ptrack_free->pid, ptrack_free->when, (unsigned)ptrack_free->addr, state[flag]);
 				if (track_on)
 					ptrack_debugfs_show_stack(s, ptrack_free);
 
@@ -2037,6 +2075,12 @@ static bool __zone_watermark_ok(struct zone *z, int order, unsigned long mark,
 
 	if (free_pages - free_cma <= min + lowmem_reserve)
 		return false;
+#ifdef CONFIG_ACCURATE_FREE_PAGES_CHECK
+	/*recaculate free_page cause by imbalancing between zone page state and free_area*/
+	free_pages = 0;
+	for (o = 0; o < MAX_ORDER; o++)
+		free_pages += z->free_area[o].nr_free << o;
+#endif
 	for (o = 0; o < order; o++) {
 		/* At the next order, this order's pages become unavailable */
 		free_pages -= z->free_area[o].nr_free << o;
@@ -2841,7 +2885,7 @@ static int __init slowpath_init(void)
 	return 0;
 }
 
-module_init(slowpath_init)
+module_init(slowpath_init);
 #endif
 
 static inline struct page *
@@ -2859,7 +2903,7 @@ __alloc_pages_slowpath(gfp_t gfp_mask, unsigned int order,
 	bool deferred_compaction = false;
 	bool contended_compaction = false;
 #if defined(CONFIG_SEC_OOM_KILLER) || defined(CONFIG_OOM_KILLER_TIMEOUT)
-	unsigned long oom_invoke_timeout = jiffies + HZ/50;
+	unsigned long oom_invoke_timeout = jiffies + HZ/4;
 #endif
 
 #ifdef CONFIG_SEC_SLOWPATH
@@ -3035,7 +3079,7 @@ rebalance:
 			}
 
 #if defined(CONFIG_SEC_OOM_KILLER) || defined(CONFIG_OOM_KILLER_TIMEOUT)
-			oom_invoke_timeout = jiffies + HZ/25;
+			oom_invoke_timeout = jiffies + HZ/4;
 #endif
 			goto restart;
 		}
@@ -3171,34 +3215,6 @@ out:
 		goto retry_cpuset;
 
 	memcg_kmem_commit_charge(page, memcg, order);
-
-
-#ifdef CONFIG_SDP_CACHE_CLEANUP
-	if(page) {
-		uid_t uid = task_uid(current);
-		if (((uid/PER_USER_RANGE) <= 199)  && ((uid/PER_USER_RANGE) >= 100)) {
-			if (dek_is_sdp_uid(uid)) {
-				switch (current->sensitive) {
-				case SENSITIVITY_UNKNOWN:
-					if ((0 == strcmp(current->comm, "m.android.email")) ||
-						(0 == strcmp(current->comm, "ndroid.exchange"))) {
-						SetPageSensitive(page);
-						current->sensitive = SENSITIVE;
-					} else {
-						current->sensitive = NOT_SENSITIVE;
-					}
-					break;
-				case SENSITIVE:
-						SetPageSensitive(page);
-					break;
-				case NOT_SENSITIVE:
-				default:
-					break;
-				}
-			}
-		}
-	}
-#endif
 
 #ifdef CONFIG_PTRACK_DEBUG
 	if (ptrack_check_target(page)) {
@@ -6012,11 +6028,11 @@ int __meminit init_per_zone_wmark_min(void)
 module_init(init_per_zone_wmark_min)
 
 /*
- * min_free_kbytes_sysctl_handler - just a wrapper around proc_dointvec() so 
+ * min_free_kbytes_sysctl_handler - just a wrapper around proc_dointvec() so
  *	that we can call two helper functions whenever min_free_kbytes
  *	or extra_free_kbytes changes.
  */
-int min_free_kbytes_sysctl_handler(ctl_table *table, int write, 
+int min_free_kbytes_sysctl_handler(ctl_table *table, int write,
 	void __user *buffer, size_t *length, loff_t *ppos)
 {
 	proc_dointvec(table, write, buffer, length, ppos);
@@ -6753,9 +6769,6 @@ static const struct trace_print_flags pageflag_names[] = {
 #endif
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
 	{1UL << PG_compound_lock,	"compound_lock"	},
-#endif
-#ifdef CONFIG_SDP
-	{1UL << PG_sensitive,	"sensitive"	},
 #endif
 #ifdef CONFIG_SCFS_LOWER_PAGECACHE_INVALIDATION
 	{1UL << PG_scfslower,		"scfslower"	},

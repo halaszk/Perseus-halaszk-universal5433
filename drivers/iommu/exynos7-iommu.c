@@ -467,14 +467,15 @@ static void show_fault_information(struct sysmmu_drvdata *drvdata,
 		pr_crit("Page table base of driver: %#010x\n",
 			drvdata->pgtable);
 
-	if (fault_id == SYSMMU_FAULT_PTW_ACCESS) {
+	if (fault_id == SYSMMU_FAULT_PTW_ACCESS)
 		pr_crit("System MMU has failed to access page table\n");
-		goto finish;
-	}
 
 	if (!pfn_valid(pgtable >> PAGE_SHIFT)) {
 		pr_crit("Page table base is not in a valid memory region\n");
-	} else {
+		pgtable = drvdata->pgtable;
+	}
+
+	if (pfn_valid(pgtable)) {
 		sysmmu_pte_t *ent;
 		ent = section_entry(phys_to_virt(pgtable), fault_addr);
 		pr_crit("Lv1 entry: %#010x\n", *ent);

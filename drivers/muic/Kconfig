@@ -112,6 +112,21 @@ config MUIC_MAX77843_RESET_WA
 	help
 	  If you say yes here you will get support for the MAX77843 MUIC RESET WA.
 
+config MUIC_MAX77849
+	bool "Using MAX77849 MUIC"
+	depends on MFD_MAX77849 && USE_MUIC
+	default n
+	help
+	  If you say yes here you will get support for
+	  for the MAX77849 MUIC chip.
+
+config MUIC_MAX77849_IGNORE_ADCERR_WA
+	bool "Using MAX77849 MUIC ignore ADCERR WA"
+	depends on MUIC_MAX77849
+	default n
+	help
+	  If you say yes here you will get support for the MAX77849 MUIC RESET WA.
+
 config MUIC_MAX77888
 	bool "Using MAX77888 MUIC"
 	depends on MFD_MAX77888 && USE_MUIC
@@ -120,3 +135,56 @@ config MUIC_MAX77888
 	  If you say yes here you will get support for
 	  for the MAX77888 MUIC chip.
 
+config MUIC_SM5703_SUPPORT_OTG
+	bool "SM5703 MUIC SUPPORT OTG"
+	depends on MUIC_SM5703
+	default n
+	help
+	  If you say yes here you will get support for the OTG of SM5703 MUIC chip.
+config MUIC_SM5703_SUPPORT_AUDIODOCK
+	bool "SM5703_MUIC_SUPPORT_AUDIODOCK"
+	depends on MUIC_SM5703
+	default n
+	help
+          If you say yes here you will get support for AUDIO DOCK
+config MUIC_SM5502
+	bool "SM5502 MUIC"
+	depends on USE_MUIC
+	default n
+	help
+	  If you say yes here you will get support for the SM5502 MUIC chip.
+
+config MUIC_SM5502_SUPPORT_OTG
+	bool "SM5502 MUIC SUPPORT OTG"
+	depends on MUIC_SM5502
+	default n
+	help
+	  If you say yes here you will get support for the OTG of SM5502 MUIC chip.
+
+config MUIC_SM5502_SUPPORT_AUDIODOCK
+	bool "SM5502_MUIC_SUPPORT_AUDIODOCK"
+	depends on MUIC_SM5502
+	default n
+	help
+          If you say yes here you will get support for AUDIO DOCK
+
+config MUIC_UNIVERSAL
+	bool "UNIVERSAL MUIC"
+	depends on USE_MUIC
+	default n
+	help
+	  If you say yes here you will get support for various MUIC chips.
+
+config MUIC_UNIVERSAL_SM5703
+	bool "SM5703 MUIC"
+	depends on USE_MUIC
+	default n
+	help
+	  If you say yes here you will get support for the SM5703 MUIC chip.
+
+config MUIC_UNIVERSAL_MAX77849
+	bool "MAX77849 MUIC"
+	depends on USE_MUIC
+	default n
+	help
+	  If you say yes here you will get support for the MAX77849 MUIC chip.

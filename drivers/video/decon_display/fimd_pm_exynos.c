@@ -35,6 +35,9 @@
 static const char * const lcd_regulator_arr[] = {
 	"LCD18V",
 	"LCD30V",
+#ifdef CONFIG_DECON_LCD_S6E3HA1
+	"LCD16V",
+#endif
 };
 
 static struct clk *g_mout_fimd1;
@@ -300,7 +303,13 @@ int enable_display_driver_power(struct device *dev)
 
 	dispdrv = get_display_driver();
 	gpio = dispdrv->dt_ops.get_display_dsi_reset_gpio();
-
+#ifdef CONFIG_DECON_LCD_S6TNMR7
+	gpio_request_one(gpio->id[1], GPIOF_OUT_INIT_HIGH, "lcd_power");
+	gpio_free(gpio->id[1]);
+	gpio_request_one(gpio->id[2], GPIOF_OUT_INIT_HIGH, "mipi_power");
+	gpio_free(gpio->id[2]);
+	usleep_range(11000, 12000);
+#endif
 	for (i = 0; i < ARRAY_SIZE(lcd_regulator_arr); i++) {
 		regulator = regulator_get(dev, lcd_regulator_arr[i]);
 		if (IS_ERR(regulator))
@@ -366,6 +375,12 @@ int disable_display_driver_power(struct device *dev)
 		}
 	}
 
+#ifdef CONFIG_DECON_LCD_S6TNMR7
+    usleep_range(5000, 6000);
+    gpio_request_one(gpio->id[1], GPIOF_OUT_INIT_LOW, "lcd_power");
+	gpio_free(gpio->id[1]);
+#endif
+
 	set_pinctrl(dev, 0);
 
 	return ret;
@@ -387,7 +402,12 @@ int reset_display_driver_panel(struct device *dev)
 	gpio_set_value(gpio->id[0], 1);
 	usleep_range(5000, 6000);
 	gpio_free(gpio->id[0]);
-
+#ifdef CONFIG_DECON_LCD_S6TNMR7
+    usleep_range(400000, 410000);
+#endif
+#ifdef CONFIG_DECON_LCD_S6E3HA1
+	usleep_range(10000, 11000);
+#endif
 	return 0;
 }
 

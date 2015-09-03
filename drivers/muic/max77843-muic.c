@@ -42,11 +42,7 @@
 #include <linux/muic/muic_notifier.h>
 #endif /* CONFIG_MUIC_NOTIFIER */
 
-#if !defined(CONFIG_SEC_FACTORY)
-#if defined(CONFIG_MUIC_ADCMODE_SWITCH_WA)
 #include <linux/delay.h>
-#endif /* CONFIG_MUIC_ADCMODE_SWITCH_WA */
-#endif /* !CONFIG_SEC_FACTORY */
 
 #if defined(CONFIG_MUIC_MAX77843_RESET_WA)
 #include <linux/mfd/samsung/irq.h>
@@ -1983,7 +1979,7 @@ static muic_attached_dev_t muic_get_new_dev
 }
 
 #if !defined(CONFIG_SEC_FACTORY)
-bool is_need_muic_adcmode_continuous(muic_attached_dev_t new_dev)
+static bool is_need_muic_adcmode_continuous(muic_attached_dev_t new_dev)
 {
 	bool ret = false;
 
@@ -2053,7 +2049,6 @@ static void max77843_muic_detect_dev(struct max77843_muic_data *muic_data, int i
 
 	pr_info("%s:%s HVCONTROL1:0x%02x, 2:0x%02x\n", MUIC_DEV_NAME, __func__,
 		hvcontrol[0], hvcontrol[1]);
-
 
 	/* attached status */
 	muic_data->status1 = status[0];

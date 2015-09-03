@@ -375,6 +375,10 @@ enum sec_debug_aux_log_idx {
 #ifdef CONFIG_SEC_DEBUG_RT_THROTTLE_ACTIVE
 	SEC_DEBUG_AUXLOG_IRQ,
 #endif
+	SEC_DEBUG_AUXLOG_WIFI,
+#ifdef CONFIG_SEC_DEBUG_AUX_SUSPEND
+	SEC_DEBUG_AUXLOG_SUSPEND,
+#endif
 	SEC_DEBUG_AUXLOG_ITEM_MAX,
 };
 
@@ -393,6 +397,9 @@ extern void sec_debug_avc_log(char *fmt, ...);
 extern void sec_debug_tsp_log(char *fmt, ...);
 #ifdef CONFIG_TOUCHSCREEN_FTS
 extern void tsp_dump(void);
+#endif
+#ifdef CONFIG_TOUCHSCREEN_MELFAS_MMS449
+extern void mms_tsp_dump(void);
 #endif
 #endif
 

@@ -8,4 +8,7 @@ obj-$(CONFIG_FB_HIBERNATION_DISPLAY)	+= decon_pm_core.o
 obj-$(CONFIG_DECON_LCD_S6E8AA0)		+= s6e8aa0_mipi_lcd.o
 obj-$(CONFIG_DECON_LCD_S6E3FA0)		+= s6e3fa0_mipi_lcd.o
 obj-$(CONFIG_DECON_MDNIE_LITE)		+= mdnie_lite.o mdnie_tuning.o
+obj-$(CONFIG_DECON_MDNIE_LITE_CHAGALL)	+= mdnie_lite_chagall.o mdnie_tuning.o
 obj-$(CONFIG_DECON_LCD_S6E3FA2)		+= s6e3fa2_mipi_lcd.o dynamic_aid.o
+obj-$(CONFIG_DECON_LCD_S6TNMR7)		+= s6tnmr7_mipi_lcd.o dynamic_aid.o
+obj-$(CONFIG_DECON_LCD_S6E3HA1)		+= s6e3ha1_mipi_lcd.o dynamic_aid.o

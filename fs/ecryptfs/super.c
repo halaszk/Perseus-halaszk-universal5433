@@ -65,8 +65,7 @@ static struct inode *ecryptfs_alloc_inode(struct super_block *sb)
 	inode_info->lower_file = NULL;
 #ifdef CONFIG_SDP
 	// get userid from super block
-	inode_info->userid = ecryptfs_super_block_get_userid(sb);
-	inode_info->crypt_stat.userid = inode_info->userid;
+	inode_info->crypt_stat.engine_id = -1;
 #endif
 	inode = &inode_info->vfs_inode;
 out:
@@ -168,11 +167,13 @@ static int ecryptfs_show_options(struct seq_file *m, struct dentry *root)
 			seq_printf(m, ",ecryptfs_sig=%s", walker->sig);
 	}
 #ifdef CONFIG_SDP
-	if(ecryptfs_is_valid_userid(mount_crypt_stat->userid)){
-		seq_printf(m, ",userid=%d", mount_crypt_stat->userid);
-	}
+	seq_printf(m, ",userid=%d", mount_crypt_stat->userid);
+
 	if (mount_crypt_stat->flags & ECRYPTFS_MOUNT_SDP_ENABLED){
 		seq_printf(m, ",sdp_enabled");
+	}
+	if (mount_crypt_stat->partition_id >= 0){
+	    seq_printf(m, ",partition_id=%d", mount_crypt_stat->partition_id);
 	}
 #endif
 	mutex_unlock(&mount_crypt_stat->global_auth_tok_list_mutex);
@@ -211,5 +212,5 @@ const struct super_operations ecryptfs_sops = {
 	.statfs = ecryptfs_statfs,
 	.remount_fs = NULL,
 	.evict_inode = ecryptfs_evict_inode,
-	.show_options = ecryptfs_show_options,
+	.show_options = ecryptfs_show_options
 };

@@ -1329,6 +1329,29 @@ static int mmc_blk_err_check(struct mmc_card *card,
 				gen_err = 1;
 			}
 
+			/*
+			 * CMD25 -> CMD13 (WP violation) -> next CMD (illegal CMD)
+			 * need to change card status (rcv->tran)
+			 */
+			if ((status & R1_WP_VIOLATION) && 
+					(R1_CURRENT_STATE(status) == R1_STATE_RCV)) {
+				err = send_stop(card, &status);
+
+				pr_err("%s: WP violation. send CMD12 to "
+						"change card status (rcv->tran)\n",
+						req->rq_disk->disk_name);
+
+				/*
+				 * If the stop cmd also timed out, the card is probably
+				 * not present, so abort.  Other errors are bad news too.
+				 */
+				if (err) {
+					pr_err("%s: error %d sending stop command\n",
+							req->rq_disk->disk_name, err);
+					return MMC_BLK_ABORT;
+				}
+			}
+
 			/* Timeout if the device never becomes ready for data
 			 * and never leaves the program state.
 			 */
@@ -2920,6 +2943,20 @@ static void mmc_blk_remove(struct mmc_card *card)
 #endif
 }
 
+static int mmc_blk_shutdown(struct mmc_card *card)
+{
+	struct mmc_blk_data *part_md;
+	struct mmc_blk_data *md = mmc_get_drvdata(card);
+
+	if (md) {
+		mmc_queue_suspend(&md->queue, 1);
+		list_for_each_entry(part_md, &md->part, part) {
+			mmc_queue_suspend(&part_md->queue, 1);
+		}
+	}
+	return 0;
+}
+
 #ifdef CONFIG_PM
 static int mmc_blk_suspend(struct mmc_card *card)
 {
@@ -2927,9 +2964,9 @@ static int mmc_blk_suspend(struct mmc_card *card)
 	struct mmc_blk_data *md = mmc_get_drvdata(card);
 
 	if (md) {
-		mmc_queue_suspend(&md->queue);
+		mmc_queue_suspend(&md->queue, 0);
 		list_for_each_entry(part_md, &md->part, part) {
-			mmc_queue_suspend(&part_md->queue);
+			mmc_queue_suspend(&part_md->queue, 0);
 		}
 	}
 	return 0;
@@ -2966,6 +3003,7 @@ static struct mmc_driver mmc_driver = {
 	.remove		= mmc_blk_remove,
 	.suspend	= mmc_blk_suspend,
 	.resume		= mmc_blk_resume,
+	.shutdown	= mmc_blk_shutdown,
 };
 
 static int __init mmc_blk_init(void)

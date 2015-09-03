@@ -495,11 +495,20 @@ extern int lm3560_reg_update_export(u8 reg, u8 mask, u8 data);
 #ifdef CONFIG_LEDS_SKY81296
 extern int sky81296_torch_ctrl(int state);
 #endif
+#ifdef CONFIG_FLED_SM5703
+extern bool flash_control_ready;
+extern int sm5703_led_mode_ctrl(int state);
+#endif
 
 static void fimc_is_group_set_torch(struct fimc_is_group *group,
 	struct fimc_is_frame *ldr_frame)
 {
+	struct fimc_is_device_ischain *device = group->device;
+
 	if (group->prev)
+		return;
+
+	if (test_bit(FIMC_IS_ISCHAIN_REPROCESSING, &device->state))
 		return;
 
 	if (group->aeflashMode != ldr_frame->shot->ctl.aa.aeflashMode) {
@@ -510,6 +519,12 @@ static void fimc_is_group_set_torch(struct fimc_is_group *group,
 			lm3560_reg_update_export(0xE0, 0xFF, 0xEF);
 #elif defined(CONFIG_LEDS_SKY81296)
 			sky81296_torch_ctrl(1);
+#elif defined(CONFIG_FLED_SM5703)
+			sm5703_led_mode_ctrl(1);
+			if (flash_control_ready == false) {
+				sm5703_led_mode_ctrl(3);
+				flash_control_ready = true;
+			}
 #endif
 			break;
 		case AA_FLASHMODE_START: /*Pre flash mode*/
@@ -517,13 +532,24 @@ static void fimc_is_group_set_torch(struct fimc_is_group *group,
 			lm3560_reg_update_export(0xE0, 0xFF, 0xEF);
 #elif defined(CONFIG_LEDS_SKY81296)
 			sky81296_torch_ctrl(1);
+#elif defined(CONFIG_FLED_SM5703)
+			sm5703_led_mode_ctrl(1);
+			if (flash_control_ready == false) {
+				sm5703_led_mode_ctrl(3);
+				flash_control_ready = true;
+			}
 #endif
 			break;
 		case AA_FLASHMODE_CAPTURE: /*Main flash mode*/
+#if defined(CONFIG_FLED_SM5703)
+			sm5703_led_mode_ctrl(2);
+#endif
 			break;
 		case AA_FLASHMODE_OFF: /*OFF mode*/
 #ifdef CONFIG_LEDS_SKY81296
 			sky81296_torch_ctrl(0);
+#elif defined(CONFIG_FLED_SM5703)
+			sm5703_led_mode_ctrl(0);
 #endif
 			break;
 		default:
@@ -863,6 +889,13 @@ int fimc_is_group_close(struct fimc_is_groupmgr *groupmgr,
 	BUG_ON(!group);
 	BUG_ON(group->instance >= FIMC_IS_MAX_NODES);
 	BUG_ON(group->id >= GROUP_ID_MAX);
+
+#if defined(CONFIG_FLED_SM5703)
+	if (flash_control_ready == true) {
+		sm5703_led_mode_ctrl(4);
+		flash_control_ready = false;
+	}
+#endif
 
 	refcount = atomic_read(&groupmgr->group_refcount[group->id]);
 

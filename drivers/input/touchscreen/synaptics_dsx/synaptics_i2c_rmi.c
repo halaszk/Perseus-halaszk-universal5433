@@ -842,6 +842,7 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 	int y;
 	int wx;
 	int wy;
+	int x_y_tmp;
 	struct synaptics_rmi4_f12_extra_data *extra_data;
 	struct synaptics_rmi4_f12_finger_data *data;
 	struct synaptics_rmi4_f12_finger_data *finger_data;
@@ -960,6 +961,14 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 				x = rmi4_data->sensor_max_x - x;
 			if (rmi4_data->board->y_flip)
 				y = rmi4_data->sensor_max_y - y;
+			if (rmi4_data->board->x_y_chnage) {
+				x_y_tmp = x;
+				x = y;
+				y = x_y_tmp;
+			}
+			if (rmi4_data->board->x_offset) {
+				x = x - rmi4_data->board->x_offset;
+			}
 
 			input_report_key(rmi4_data->input_dev,
 					BTN_TOUCH, finger_status == OBJECT_HOVER ? 0 : 1);
@@ -1859,6 +1868,10 @@ static int synaptics_rmi4_f12_obj_report_enable(struct synaptics_rmi4_data *rmi4
 			"%s: write fail[%d]\n",
 			__func__, retval);
 
+	tsp_debug_info(true, &rmi4_data->i2c_client->dev, "%s: [0x%02X], Glove mode %s\n",
+				__func__, rmi4_data->f12.obj_report_enable,
+				(rmi4_data->f12.obj_report_enable & OBJ_TYPE_GLOVE) ? "enabled" : "disabled");
+
 	return retval;
 }
 
@@ -1908,6 +1921,17 @@ static int synaptics_rmi4_f12_set_init(struct synaptics_rmi4_data *rmi4_data)
 	}
 
 #ifdef GLOVE_MODE
+	if(rmi4_data->f12.obj_report_enable == 0) {
+		retval = synaptics_rmi4_i2c_read(rmi4_data,
+						rmi4_data->f12.ctrl23_addr,
+						&rmi4_data->f12.obj_report_enable,
+						sizeof(rmi4_data->f12.obj_report_enable));
+
+		tsp_debug_info(true, &rmi4_data->i2c_client->dev,
+					"%s: obj_report_enable default val[0x%x]\n",
+					__func__, rmi4_data->f12.obj_report_enable);
+	}
+
 	retval = synaptics_rmi4_f12_obj_report_enable(rmi4_data);
 	if (retval < 0) {
 		tsp_debug_err(true, &rmi4_data->i2c_client->dev,
@@ -2103,8 +2127,14 @@ static int synaptics_rmi4_f12_init(struct synaptics_rmi4_data *rmi4_data,
 	rmi4_data->f12.ctrl26_addr = fhandler->full_addr.ctrl_base + ctrl_26_offset;
 	rmi4_data->f12.ctrl28_addr = fhandler->full_addr.ctrl_base + ctrl_28_offset;
 	rmi4_data->f12.glove_mode_feature = query_10.glove_mode_feature;
+#if defined(CONFIG_TOUCHSCREEN_CHAGALLVE)
+	if (rmi4_data->board->panel_revision == 1)
+		rmi4_data->f12.obj_report_enable = OBJ_TYPE_DEFAULT;
+	else
+		rmi4_data->f12.obj_report_enable = OBJ_TYPE_FINGER | OBJ_TYPE_UNCLASSIFIED;
+#endif
 	rmi4_data->f12.report_enable = RPT_DEFAULT;
-	rmi4_data->f12.obj_report_enable = OBJ_TYPE_DEFAULT;
+//	rmi4_data->f12.obj_report_enable = OBJ_TYPE_DEFAULT; /* depend on models */
 #ifdef REPORT_2D_Z
 	rmi4_data->f12.report_enable |= RPT_Z;
 #endif
@@ -3002,6 +3032,8 @@ static void	synaptics_init_product_info(struct synaptics_rmi4_data *rmi4_data)
 				__func__, rmi4_data->rmi4_mod_info.product_id_string);
 		} else if (strncmp(rmi4_data->rmi4_mod_info.product_id_string, "s5710", 5) == 0) {
 			tsp_debug_err(true, &rmi4_data->i2c_client->dev, "%s s5710 ic_reversion = 0x%x\n",__func__,rmi4_data->ic_revision_of_ic);
+		} else if (strncmp(rmi4_data->rmi4_mod_info.product_id_string, "s5707", 5) == 0) {
+			tsp_debug_err(true, &rmi4_data->i2c_client->dev, "%s s5707 ic_reversion = 0x%x\n",__func__,rmi4_data->ic_revision_of_ic);
 		} else {
 
 			tsp_debug_err(true, &rmi4_data->i2c_client->dev, "%s, Undefined IC revision: %s\n",
@@ -3413,10 +3445,10 @@ static int synaptics_rmi4_set_input_device(struct synaptics_rmi4_data *rmi4_data
 
 	input_set_abs_params(rmi4_data->input_dev,
 			ABS_MT_POSITION_X, 0,
-			rmi4_data->sensor_max_x, 0, 0);
+			rmi4_data->board->sensor_max_x, 0, 0);
 	input_set_abs_params(rmi4_data->input_dev,
 			ABS_MT_POSITION_Y, 0,
-			rmi4_data->sensor_max_y, 0, 0);
+			rmi4_data->board->sensor_max_y, 0, 0);
 #ifdef REPORT_2D_W
 #ifdef EDGE_SWIPE
 	input_set_abs_params(rmi4_data->input_dev,
@@ -3913,6 +3945,9 @@ static int synaptics_power_ctrl(void *data, bool on)
 		}
 
 		pinctrl_state = pinctrl_lookup_state(rmi4_data->pinctrl, "on_state");
+#if defined(CONFIG_TOUCHSCREEN_KLIMTVE)
+		gpio_direction_output(pdata->reset, 1);
+#endif
 	} else {
 		if (regulator_is_enabled(regulator_dvdd))
 			regulator_disable(regulator_dvdd);
@@ -3920,6 +3955,9 @@ static int synaptics_power_ctrl(void *data, bool on)
 			regulator_disable(regulator_avdd);
 
 		pinctrl_state = pinctrl_lookup_state(rmi4_data->pinctrl, "off_state");
+#if defined(CONFIG_TOUCHSCREEN_KLIMTVE)
+		gpio_direction_output(pdata->reset, 0);
+#endif
 	}
 
 	if (IS_ERR(pinctrl_state)) {
@@ -3958,6 +3996,20 @@ static int synaptics_parse_dt(struct i2c_client *client)
 	}
 	client->irq = gpio_to_irq(pdata->gpio);
 
+#if defined(CONFIG_TOUCHSCREEN_KLIMTVE)
+	pdata->reset = of_get_named_gpio(np, "synaptics,tsp_rst", 0);
+	if (gpio_is_valid(pdata->reset)) {
+		retval = gpio_request_one(pdata->reset, GPIOF_DIR_OUT, "synaptics,tsp_rst");
+		if (retval) {
+			tsp_debug_err(true, dev, "Unable to request tsp_rst [%d]\n", pdata->reset);
+			return -EINVAL;
+		}
+	} else {
+		tsp_debug_err(true, dev, "Failed to get reset gpio\n");
+		return -EINVAL;
+	}
+#endif
+
 	if (of_property_read_u32(np, "synaptics,irq_type", &pdata->irq_type)) {
 		tsp_debug_err(true, dev, "Failed to get irq_type property\n");
 		return -EINVAL;
@@ -3980,6 +4032,11 @@ static int synaptics_parse_dt(struct i2c_client *client)
 
 	pdata->x_flip = of_property_read_bool(np, "synaptics,x_flip");
 	pdata->y_flip = of_property_read_bool(np, "synaptics,y_flip");
+	pdata->x_y_chnage = of_property_read_bool(np, "synaptics,x_y_chnage");
+
+	if (of_property_read_u32(np, "synaptics,x_offset", &pdata->x_offset)) {
+		tsp_debug_info(true, dev, "Failed to get x_offset property\n");
+	}
 
 	if (of_property_read_string(np, "synaptics,regulator_dvdd", &pdata->regulator_dvdd)) {
 		tsp_debug_err(true, dev, "Failed to get regulator_dvdd name property\n");
@@ -4006,10 +4063,10 @@ static int synaptics_parse_dt(struct i2c_client *client)
 		tsp_debug_err(true, dev, "Failed to get device_num property\n");
 
 	tsp_debug_info(false, dev, "irq :%d, irq_type: 0x%04x, sensor_max[x,y]: [%d,%d], \
-								flip[x,y]:[%d,%d], num_of[rx,tx]: [%d,%d], max_width: %d, \
+								flip[x,y,x_y,x_offset]:[%d,%d,%d %d], num_of[rx,tx]: [%d,%d], max_width: %d, \
 								project/model_name: %s/%s, device_num: %d\n",
 			pdata->gpio, pdata->irq_type, pdata->sensor_max_x, pdata->sensor_max_y,
-			pdata->x_flip, pdata->y_flip, pdata->num_of_rx, pdata->num_of_tx,
+			pdata->x_flip, pdata->y_flip, pdata->x_y_chnage, pdata->x_offset, pdata->num_of_rx, pdata->num_of_tx,
 			pdata->max_touch_width, pdata->project_name, pdata->model_name,
 			pdata->device_num);
 

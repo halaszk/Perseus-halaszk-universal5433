@@ -45,7 +45,7 @@
 #define CHIPID          0
 #define DRIVER_NAME "fc8080_spi"
 
-u32 fc8080_spi;
+unsigned long fc8080_spi;
 static u8 tx_data[32] __cacheline_aligned;
 
 static DEFINE_MUTEX(lock);
@@ -150,7 +150,7 @@ static s32 spi_bulkwrite(HANDLE handle, u16 addr, u8 command, u8 *data,
 	return BBM_OK;
 }
 
-static s32 spi_dataread(HANDLE handle, u8 addr, u8 command, u8 *data,
+static s32 spi_dataread(HANDLE handle, u16 addr, u8 command, u8 *data,
 			u32 length)
 {
 	s32 res = BBM_OK;
@@ -171,11 +171,9 @@ static s32 spi_dataread(HANDLE handle, u8 addr, u8 command, u8 *data,
 	return BBM_OK;
 }
 
-s32 fc8080_spi_init(HANDLE handle, u16 param1, u16 param2)
+s32 fc8080_spi_init(HANDLE handle, unsigned long param)
 {
-	fc8080_spi = param2;
-	fc8080_spi <<= 16;
-	fc8080_spi |= param1;
+	fc8080_spi = param;
 
 	DPRINTK("%s : 0x%p\n", __func__, (struct spi_device *)fc8080_spi);
 

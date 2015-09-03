@@ -31,7 +31,7 @@
 extern "C" {
 #endif
 
-extern s32 fc8080_spi_init(HANDLE handle, u16 param1, u16 param2);
+extern s32 fc8080_spi_init(HANDLE handle, unsigned long param);
 extern s32 fc8080_spi_byteread(HANDLE handle, u16 addr, u8 *data);
 extern s32 fc8080_spi_wordread(HANDLE handle, u16 addr, u16 *data);
 extern s32 fc8080_spi_longread(HANDLE handle, u16 addr, u32 *data);

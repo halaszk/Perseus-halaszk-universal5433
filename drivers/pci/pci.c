@@ -197,7 +197,7 @@ static int __pci_bus_find_cap_start(struct pci_bus *bus,
 }
 
 /**
- * pci_find_capability - query for devices' capabilities 
+ * pci_find_capability - query for devices' capabilities
  * @dev: PCI device to query
  * @cap: capability code
  *
@@ -206,12 +206,12 @@ static int __pci_bus_find_cap_start(struct pci_bus *bus,
  * device's PCI configuration space or 0 in case the device does not
  * support it.  Possible values for @cap:
  *
- *  %PCI_CAP_ID_PM           Power Management 
- *  %PCI_CAP_ID_AGP          Accelerated Graphics Port 
- *  %PCI_CAP_ID_VPD          Vital Product Data 
- *  %PCI_CAP_ID_SLOTID       Slot Identification 
+ *  %PCI_CAP_ID_PM           Power Management
+ *  %PCI_CAP_ID_AGP          Accelerated Graphics Port
+ *  %PCI_CAP_ID_VPD          Vital Product Data
+ *  %PCI_CAP_ID_SLOTID       Slot Identification
  *  %PCI_CAP_ID_MSI          Message Signalled Interrupts
- *  %PCI_CAP_ID_CHSWP        CompactPCI HotSwap 
+ *  %PCI_CAP_ID_CHSWP        CompactPCI HotSwap
  *  %PCI_CAP_ID_PCIX         PCI-X
  *  %PCI_CAP_ID_EXP          PCI Express
  */
@@ -227,13 +227,13 @@ int pci_find_capability(struct pci_dev *dev, int cap)
 }
 
 /**
- * pci_bus_find_capability - query for devices' capabilities 
+ * pci_bus_find_capability - query for devices' capabilities
  * @bus:   the PCI bus to query
  * @devfn: PCI device to query
  * @cap:   capability code
  *
  * Like pci_find_capability() but works for pci devices that do not have a
- * pci_dev structure set up yet. 
+ * pci_dev structure set up yet.
  *
  * Returns the address of the requested capability structure within the
  * device's PCI configuration space or 0 in case the device does not
@@ -500,6 +500,7 @@ static inline int platform_pci_run_wake(struct pci_dev *dev, bool enable)
  */
 static int pci_raw_set_power_state(struct pci_dev *dev, pci_power_t state)
 {
+	u32 device_vendor_id;
 	u16 pmcsr;
 	bool need_restore = false;
 
@@ -514,7 +515,7 @@ static int pci_raw_set_power_state(struct pci_dev *dev, pci_power_t state)
 		return -EINVAL;
 
 	/* Validate current state:
-	 * Can enter D0 from any state, but if we can only go deeper 
+	 * Can enter D0 from any state, but if we can only go deeper
 	 * to sleep if we're already in a low power state
 	 */
 	if (state != PCI_D0 && dev->current_state <= PCI_D3cold
@@ -568,6 +569,9 @@ static int pci_raw_set_power_state(struct pci_dev *dev, pci_power_t state)
 
 	pci_read_config_word(dev, dev->pm_cap + PCI_PM_CTRL, &pmcsr);
 	dev_info(&dev->dev, "[debug] pmcsr reg : %x dev->current_state : %d\n", pmcsr, dev->current_state);
+
+	pci_read_config_dword(dev, 0x0, &device_vendor_id);
+	dev_info(&dev->dev, "[debug] device_vendor_id reg : %x\n", device_vendor_id);
 
 	dev->current_state = (pmcsr & PCI_PM_CTRL_STATE_MASK);
 	if (dev->current_state != state && printk_ratelimit())

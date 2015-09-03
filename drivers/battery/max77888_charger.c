@@ -43,6 +43,7 @@ struct max77888_charger_data {
 	/* mutex */
 	struct mutex irq_lock;
 	struct mutex ops_lock;
+	struct mutex chg_lock;
 
 	struct wake_lock chgin_wake_lock;
 	struct wake_lock bypass_wake_lock;
@@ -878,6 +879,7 @@ static int max77888_chg_set_property(struct power_supply *psy,
 {
 	struct max77888_charger_data *charger =
 		container_of(psy, struct max77888_charger_data, psy_chg);
+	static int prev_cable_type = POWER_SUPPLY_TYPE_BATTERY;
 	union power_supply_propval value;
 	int set_charging_current, set_charging_current_max;
 	const int usb_charging_current = charger->pdata->charging_current[
@@ -921,6 +923,7 @@ static int max77888_chg_set_property(struct power_supply *psy,
 			break;
 		}
 
+		mutex_lock(&charger->chg_lock);
 		charger->cable_type = val->intval;
 		psy_do_property("battery", get,
 				POWER_SUPPLY_PROP_HEALTH, value);
@@ -950,6 +953,13 @@ static int max77888_chg_set_property(struct power_supply *psy,
 					     | CHG_CNFG_00_BOOST_MASK
 					     | CHG_CNFG_00_WDTEN_MASK
 					     | CHG_CNFG_00_DIS_MUIC_CTRL_MASK));
+		} else if (val->intval == POWER_SUPPLY_TYPE_MDOCK_TA &&
+			prev_cable_type == POWER_SUPPLY_TYPE_SMART_OTG) {
+			pr_info("%s: skip current control(Now:%d, Prev:%d)\n",
+				__func__, charger->cable_type, prev_cable_type);
+			prev_cable_type = charger->cable_type;
+			mutex_unlock(&charger->chg_lock);
+			break;
 		} else {
 			charger->is_charging = true;
 			charger->charging_current_max =
@@ -1023,6 +1033,8 @@ static int max77888_chg_set_property(struct power_supply *psy,
 				charger->pdata->charging_current[
 				val->intval].full_check_current_2nd);
 		}
+		prev_cable_type = charger->cable_type;
+		mutex_unlock(&charger->chg_lock);
 		break;
 	/* val->intval : input charging current */
 	case POWER_SUPPLY_PROP_CURRENT_MAX:
@@ -1545,6 +1557,7 @@ static __devinit int max77888_charger_probe(struct platform_device *pdev)
 	charger->psy_chg.num_properties = ARRAY_SIZE(max77888_charger_props);
 
 	mutex_init(&charger->ops_lock);
+	mutex_init(&charger->chg_lock);
 /*
 	if (charger->pdata->chg_gpio_init) {
 		if (!charger->pdata->chg_gpio_init()) {
@@ -1629,6 +1642,7 @@ err_irq:
 err_power_supply_register:
 	destroy_workqueue(charger->wqueue);
 err_init:
+	mutex_destroy(&charger->chg_lock);
 	mutex_destroy(&charger->ops_lock);
 err_free:
 	kfree(charger);

@@ -1792,7 +1792,7 @@ static void sii8240_setup_charging(struct sii8240_data *sii8240)
 		* connected through the cable*/
 		if (pow == 1) {
 			/*Powered dongle*/
-			if (sii8240->pdata->sii8240_muic_cb && !(sii8240->muic_smartdock))
+			if (sii8240->pdata->sii8240_muic_cb)
 				sii8240->pdata->sii8240_muic_cb(false, plim);
 			}
 	} else if ((peer_devcap[MHL_DEVCAP_MHL_VERSION] & 0xF0) == 0x10) {
@@ -1801,8 +1801,7 @@ static void sii8240_setup_charging(struct sii8240_data *sii8240)
 
 		pr_info("sii8240:%s adopter id:%d, reserved:%d\n", __func__,
 				adopter_id, peer_devcap[MHL_DEVCAP_RESERVED]);
-		if (adopter_id == 321 && peer_devcap[MHL_DEVCAP_RESERVED] == 2 &&
-				!(sii8240->muic_smartdock))
+		if (adopter_id == 321 && peer_devcap[MHL_DEVCAP_RESERVED] == 2)
 			sii8240->pdata->sii8240_muic_cb(false, 0x1);
 	} else {
 		pr_err("sii8240:%s MHL version error - 0x%X\n", __func__,
@@ -2657,14 +2656,18 @@ static int sii8240_detection_callback(struct notifier_block *this,
 							mhl_nb);
 	muic_attached_dev_t attached_dev = *(muic_attached_dev_t *)data;
 	int handled = MHL_CON_UNHANDLED;
-	sii8240->muic_smartdock = false;
 
 	pr_info("sii8240: muic event: %ld, att_dev: %d\n", event, attached_dev);
 	switch (attached_dev) {
 	case ATTACHED_DEV_SMARTDOCK_TA_MUIC:
 	case ATTACHED_DEV_SMARTDOCK_USB_MUIC:
-		sii8240->muic_smartdock = true;
+		sii8240->pdata->mhl_muic_type = MHL_SMART_DOCK;
+		break;
+	case ATTACHED_DEV_UNIVERSAL_MMDOCK_MUIC:
+		sii8240->pdata->mhl_muic_type = MHL_MM_DOCK;
+		break;
 	case ATTACHED_DEV_MHL_MUIC:
+		sii8240->pdata->mhl_muic_type = MHL_MUIC_DEV;
 		break;
 	default:
 		return MHL_CON_UNHANDLED;
@@ -2683,7 +2686,7 @@ static int sii8240_detection_callback(struct notifier_block *this,
 	} else {
 		pr_info("sii8240:disconnection\n");
 		/* Charging stop when MHL detach */
-		if (sii8240->pdata->sii8240_muic_cb && !(sii8240->muic_smartdock))
+		if (sii8240->pdata->sii8240_muic_cb)
 			sii8240->pdata->sii8240_muic_cb(false, -1);
 		wake_unlock(&sii8240->mhl_wake_lock);
 		mutex_lock(&sii8240->lock);
@@ -2861,8 +2864,7 @@ static int sii8240_msc_irq_handler(struct sii8240_data *sii8240, u8 intr)
 			}
 			if (sii8240->mhl_event_switch.state == 1) {
 				pr_info("sii8240: MHL switch event sent :0\n");
-				switch_set_state(&sii8240->mhl_event_switch,
-				0);
+				switch_set_state(&sii8240->mhl_event_switch, 0);
 			}
 		}
 	}
@@ -3556,7 +3558,7 @@ static irqreturn_t sii8240_irq_thread(int irq, void *data)
 		if (sii8240->state == STATE_MHL_CONNECTED) {
 			pr_info("sii8240: mhl connected\n");
 			msleep(30);
-			if (sii8240->pdata->sii8240_muic_cb && !(sii8240->muic_smartdock))
+			if (sii8240->pdata->sii8240_muic_cb)
 				sii8240->pdata->sii8240_muic_cb(true, 0x3);
 			ret = sii8240_init_regs(sii8240);
 			if (ret < 0) {
@@ -3583,7 +3585,7 @@ static irqreturn_t sii8240_irq_thread(int irq, void *data)
 			}
 			/* If there is VBUS, charging start */
 			if (check_vbus_present()) {
-				if (sii8240->pdata->sii8240_muic_cb && !(sii8240->muic_smartdock))
+				if (sii8240->pdata->sii8240_muic_cb)
 					sii8240->pdata->sii8240_muic_cb(false, 0x3);
 			}
 			queue_work(sii8240->cbus_cmd_wqs,
@@ -3606,7 +3608,7 @@ static irqreturn_t sii8240_irq_thread(int irq, void *data)
 			/* CTS 3.3.5.2 */
 			/* OTG should turn off when discovery fail */
 			if (sii8240->pdata->charging_type == POWER_SUPPLY_TYPE_OTG) {
-				if (sii8240->pdata->sii8240_muic_cb && !(sii8240->muic_smartdock))
+				if (sii8240->pdata->sii8240_muic_cb)
 					sii8240->pdata->sii8240_muic_cb(false, -1);
 			}
 			queue_work(sii8240->cbus_cmd_wqs,
@@ -3624,7 +3626,7 @@ static irqreturn_t sii8240_irq_thread(int irq, void *data)
 		/*checking of cbus disconnection*/
 		if (intr1 & BIT_INTR4_CBUS_DISCONNECT) {
 			if (sii8240->pdata->charging_type == POWER_SUPPLY_TYPE_OTG) {
-				if (sii8240->pdata->sii8240_muic_cb && !(sii8240->muic_smartdock))
+				if (sii8240->pdata->sii8240_muic_cb)
 					sii8240->pdata->sii8240_muic_cb(false, -1);
 			}
 
@@ -4123,7 +4125,7 @@ static int __devinit of_sii8240_probe_dt(struct i2c_client *client,
 	}
 #ifdef CONFIG_MUIC_NOTIFIER
 	queue_delayed_work(system_nrt_wq,
-		&g_sii8240->notifier_register_work, msecs_to_jiffies(20000));
+		&g_sii8240->notifier_register_work, msecs_to_jiffies(5000));
 #endif /* CONFIG_MUIC_NOTIFIER */
 	return 0;
 }

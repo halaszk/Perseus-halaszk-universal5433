@@ -1550,6 +1550,13 @@ config PTRACK_DEBUG
 	 PTRACK tracks page allocation.
 	 This option affects on booting time & running time.
 
+config BUFFERED_PTRACK
+	default n
+	bool "Enable Buffered Prack debugging"
+	depends on PTRACK_DEBUG
+	help
+	 BUFFERED_PTRACK has several latest ptrack of a page.
+
 config COMPAT_BRK
 	bool "Disable heap randomization"
 	default y

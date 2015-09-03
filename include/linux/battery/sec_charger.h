@@ -53,6 +53,8 @@
 #include <linux/battery/charger/max77693_charger.h>
 #elif defined(CONFIG_CHARGER_NCP1851)
 #include <linux/battery/charger/ncp1851_charger.h>
+#elif defined(CONFIG_CHARGER_RT5033)
+#include <linux/battery/charger/rt5033_charger.h>
 #endif
 
 enum {

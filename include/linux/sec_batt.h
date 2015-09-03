@@ -22,6 +22,7 @@ extern sec_battery_platform_data_t sec_battery_pdata;
 #endif
 
 extern unsigned int lpcharge;
+extern int fg_reset;
 
 void exynos5_universal5430_pmic_init(void);
 void exynos5_universal5430_power_init(void);

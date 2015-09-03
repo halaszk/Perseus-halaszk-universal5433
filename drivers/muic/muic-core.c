@@ -31,6 +31,9 @@
 #elif defined(CONFIG_MFD_MAX77843)
 #include <linux/mfd/max77843.h>
 #include <linux/mfd/max77843-private.h>
+#elif defined(CONFIG_MFD_MAX77849)
+#include <linux/mfd/max77849.h>
+#include <linux/mfd/max77849-private.h>
 #elif defined(CONFIG_MFD_MAX77888)
 #include <linux/mfd/max77888.h>
 #include <linux/mfd/max77888-private.h>

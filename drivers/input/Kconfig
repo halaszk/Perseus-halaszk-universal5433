@@ -194,6 +194,18 @@ config HALL
 	help
 	  Enable Hall Feature
 
+config CERTIFY_HALL
+	tristate "Enable CERTIFY HALL"
+	default n
+	help
+	  Enable Certify Hall Feature
+
+config HALL_ACCESSORY
+	bool "Enable HALL ACCESSORY"
+	default n
+	help
+	  Enable Hall Accessory Feature
+
 config SENSORS_HALL_IRQ_CTRL
 	bool "SENSORS_HALL_IRQ_CTRL"
 	depends on !SEC_FACTORY

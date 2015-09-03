@@ -379,7 +379,7 @@ static struct v4l2_queryctrl controls[] = {
 		.type = V4L2_CTRL_TYPE_INTEGER,
 		.name = "QoS ratio value",
 		.minimum = 20,
-		.maximum = 200,
+		.maximum = 1000,
 		.step = 10,
 		.default_value = 100,
 	},
@@ -1430,6 +1430,7 @@ static int vidioc_s_fmt_vid_out_mplane(struct file *file, void *priv,
 		spin_lock_irq(&dev->condlock);
 		set_bit(ctx->num, &dev->ctx_work_bits);
 		spin_unlock_irq(&dev->condlock);
+		s5p_mfc_clean_ctx_int_flags(ctx);
 		s5p_mfc_try_run(dev);
 		/* Wait until instance is returned or timeout occured */
 		if (s5p_mfc_wait_for_done_ctx(ctx,
@@ -1490,6 +1491,7 @@ static int vidioc_s_fmt_vid_out_mplane(struct file *file, void *priv,
 	spin_lock_irq(&dev->condlock);
 	set_bit(ctx->num, &dev->ctx_work_bits);
 	spin_unlock_irq(&dev->condlock);
+	s5p_mfc_clean_ctx_int_flags(ctx);
 	s5p_mfc_try_run(dev);
 	if (s5p_mfc_wait_for_done_ctx(ctx,
 			S5P_FIMV_R2H_CMD_OPEN_INSTANCE_RET)) {
@@ -2145,6 +2147,9 @@ static int vidioc_s_ctrl(struct file *file, void *priv,
 		dec->is_dual_dpb = ctrl->value;
 		break;
 	case V4L2_CID_MPEG_VIDEO_QOS_RATIO:
+		if (ctrl->value > 150)
+			ctrl->value = 1000;
+		mfc_info_ctx("set %d qos_ratio.\n", ctrl->value);
 		ctx->qos_ratio = ctrl->value;
 		break;
 	case V4L2_CID_MPEG_MFC_SET_DYNAMIC_DPB_MODE:
@@ -2704,7 +2709,7 @@ static int s5p_mfc_stop_streaming(struct vb2_queue *q)
 	struct s5p_mfc_dev *dev;
 	int aborted = 0;
 	int index = 0;
-    int prev_state;
+	int prev_state;
 
 	if (!ctx) {
 		mfc_err("no mfc context to run\n");
@@ -2727,7 +2732,10 @@ static int s5p_mfc_stop_streaming(struct vb2_queue *q)
 				S5P_FIMV_R2H_CMD_FRAME_DONE_RET))
 			s5p_mfc_cleanup_timeout(ctx);
 
-		aborted = 1;
+		if (on_res_change(ctx))
+			mfc_debug(2, "stop on res change(state:%d)\n", ctx->state);
+		else
+			aborted = 1;
 	}
 
 	spin_lock_irqsave(&dev->irqlock, flags);
@@ -2750,6 +2758,7 @@ static int s5p_mfc_stop_streaming(struct vb2_queue *q)
 		dec->dpb_queue_cnt = 0;
 		dec->consumed = 0;
 		dec->remained_size = 0;
+		dec->y_addr_for_pb = 0;
 
 		while (index < MFC_MAX_BUFFERS) {
 			index = find_next_bit(&ctx->dst_ctrls_avail,
@@ -2789,6 +2798,7 @@ static int s5p_mfc_stop_streaming(struct vb2_queue *q)
 		spin_lock_irq(&dev->condlock);
 		set_bit(ctx->num, &dev->ctx_work_bits);
 		spin_unlock_irq(&dev->condlock);
+		s5p_mfc_clean_ctx_int_flags(ctx);
 		s5p_mfc_try_run(dev);
 		if (s5p_mfc_wait_for_done_ctx(ctx,
 				S5P_FIMV_R2H_CMD_DPB_FLUSH_RET))

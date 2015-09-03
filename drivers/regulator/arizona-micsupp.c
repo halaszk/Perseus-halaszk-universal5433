@@ -75,11 +75,13 @@ static int arizona_micsupp_list_voltage(struct regulator_dev *rdev,
 	struct arizona_micsupp *micsupp = rdev_get_drvdata(rdev);
 
 	switch (micsupp->arizona->type) {
-		case WM8280:
-		case WM5110:
-			return arizona_micsupp_ext_sel_to_voltage(selector);
-		default:
+		case WM5102:
+		case WM8997:
+		case WM8998:
+		case WM1814:
 			return arizona_micsupp_sel_to_voltage(selector);
+		default:
+			return arizona_micsupp_ext_sel_to_voltage(selector);
 	}
 }
 
@@ -100,13 +102,17 @@ static void arizona_micsupp_check_cp(struct work_struct *work)
 	}
 
 	if (dapm) {
-		mutex_lock(&dapm->card->dapm_mutex);
+		mutex_lock_nested(&dapm->card->dapm_mutex,
+				  SND_SOC_DAPM_CLASS_RUNTIME);
 
 		if ((reg & (ARIZONA_CPMIC_ENA | ARIZONA_CPMIC_BYPASS)) ==
-		    ARIZONA_CPMIC_ENA)
+		    ARIZONA_CPMIC_ENA) {
 			snd_soc_dapm_force_enable_pin(dapm, "MICSUPP");
-		else
+			arizona->micvdd_regulated = true;
+		} else {
 			snd_soc_dapm_disable_pin(dapm, "MICSUPP");
+			arizona->micvdd_regulated = false;
+		}
 
 		mutex_unlock(&dapm->card->dapm_mutex);
 
@@ -278,14 +284,16 @@ static int arizona_micsupp_probe(struct platform_device *pdev)
 	 * platform data if provided.
 	 */
 	switch (arizona->type) {
-	case WM8280:
-	case WM5110:
-		desc = &arizona_micsupp_ext;
-		micsupp->init_data = arizona_micsupp_ext_default;
-		break;
-	default:
+	case WM5102:
+	case WM8997:
+	case WM8998:
+	case WM1814:
 		desc = &arizona_micsupp;
 		micsupp->init_data = arizona_micsupp_default;
+		break;
+	default:
+		desc = &arizona_micsupp_ext;
+		micsupp->init_data = arizona_micsupp_ext_default;
 		break;
 	}
 	micsupp->init_data.consumer_supplies = &micsupp->supply;
@@ -314,14 +322,15 @@ static int arizona_micsupp_probe(struct platform_device *pdev)
 			   ARIZONA_CPMIC_BYPASS, 0);
 
 	micsupp->regulator = regulator_register(desc, &config);
+
+	of_node_put(config.of_node);
+
 	if (IS_ERR(micsupp->regulator)) {
 		ret = PTR_ERR(micsupp->regulator);
 		dev_err(arizona->dev, "Failed to register mic supply: %d\n",
 			ret);
 		return ret;
 	}
-
-	of_node_put(config.of_node);
 
 	platform_set_drvdata(pdev, micsupp);
 

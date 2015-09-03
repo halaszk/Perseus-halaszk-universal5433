@@ -27,7 +27,10 @@
 #include "modem_prj.h"
 #include "modem_utils.h"
 
-#ifdef DEBUG_MODEM_IF
+static unsigned long cp_hold_time = CP_HOLD_TIME;
+module_param(cp_hold_time, ulong, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(cp_hold_time, "modem_v1 pm cp_hold_time");
+
 static inline void print_pm_event(struct modem_link_pm *pm, enum pm_event event)
 {
 	int cp2ap_wakeup;
@@ -76,7 +79,6 @@ static inline void print_pm_fsm(struct modem_link_pm *pm)
 		wdog->msg[0] = 0;
 	}
 }
-#endif
 
 static void pm_wdog_bark(unsigned long data);
 
@@ -133,7 +135,7 @@ static inline void schedule_cp_free(struct modem_link_pm *pm)
 		return;
 
 	queue_delayed_work(pm->wq, &pm->cp_free_dwork,
-			   msecs_to_jiffies(CP_HOLD_TIME));
+			   msecs_to_jiffies(cp_hold_time));
 }
 
 static inline void cancel_cp_free(struct modem_link_pm *pm)
@@ -173,11 +175,9 @@ static inline void stop_pm_wdog(struct modem_link_pm *pm, enum pm_state state,
 		if (timer_pending(timer))
 			del_timer(timer);
 
-#ifdef DEBUG_MODEM_IF
 		mif_debug("%s: PM WDOG kicked by {%s@%s}\n",
 			pm->link_name, pm_event2str(event),
 			pm_state2str(state));
-#endif
 	} else {
 		mif_err("%s: ERR! PM WDOG illegal state {%s@%s}\n",
 			pm->link_name, pm_event2str(event),
@@ -359,7 +359,11 @@ static inline void check_pm_fail(struct modem_link_pm *pm,
 		break;
 
 	case PM_STATE_AP_FAIL:
+#ifdef CONFIG_SEC_MODEM_DEBUG
 		panic("%s: PM_STATE_AP_FAIL\n", pm->link_name);
+#else
+		handle_cp_fail(pm);
+#endif
 		break;
 
 	default:
@@ -487,11 +491,7 @@ static void run_pm_fsm(struct modem_link_pm *pm, enum pm_event event)
 		} else if (event == PM_EVENT_WDOG_TIMEOUT) {
 			n_state = PM_STATE_WDOG_TIMEOUT;
 		} else if (event == PM_EVENT_CP2AP_WAKEUP_LOW) {
-#if 0
 			n_state = PM_STATE_CP_FAIL;
-#else
-			n_state = PM_STATE_AP_FAIL;
-#endif
 		}
 		break;
 
@@ -523,6 +523,7 @@ static void run_pm_fsm(struct modem_link_pm *pm, enum pm_event event)
 			*/
 			if (!gpio_get_value(pm->gpio_cp2ap_wakeup)) {
 				n_state = PM_STATE_CP_FREE;
+				pm->hold_requested = false;
 				release_ap2cp_wakeup(pm);
 			} else {
 				n_state = PM_STATE_ACTIVE;
@@ -613,9 +614,7 @@ static void run_pm_fsm(struct modem_link_pm *pm, enum pm_event event)
 
 	set_pm_fsm(pm, c_state, n_state, event);
 
-#ifdef DEBUG_MODEM_IF
 	print_pm_fsm(pm);
-#endif
 
 	decide_pm_wake(pm, c_state, n_state);
 
@@ -826,9 +825,7 @@ static void start_link_pm(struct modem_link_pm *pm, enum pm_event event)
 
 	pm->active = true;
 
-#ifdef DEBUG_MODEM_IF
 	print_pm_fsm(pm);
-#endif
 
 exit:
 	spin_unlock_irqrestore(&pm->lock, flags);
@@ -858,9 +855,7 @@ static void stop_link_pm(struct modem_link_pm *pm)
 	state = pm->fsm.state;
 	event = PM_EVENT_STOP_PM;
 	set_pm_fsm(pm, state, PM_STATE_UNMOUNTED, event);
-#ifdef DEBUG_MODEM_IF
 	print_pm_event(pm, event);
-#endif
 
 exit:
 	spin_unlock_irqrestore(&pm->lock, flags);

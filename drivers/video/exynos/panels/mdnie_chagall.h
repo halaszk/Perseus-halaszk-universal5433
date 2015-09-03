@@ -71,10 +71,10 @@ enum hmt_mode {
 
 enum MDNIE_CMD {
 #if defined(MDNIE_LITE)
-	LEVEL1_KEY_UNLOCK,
+	LEVEL_KEY_UNLOCK,
 	MDNIE_CMD1,
 	MDNIE_CMD2,
-	LEVEL1_KEY_LOCK,
+	LEVEL_KEY_LOCK,
 	MDNIE_CMD_MAX,
 #else
 	MDNIE_CMD1,
@@ -83,25 +83,25 @@ enum MDNIE_CMD {
 #endif
 };
 
-struct mdnie_command {
-	mdnie_t *sequence;
-	unsigned int size;
+struct mdnie_seq_info {
+	mdnie_t *cmd;
+	unsigned int len;
 	unsigned int sleep;
 };
 
 struct mdnie_table {
 	char *name;
-	struct mdnie_command tune[MDNIE_CMD_MAX];
+	struct mdnie_seq_info seq[MDNIE_CMD_MAX];
 };
 
 #define MDNIE_SET(id)	\
 {							\
 	.name		= #id,				\
-	.tune		= {				\
-		{	.sequence = LEVEL1_UNLOCK, .size = ARRAY_SIZE(LEVEL1_UNLOCK),	.sleep = 0,},	\
-		{	.sequence = id##_1, .size = ARRAY_SIZE(id##_1),			.sleep = 0,},	\
-		{	.sequence = id##_2, .size = ARRAY_SIZE(id##_2),			.sleep = 0,},	\
-		{	.sequence = LEVEL1_LOCK, .size = ARRAY_SIZE(LEVEL1_LOCK),	.sleep = 0,},	\
+	.seq		= {				\
+		{	.cmd = LEVEL_UNLOCK,	.len = ARRAY_SIZE(LEVEL_UNLOCK),	.sleep = 0,},	\
+		{	.cmd = id##_1,		.len = ARRAY_SIZE(id##_1),		.sleep = 0,},	\
+		{	.cmd = id##_2,		.len = ARRAY_SIZE(id##_2),		.sleep = 0,},	\
+		{	.cmd = LEVEL_LOCK,	.len = ARRAY_SIZE(LEVEL_LOCK),		.sleep = 0,},	\
 	}	\
 }
 

@@ -37,6 +37,12 @@
 #define COLD_VOLT_OFFSET	37500
 #define LIMIT_COLD_VOLTAGE	1250000
 
+#if defined(CONFIG_EXYNOS5430_FHD)
+#define MIN_COLD_VOLTAGE	(925000)
+#else
+#define MIN_COLD_VOLTAGE	(0)
+#endif
+
 #define CONSTRAINT_VOLT		900000
 
 enum devfreq_isp_idx {
@@ -335,6 +341,16 @@ struct devfreq_clk_state aclk_cam1_333_mfc_pll[] = {
 struct devfreq_clk_state aclk_cam1_333_bus_pll[] = {
 	{MOUT_ACLK_CAM1_333,	MOUT_BUS_PLL_USER},
 };
+#elif defined(CONFIG_EXYNOS5430_FHD)
+struct devfreq_clk_state mux_aclk_csis2_isp[] = {
+	{MOUT_ACLK_CSIS2_A,	MOUT_ACLK_CAM1_552_USER},
+	{MOUT_ACLK_CSIS2_B,	MOUT_ACLK_CSIS2_A},
+};
+
+struct devfreq_clk_state mux_aclk_lite_c_isp[] = {
+	{MOUT_ACLK_LITE_C_A,	MOUT_ACLK_CAM1_552_USER},
+	{MOUT_ACLK_LITE_C_B,	MOUT_ACLK_LITE_C_A},
+};
 #endif
 
 struct devfreq_clk_states sclk_lite_freecnt_c_list = {
@@ -456,6 +472,16 @@ struct devfreq_clk_states aclk_cam1_333_mfc_pll_list = {
 struct devfreq_clk_states aclk_cam1_333_bus_pll_list = {
 	.state = aclk_cam1_333_bus_pll,
 	.state_count = ARRAY_SIZE(aclk_cam1_333_bus_pll),
+};
+#elif defined(CONFIG_EXYNOS5430_FHD)
+struct devfreq_clk_states mux_aclk_csis2_isp_list = {
+	.state = mux_aclk_csis2_isp,
+	.state_count = ARRAY_SIZE(mux_aclk_csis2_isp),
+};
+
+struct devfreq_clk_states mux_aclk_lite_c_isp_list = {
+	.state = mux_aclk_lite_c_isp,
+	.state_count = ARRAY_SIZE(mux_aclk_lite_c_isp),
 };
 #endif
 
@@ -709,7 +735,19 @@ struct devfreq_clk_info aclk_3aa1[] = {
 	{LV5,	134000000,	0,	&aclk_3aa1_bus_pll_list},
 	{LV6,	 13000000,	0,	&aclk_3aa1_bus_pll_list},
 };
-#elif defined(CONFIG_EXYNOS5430_FHD) || defined(CONFIG_EXYNOS5430_WQHD)
+#elif defined(CONFIG_EXYNOS5430_FHD)
+struct devfreq_clk_info aclk_3aa1[] = {
+	{LV0,	552000000,	0,	NULL},
+	{LV1,	552000000,	0,	NULL},
+	{LV2,	552000000,	0,	NULL},
+	{LV3,	552000000,	0,	NULL},
+	{LV4,	552000000,	0,	NULL},
+	{LV5,	184000000,	0,	NULL},
+	{LV6,	184000000,	0,	NULL},
+	{LV7,	 92000000,	0,	NULL},
+	{LV8,	 79000000,	0,	NULL},
+};
+#elif defined(CONFIG_EXYNOS5430_WQHD)
 struct devfreq_clk_info aclk_3aa1[] = {
 	{LV0,	552000000,	0,	NULL},
 	{LV1,	552000000,	0,	NULL},
@@ -901,7 +939,19 @@ struct devfreq_clk_info aclk_csis2_333[] = {
 	{LV5,	 80000000,	0,	&mux_aclk_csis2_list},
 	{LV6,	 13000000,	0,	&mux_aclk_csis2_list},
 };
-#elif defined(CONFIG_EXYNOS5430_FHD) || defined(CONFIG_EXYNOS5430_WQHD)
+#elif defined(CONFIG_EXYNOS5430_FHD)
+struct devfreq_clk_info aclk_csis2_333[] = {
+	{LV0,	184000000,	0,	&mux_aclk_csis2_isp_list},
+	{LV1,	184000000,	0,	&mux_aclk_csis2_isp_list},
+	{LV2,	184000000,	0,	&mux_aclk_csis2_isp_list},
+	{LV3,	184000000,	0,	&mux_aclk_csis2_isp_list},
+	{LV4,	184000000,	0,	&mux_aclk_csis2_isp_list},
+	{LV5,	184000000,	0,	&mux_aclk_csis2_isp_list},
+	{LV6,	184000000,	0,	&mux_aclk_csis2_isp_list},
+	{LV7,	 80000000,	0,	&mux_aclk_csis2_list},
+	{LV8,	 80000000,	0,	&mux_aclk_csis2_list},
+};
+#elif defined(CONFIG_EXYNOS5430_WQHD)
 struct devfreq_clk_info aclk_csis2_333[] = {
 	{LV0,	 80000000,	0,	&mux_aclk_csis2_list},
 	{LV1,	 40000000,	0,	&mux_aclk_csis2_list},
@@ -929,7 +979,19 @@ struct devfreq_clk_info aclk_lite_c[] = {
 	{LV5,	 80000000,	0,	&mux_aclk_lite_c_list},
 	{LV6,	 13000000,	0,	&mux_aclk_lite_c_list},
 };
-#elif defined(CONFIG_EXYNOS5430_FHD) || defined(CONFIG_EXYNOS5430_WQHD)
+#elif defined(CONFIG_EXYNOS5430_FHD)
+struct devfreq_clk_info aclk_lite_c[] = {
+	{LV0,	184000000,	0,	&mux_aclk_lite_c_isp_list},
+	{LV1,	184000000,	0,	&mux_aclk_lite_c_isp_list},
+	{LV2,	184000000,	0,	&mux_aclk_lite_c_isp_list},
+	{LV3,	184000000,	0,	&mux_aclk_lite_c_isp_list},
+	{LV4,	184000000,	0,	&mux_aclk_lite_c_isp_list},
+	{LV5,	184000000,	0,	&mux_aclk_lite_c_isp_list},
+	{LV6,	184000000,	0,	&mux_aclk_lite_c_isp_list},
+	{LV7,	 80000000,	0,	&mux_aclk_lite_c_list},
+	{LV8,	 80000000,	0,	&mux_aclk_lite_c_list},
+};
+#elif defined(CONFIG_EXYNOS5430_WQHD)
 struct devfreq_clk_info aclk_lite_c[] = {
 	{LV0,	 80000000,	0,	&mux_aclk_lite_c_list},
 	{LV1,	 40000000,	0,	&mux_aclk_lite_c_list},
@@ -1339,6 +1401,11 @@ static unsigned int get_limit_voltage(unsigned int voltage, unsigned int volt_of
 
 	if (voltage + volt_offset > LIMIT_COLD_VOLTAGE)
 		return LIMIT_COLD_VOLTAGE;
+
+#if defined(CONFIG_EXYNOS5430_FHD)
+	if (volt_offset && (voltage + volt_offset) < MIN_COLD_VOLTAGE)
+		return MIN_COLD_VOLTAGE;
+#endif
 
 	return voltage + volt_offset;
 }

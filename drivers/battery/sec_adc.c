@@ -49,6 +49,13 @@ static int sec_bat_adc_ap_read(int channel)
 		else
 			pr_debug("TEMP ADC(%d)\n", data);
 		break;
+	case SEC_BAT_ADC_CHANNEL_DISCHARGING_CHECK:
+		ret = iio_read_channel_raw(&temp_adc[2], &data);
+		if (ret < 0)
+			pr_info("read channel error[%d]\n", ret);
+		else
+			pr_debug("DISCHARGING CHECK(%d)\n", data);
+		break;
 	default:
 		break;
 	}

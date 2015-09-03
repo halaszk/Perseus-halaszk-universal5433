@@ -247,7 +247,8 @@ read_start:
 
 	dbg_log_event(ksb, "KS_READ", copied, 0);
 
-	if (!strcmp(ksb->id_info.name, "efs_hsic_bridge"))
+	if (!strcmp(ksb->id_info.name, "efs_hsic_bridge") &&
+		test_bit(USB_DEV_CONNECTED, &ksb->flags))
 		dev_err(ksb->device, "%s, count:%d space:%d copied:%d",
 				__func__, count, space, copied);
 #if 0

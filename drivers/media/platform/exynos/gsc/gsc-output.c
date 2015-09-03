@@ -32,7 +32,7 @@
 #include <media/v4l2-ioctl.h>
 
 #include "gsc-core.h"
-
+DEFINE_SPINLOCK(size_lock);
 int gsc_out_hw_reset_off(struct gsc_dev *gsc)
 {
 	gsc_hw_enable_localout(gsc->out.ctx, false);
@@ -56,13 +56,9 @@ void gsc_out_add_active_buf(struct gsc_dev *gsc)
 int gsc_out_hw_set(struct gsc_ctx *ctx)
 {
 	struct gsc_dev *gsc = ctx->gsc_dev;
+	struct exynos_platform_gscaler *pdata = gsc->pdata;
+	struct gsc_scaler *sc = &ctx->scaler;
 	int ret = 0;
-
-	ret = gsc_set_scaler_info(ctx);
-	if (ret) {
-		gsc_err("Scaler setup error");
-		return ret;
-	}
 
 	if (gsc->out.ctx->out_path == GSC_FIMD) {
 		gsc_hw_set_local_dst(gsc, GSC_FIMD, true);
@@ -81,18 +77,21 @@ int gsc_out_hw_set(struct gsc_ctx *ctx)
 	gsc_hw_set_freerun_clock_mode(gsc, false);
 
 	gsc_hw_set_input_path(ctx);
-	gsc_hw_set_in_size(ctx);
 	gsc_hw_set_in_image_format(ctx);
 
 	gsc_hw_set_output_path(ctx);
-	gsc_hw_set_out_size(ctx);
 	gsc_hw_set_out_image_format(ctx);
 
-	gsc_hw_set_prescaler(ctx);
-	gsc_hw_set_mainscaler(ctx);
-	gsc_hw_set_h_coef(ctx);
-	gsc_hw_set_v_coef(ctx);
 	gsc_hw_set_input_rotation(ctx);
+
+	if (ctx->gsc_ctrls.rotate->val &&
+		((sc->main_hratio > GSC_SC_UP_MAX_RATIO) ||
+		(sc->main_vratio > GSC_SC_UP_MAX_RATIO)))
+		gsc_pm_qos_ctrl(gsc, GSC_QOS_ON, pdata->mif_min_otf_rot,
+				pdata->int_min_otf);
+	else
+		gsc_pm_qos_ctrl(gsc, GSC_QOS_ON, pdata->mif_min,
+				pdata->int_min_otf);
 
 	gsc_hw_enable_localout(ctx, true);
 	ret = gsc_wait_operating(gsc);
@@ -229,6 +228,7 @@ static int gsc_subdev_set_crop(struct v4l2_subdev *sd,
 {
 	struct gsc_dev *gsc = entity_data_to_gsc(v4l2_get_subdevdata(sd));
 	struct gsc_ctx *ctx = gsc->out.ctx;
+	struct gsc_scaler *sc = &ctx->scaler;
 	struct v4l2_rect *r;
 	struct gsc_frame *f;
 
@@ -240,6 +240,8 @@ static int gsc_subdev_set_crop(struct v4l2_subdev *sd,
 		gsc_err("Sink pad set_fmt is not supported\n");
 		return 0;
 	}
+
+	spin_lock(&size_lock);
 
 	if (crop->which == V4L2_SUBDEV_FORMAT_TRY) {
 		r = v4l2_subdev_get_try_crop(fh, crop->pad);
@@ -260,25 +262,33 @@ static int gsc_subdev_set_crop(struct v4l2_subdev *sd,
 			ret = gsc_subdev_try_crop(gsc, &f->crop);
 			if (ret) {
 				gsc_err("Crop size error");
+				spin_unlock(&size_lock);
 				return ret;
 			}
 			ret = gsc_set_scaler_info(ctx);
 			if (ret) {
 				gsc_err("Scaler setup error");
+				spin_unlock(&size_lock);
 				return ret;
 			}
 			gsc_hw_set_in_size(ctx);
 			gsc_hw_set_out_size(ctx);
 			gsc_hw_set_prescaler(ctx);
 			gsc_hw_set_mainscaler(ctx);
-			gsc_hw_set_h_coef(ctx);
-			gsc_hw_set_v_coef(ctx);
+
+			if (sc->main_hratio_dirty)
+				gsc_hw_set_h_coef(ctx);
+			if (sc->main_vratio_dirty)
+				gsc_hw_set_v_coef(ctx);
+
 			gsc_hw_set_input_rotation(ctx);
 
 			gsc_hw_set_smart_if_pix_num(ctx);
 			gsc_hw_set_smart_if_con(gsc, true);
 		}
 	}
+
+	spin_unlock(&size_lock);
 
 	return 0;
 }
@@ -342,12 +352,13 @@ static long gsc_subdev_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg
 		gsc_out_add_active_buf(gsc);
 		if ((bool)arg)
 			gsc_hw_set_sfr_update(ctx);
-		gsc->out.wq_time[gsc->wq_cnt % 50] = sched_clock();
- 		gsc->wq_cnt++;
+		gsc->out.wq_time[gsc->out.wq_cnt % MAX_DEBUG_BUF_CNT] = sched_clock();
+		gsc->out.wq_cnt++;
 		break;
 
 	case GSC_WAIT_STOP:
 		gsc_wait_stop(gsc);
+		gsc_pm_qos_ctrl(gsc, GSC_QOS_OFF, 0, 0);
 		spin_lock_irqsave(&gsc->slock, flags);
 		if ((int)arg & FBINFO_MISC_ESD_DETECTED)
 			gsc_info("ST_OUTPUT_STREAMON is not cleared");
@@ -559,19 +570,6 @@ static int gsc_output_streamon(struct file *file, void *priv,
 		return PTR_ERR(sink_pad);
 	}
 
-	/*
-	 * This is for setting out_path when platform
-	 * missed link_setup function
-	 */
-	gsc->out.ctx->out_path = GSC_FIMD;
-
-	ret = media_entity_pipeline_start(&gsc->out.vfd->entity,
-					gsc->pipeline.pipe);
-	if (ret) {
-		gsc_err("media entity pipeline start fail");
-		return ret;
-	}
-
 	ret = vb2_streamon(&gsc->out.vbq, type);
 
 	return ret;
@@ -584,8 +582,6 @@ static int gsc_output_streamoff(struct file *file, void *priv,
 	int ret = 0;
 
 	ret = vb2_streamoff(&gsc->out.vbq, type);
-	if (!ret)
-		media_entity_pipeline_stop(&gsc->out.vfd->entity);
 
 	return ret;
 }
@@ -598,8 +594,8 @@ static int gsc_output_qbuf(struct file *file, void *priv,
 	int ret;
 
 	ret = vb2_qbuf(&out->vbq, buf);
-	gsc->out.q_time[gsc->q_cnt % 50] = sched_clock();
-	gsc->q_cnt++;
+	gsc->out.q_time[gsc->out.q_cnt % MAX_DEBUG_BUF_CNT] = sched_clock();
+	gsc->out.q_cnt++;
 
 	return ret;
 }
@@ -619,8 +615,8 @@ static int gsc_output_dqbuf(struct file *file, void *priv,
  
 	ret = vb2_dqbuf(vbq, buf, file->f_flags & O_NONBLOCK);
 
-	gsc->out.dq_time[gsc->dq_cnt % 50] = sched_clock();
-	gsc->dq_cnt++;
+	gsc->out.dq_time[gsc->out.dq_cnt % MAX_DEBUG_BUF_CNT] = sched_clock();
+	gsc->out.dq_cnt++;
 
 	return ret;
 }
@@ -671,9 +667,13 @@ static int gsc_output_s_crop(struct file *file, void *fh, struct v4l2_crop *cr)
 		return -EINVAL;
 	}
 
+	spin_lock(&size_lock);
+
 	ret = gsc_try_crop(ctx, cr);
-	if (ret)
+	if (ret) {
+		spin_unlock(&size_lock);
 		return ret;
+	}
 
 	f = &ctx->s_frame;
 
@@ -683,6 +683,8 @@ static int gsc_output_s_crop(struct file *file, void *fh, struct v4l2_crop *cr)
 	f->crop.top = cr->c.top;
 	f->crop.width  = cr->c.width;
 	f->crop.height = cr->c.height;
+
+	spin_unlock(&size_lock);
 
 	return 0;
 }
@@ -933,7 +935,6 @@ static int gsc_output_open(struct file *file)
 {
 	struct gsc_dev *gsc = video_drvdata(file);
 	int ret = v4l2_fh_open(file);
-	struct exynos_platform_gscaler *pdata = gsc->pdata;
 
 	if (ret)
 		return ret;
@@ -945,11 +946,11 @@ static int gsc_output_open(struct file *file)
 		return ret;
 	}
 
-	gsc_pm_qos_ctrl(gsc, GSC_QOS_ON, pdata->mif_min, pdata->int_min_otf);
 	/* Return if the corresponding mem2mem/output/capture video node
 	   is already opened. */
 	if (gsc_m2m_opened(gsc) || gsc_cap_opened(gsc) || gsc_out_opened(gsc)) {
-		gsc_err("G-Scaler%d has been opened already", gsc->id);
+		gsc_err("G-Scaler%d has been opened already, state : 0x%lx",
+				gsc->id, gsc->state);
 		return -EBUSY;
 	}
 
@@ -959,6 +960,8 @@ static int gsc_output_open(struct file *file)
 	}
 
 	set_bit(ST_OUTPUT_OPEN, &gsc->state);
+
+	gsc->out.ctx->out_path = GSC_FIMD;
 
 	ret = gsc_ctrls_create(gsc->out.ctx);
 	if (ret < 0) {
@@ -972,8 +975,10 @@ static int gsc_output_open(struct file *file)
 
 	bts_otf_initialize(gsc->id, true);
 
-	gsc->q_cnt = gsc->dq_cnt = gsc->isr_cnt = gsc->wq_cnt = 0;
-	gsc->real_isr_cnt = 0;
+	gsc->out.q_cnt = gsc->out.dq_cnt = gsc->out.isr_cnt = gsc->out.wq_cnt = 0;
+	gsc->out.real_isr_cnt = 0;
+	gsc->out.ctx->scaler.main_hratio = 0;
+	gsc->out.ctx->scaler.main_vratio = 0;
 
 	return ret;
 }
@@ -995,11 +1000,10 @@ static int gsc_output_close(struct file *file)
 
 	if (test_bit(ST_OUTPUT_STREAMON, &gsc->state)) {
 		gsc_info("driver is closed by force");
-		media_entity_pipeline_stop(&gsc->out.vfd->entity);
 		gsc_ctx_state_lock_clear(GSC_SRC_FMT | GSC_DST_FMT |
 				GSC_DST_CROP, gsc->out.ctx);
 
-		ret = v4l2_subdev_call(gsc->pipeline.disp, core, ioctl,
+		ret = v4l2_subdev_call(gsc->mdev[MDEV_OUTPUT]->decon_sd, core, ioctl,
 				S3CFB_FLUSH_WORKQUEUE, NULL);
 		if (ret) {
 			gsc_err("Decon subdev ioctl failed");
@@ -1021,11 +1025,12 @@ static int gsc_output_close(struct file *file)
 	gsc_ctrls_delete(gsc->out.ctx);
 	v4l2_fh_release(file);
 
-	gsc_pm_qos_ctrl(gsc, GSC_QOS_OFF, 0, 0);
 	bts_otf_initialize(gsc->id, false);
 	pm_runtime_put_sync(&gsc->pdev->dev);
 
 	clear_bit(ST_OUTPUT_OPEN, &gsc->state);
+
+	gsc->out.ctx->out_path = 0;
 
 	return 0;
 }

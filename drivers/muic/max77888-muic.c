@@ -89,7 +89,8 @@ struct max77888_muic_data {
 	bool				rustproof_inbat;
 
 	/* muic path status value (suspend/resume) for rustproof */
-	u8 path_status;
+	u8				path_status;
+	muic_attached_dev_t		suspend_dev;
 };
 
 struct max77888_muic_vps_data {
@@ -404,7 +405,6 @@ static const struct max77888_muic_vps_data muic_vps_table[] = {
 		.vps_name	= "HMT",
 		.attached_dev	= ATTACHED_DEV_HMT_MUIC,
 	},
-	/* Unsupported Device Type - Charging */
 	{
 		.adc1k		= 0x00,
 		.adcerr		= 0x00,
@@ -416,6 +416,7 @@ static const struct max77888_muic_vps_data muic_vps_table[] = {
 		.vps_name	= "Universal Multimedia dock",
 		.attached_dev	= ATTACHED_DEV_UNIVERSAL_MMDOCK_MUIC,
 	},
+	/* Unsupported Device Type - Charging */
 	{
 		.adc1k		= 0x00,
 		.adcerr		= 0x00,
@@ -1902,7 +1903,7 @@ static bool is_need_muic_adcmode_continuous(muic_attached_dev_t new_dev)
 	bool ret = false;
 
 	switch (new_dev) {
-	case ATTACHED_DEV_OTG_MUIC: 
+	case ATTACHED_DEV_OTG_MUIC:
 	case ATTACHED_DEV_USB_LANHUB_MUIC:
 	case ATTACHED_DEV_SMARTDOCK_MUIC:
 	case ATTACHED_DEV_SMARTDOCK_VB_MUIC:
@@ -2062,35 +2063,6 @@ static void max77888_muic_detect_dev(struct max77888_muic_data *muic_data, int i
 
 	return;
 }
-
-#if !defined(CONFIG_SEC_FACTORY)
-void max77888_muic_set_path_suspend(struct device *dev)
-{
-	struct i2c_client *i2c = container_of(dev, struct i2c_client, dev);
-	int ret;
-
-	max77888_read_reg(i2c, MAX77888_MUIC_REG_CTRL1, &muic_pdata.path_status);
-	ret = max77888_muic_update_reg(i2c, MAX77888_MUIC_REG_CTRL1, CTRL1_OPEN,
-					0xff, true);
-	if (ret)
-		pr_warn("%s:%s cannot back 'muic control1 register' up [%d]\n",
-				MUIC_DEV_NAME, __func__, ret);
-	return;
-}
-
-void max77888_muic_set_path_resume(struct device *dev)
-{
-	struct i2c_client *i2c = container_of(dev, struct i2c_client, dev);
-	int ret;
-
-	ret = max77888_muic_update_reg(i2c, MAX77888_MUIC_REG_CTRL1,
-					muic_pdata.path_status, 0xff, true);
-	if (ret)
-		pr_warn("%s:%s cannot recover the muic control1 register [%d]\n",
-				MUIC_DEV_NAME, __func__, ret);
-	return;
-}
-#endif /* CONFIG_SEC_FACTORY */
 
 static irqreturn_t max77888_muic_irq(int irq, void *data)
 {
@@ -2317,6 +2289,38 @@ void max77888_muic_reg_restore(struct work_struct *work)
 }
 /* WA for MUIC RESET */
 
+#if defined(CONFIG_LEDS_MAX77888)
+/*
+* func: max77888_muic_set_jigset
+* arg: Manual control
+* (bit[1:0] 00=Auto detection, 01=Output Low, 10(or 11)=Hi-Impedance)
+* return: only 0 success
+*/
+int max77888_muic_set_jigset(struct i2c_client *i2c, int reg_value)
+{
+	u8 cntl3_val;
+	int ret;
+
+	pr_info("%s reg_value(0x%2x)", __func__, reg_value);
+
+	if( i2c==NULL ) {
+		pr_err("%s : muic i2c is null", __func__);
+		return 0;
+	}
+
+	ret = max77888_update_reg(i2c, MAX77888_MUIC_REG_CTRL3,
+			reg_value << CTRL3_JIGSET_SHIFT, CTRL3_JIGSET_MASK);
+	if (ret) {
+		pr_err("%s: fail to update muic CTRL3 reg(%d)\n",
+			__func__, ret);
+	}
+	max77888_read_reg(i2c, MAX77888_MUIC_REG_CTRL3, &cntl3_val);
+	pr_info("%s: CNTL3(0x0E : 0x%02x)\n", __func__, cntl3_val);
+
+	return ret;
+}
+#endif
+
 static int max77888_muic_init_regs(struct max77888_muic_data *muic_data)
 {
 	int ret;
@@ -2375,14 +2379,6 @@ static int max77888_muic_probe(struct platform_device *pdev)
 		pr_err("%s:%s not found muic dt! ret[%d]\n", MUIC_DEV_NAME, __func__, ret);
 	}
 #endif /* CONFIG_OF */
-
-#if !defined(CONFIG_SEC_FACTORY)
-	if (muic_data->rustproof_inbat) {
-		muic_pdata.set_path_switch_suspend = max77888_muic_set_path_suspend;
-		muic_pdata.set_path_switch_resume = max77888_muic_set_path_resume;
-	}
-	mfd_pdata->muic_pdata = &muic_pdata;
-#endif /* !CONFIG_SEC_FACTORY */
 
 	muic_data->dev = &pdev->dev;
 	mutex_init(&muic_data->muic_mutex);
@@ -2523,12 +2519,15 @@ static int max77888_muic_suspend(struct device *dev)
 	struct max77888_muic_data *muic_data = dev_get_drvdata(dev);
 	struct i2c_client *i2c = muic_data->i2c;
 
+	mutex_lock(&muic_data->muic_mutex);
+
 	pr_info("%s:%s\n", MUIC_DEV_NAME, __func__);
 
 	if (muic_data->rustproof_inbat) {
 		int ret;
 		max77888_read_reg(i2c, MAX77888_MUIC_REG_CTRL1,
 					&muic_data->path_status);
+		muic_data->suspend_dev = muic_data->attached_dev;
 		ret = max77888_muic_update_reg(i2c, MAX77888_MUIC_REG_CTRL1,
 						CTRL1_OPEN, 0xff, true);
 		if (ret)
@@ -2539,6 +2538,7 @@ static int max77888_muic_suspend(struct device *dev)
 				MUIC_DEV_NAME, __func__,
 				muic_data->rustproof_inbat ? 'T' : 'F');
 	}
+	mutex_unlock(&muic_data->muic_mutex);
 #endif /* !CONFIG_SEC_FACTORY */
 
 	return 0;
@@ -2550,9 +2550,12 @@ static int max77888_muic_resume(struct device *dev)
 	struct max77888_muic_data *muic_data = dev_get_drvdata(dev);
 	struct i2c_client *i2c = muic_data->i2c;
 
+	mutex_lock(&muic_data->muic_mutex);
+
 	pr_info("%s:%s\n", MUIC_DEV_NAME, __func__);
 
-	if (muic_data->rustproof_inbat) {
+	if (muic_data->rustproof_inbat &&
+		muic_data->suspend_dev == muic_data->attached_dev) {
 		int ret;
 		ret = max77888_muic_update_reg(i2c, MAX77888_MUIC_REG_CTRL1,
 					muic_data->path_status, 0xff, true);
@@ -2564,6 +2567,7 @@ static int max77888_muic_resume(struct device *dev)
 				MUIC_DEV_NAME, __func__,
 				muic_data->rustproof_inbat ? 'T' : 'F');
 	}
+	mutex_unlock(&muic_data->muic_mutex);
 #endif /* !CONFIG_SEC_FACTORY */
 
 	return 0;

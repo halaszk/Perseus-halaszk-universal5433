@@ -32,6 +32,25 @@
 #define MAX77888_IRQSRC_MUIC            (1 << 3)
 
 enum max77888_reg {
+	MAX77888_LED_REG_IFLASH				= 0x00,
+	MAX77888_LED_REG_RESERVED_01			= 0x01,
+	MAX77888_LED_REG_ITORCH				= 0x02,
+	MAX77888_LED_REG_ITORCHTORCHTIMER		= 0x03,
+	MAX77888_LED_REG_FLASH_TIMER			= 0x04,
+	MAX77888_LED_REG_FLASH_EN			= 0x05,
+	MAX77888_LED_REG_MAX_FLASH1			= 0x06,
+	MAX77888_LED_REG_MAX_FLASH2			= 0x07,
+	MAX77888_LED_REG_MAX_FLASH3			= 0x08,
+	MAX77888_LED_REG_MAX_FLASH4			= 0x09,
+	MAX77888_LED_REG_VOUT_CNTL			= 0x0A,
+	MAX77888_LED_REG_VOUT_FLASH			= 0x0B,
+	MAX77888_LED_REG_RESERVED_0C			= 0x0C,
+	MAX77888_LED_REG_RESERVED_0D			= 0x0D,
+	MAX77888_LED_REG_FLASH_INT			= 0x0E,
+	MAX77888_LED_REG_FLASH_INT_MASK			= 0x0F,
+	MAX77888_LED_REG_FLASH_INT_STATUS		= 0x10,
+	MAX77888_LED_REG_RESERVED_11			= 0x11,
+
 	MAX77888_PMIC_REG_PMIC_ID1			= 0x20,
 	MAX77888_PMIC_REG_PMIC_ID2			= 0x21,
 	MAX77888_PMIC_REG_INTSRC			= 0x22,
@@ -156,6 +175,7 @@ enum max77888_haptic_reg {
 #define CHG_CNFG_04_CHG_CV_PRM_SHIFT		0
 #define CHG_CNFG_04_CHG_CV_PRM_MASK		(0x1f << CHG_CNFG_04_CHG_CV_PRM_SHIFT)
 enum max77888_irq_source {
+	LED_INT = 0,
 	TOPSYS_INT,
 	CHG_INT,
 	MUIC_INT1,
@@ -168,6 +188,13 @@ enum max77888_irq_source {
 #define MAX77888_NUM_IRQ_MUIC_REGS	(MUIC_MAX_INT - MUIC_INT1 + 1)
 
 enum max77888_irq {
+	/* PMIC; FLASH */
+	MAX77888_LED_IRQ_FLED2_OPEN,
+	MAX77888_LED_IRQ_FLED2_SHORT,
+	MAX77888_LED_IRQ_FLED1_OPEN,
+	MAX77888_LED_IRQ_FLED1_SHORT,
+	MAX77888_LED_IRQ_MAX_FLASH,
+
 	/* PMIC; TOPSYS */
 	MAX77888_TOPSYS_IRQ_T120C_INT,
 	MAX77888_TOPSYS_IRQ_T140C_INT,
@@ -200,6 +227,7 @@ struct max77888_dev {
 	struct i2c_client *i2c;		/* 0xCC: Charger */
 	struct i2c_client *muic;	/* 0x4A; MUIC */
 	struct i2c_client *haptic;	/* 0x90; Haptic */
+	struct i2c_client *test; /* 0xCE; Test */
 	struct mutex i2c_lock;
 
 	int type;
@@ -257,6 +285,10 @@ extern bool is_muic_usb_path_cp_usb(void);
 
 /* MAX77888 Debug. ft */
 extern void max77888_muic_read_register(struct i2c_client *i2c);
+
+#if defined(CONFIG_LEDS_MAX77888)
+extern int max77888_muic_set_jigset(struct i2c_client *i2c, int reg_value);
+#endif
 
 /* WA for MUIC RESET */
 extern u8 max77888_restore_last_snapshot(u8 reg);

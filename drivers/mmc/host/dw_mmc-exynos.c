@@ -728,6 +728,12 @@ static int dw_mci_exynos_parse_dt(struct dw_mci *host)
 	else
 		priv->cd_gpio = -1;
 
+	if (of_get_property(np, "sec-sd-slot-type", NULL))
+		of_property_read_u32(np,
+			"sec-sd-slot-type", &priv->sec_sd_slot_type);
+	else
+		priv->sec_sd_slot_type = -1;
+
 	if (of_property_read_u32(np, "selclk_drv", &priv->selclk_drv))
 		priv->selclk_drv = 3;
 
@@ -1428,23 +1434,30 @@ static ssize_t sd_detection_cmd_show(struct device *dev,
 {
 	struct dw_mci *host = dev_get_drvdata(dev);
 	struct dw_mci_exynos_priv_data *priv = host->priv;
-	unsigned int detect;
 
-	if (gpio_is_valid(priv->cd_gpio))
-		detect = gpio_get_value(priv->cd_gpio);
-	else {
-		dev_info(host->dev, "%s : External SD detect pin Error\n", __func__);
-		return  sprintf(buf, "Error\n");
-	}
+	if (host->cur_slot && host->cur_slot->mmc && host->cur_slot->mmc->card) {
+		if (priv->sec_sd_slot_type > 0 && !gpio_is_valid(priv->cd_gpio))
+			goto gpio_error;
 
-	dev_dbg(host->dev, "%s : detect = %d.\n", __func__,  !detect);
-	if (!detect) {
-		dev_info(host->dev, "card inserted.\n");
+		dev_info(host->dev, "SD card inserted.\n");
 		return sprintf(buf, "Insert\n");
 	} else {
-		dev_info(host->dev, "card removed.\n");
+		if (priv->sec_sd_slot_type > 0 && !gpio_is_valid(priv->cd_gpio))
+			goto gpio_error;
+
+		if (gpio_get_value(priv->cd_gpio)
+				&& priv->sec_sd_slot_type == SEC_HYBRID_SD_SLOT) {
+			dev_info(host->dev, "SD slot tray Removed.\n");
+			return sprintf(buf, "Notray\n");
+		}
+
+		dev_info(host->dev, "SD card removed.\n");
 		return sprintf(buf, "Remove\n");
 	}
+
+gpio_error:
+	dev_info(host->dev, "%s : External SD detect pin Error\n", __func__);
+	return  sprintf(buf, "Error\n");
 }
 
 static DEVICE_ATTR(status, 0444, sd_detection_cmd_show, NULL);

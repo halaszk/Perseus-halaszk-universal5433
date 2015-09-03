@@ -94,6 +94,10 @@ static LIST_HEAD(drvdata_list);
 
 #define S3C2440_IICINT_BUSHOLD_CLEAR	(1 << 8)
 
+#define S3C2410_NEED_REG_INIT		(1 << 0)
+#define S3C2410_NEED_BUS_INIT		(2 << 0)
+#define S3C2410_NEED_FULL_INIT		(3 << 0)
+
 /* Treat S3C2410 as baseline hardware, anything else is supported via quirks */
 #define QUIRK_S3C2440		(1 << 0)
 #define QUIRK_HDMIPHY		(1 << 1)
@@ -724,6 +728,7 @@ static int s3c24xx_i2c_doxfer(struct s3c24xx_i2c *i2c,
 	ret = s3c24xx_i2c_set_master(i2c);
 	if (ret != 0) {
 		dev_err(i2c->dev, "cannot get bus (error %d)\n", ret);
+		i2c->need_hw_init = S3C2410_NEED_FULL_INIT;
 		ret = -EAGAIN;
 		goto out;
 	}
@@ -776,10 +781,11 @@ static int s3c24xx_i2c_xfer(struct i2c_adapter *adap,
 	pm_runtime_get_sync(&adap->dev);
 	clk_prepare_enable(i2c->clk);
 
-	if (i2c->need_hw_init)
-		s3c24xx_i2c_init(i2c);
 
 	for (retry = 0; retry < adap->retries; retry++) {
+
+		if (i2c->need_hw_init & S3C2410_NEED_FULL_INIT)
+			s3c24xx_i2c_init(i2c);
 
 		ret = s3c24xx_i2c_doxfer(i2c, msgs, num);
 
@@ -983,6 +989,7 @@ static void s3c24xx_i2c_dt_gpio_free(struct s3c24xx_i2c *i2c)
 static int s3c24xx_i2c_init(struct s3c24xx_i2c *i2c)
 {
 	unsigned long iicon = S3C2410_IICCON_IRQEN | S3C2410_IICCON_ACKEN;
+	unsigned long iicstat = readl(i2c->regs + S3C2410_IICSTAT);
 	struct s3c2410_platform_i2c *pdata;
 	unsigned int freq;
 
@@ -990,8 +997,13 @@ static int s3c24xx_i2c_init(struct s3c24xx_i2c *i2c)
 
 	pdata = i2c->pdata;
 
-	/* write slave address */
+	if (i2c->need_hw_init & S3C2410_NEED_BUS_INIT) {
+		/* reset i2c bus to recover from "cannot get bus" */
+		iicstat &= ~S3C2410_IICSTAT_TXRXEN;
+		writel(iicstat, i2c->regs + S3C2410_IICSTAT);
+	}
 
+	/* write slave address */
 	writeb(pdata->slave_addr, i2c->regs + S3C2410_IICADD);
 
 	dev_dbg(i2c->dev, "slave address 0x%02x\n", pdata->slave_addr);
@@ -1029,7 +1041,11 @@ s3c24xx_i2c_parse_dt(struct device_node *np, struct s3c24xx_i2c *i2c)
 	if (!np)
 		return;
 
+#ifdef CONFIG_FIX_I2C_BUS_NUM
+	if (of_property_read_u32(np, "samsung,i2c-bus-num", &pdata->bus_num))
+#endif
 	pdata->bus_num = -1; /* i2c bus number is dynamically assigned */
+
 	of_property_read_u32(np, "samsung,i2c-sda-delay", &pdata->sda_delay);
 	of_property_read_u32(np, "samsung,i2c-slave-addr", &pdata->slave_addr);
 	of_property_read_u32(np, "samsung,i2c-max-bus-freq",
@@ -1052,7 +1068,7 @@ static int s3c24xx_i2c_notifier(struct notifier_block *self,
 	switch (cmd) {
 	case LPA_EXIT:
 		list_for_each_entry(i2c, &drvdata_list, node)
-			i2c->need_hw_init = 1;
+			i2c->need_hw_init = S3C2410_NEED_REG_INIT;
 		break;
 	}
 
@@ -1155,7 +1171,7 @@ static int s3c24xx_i2c_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
-	i2c->need_hw_init = 1;
+	i2c->need_hw_init = S3C2410_NEED_REG_INIT;
 
 	/* find the IRQ for this unit (note, this relies on the init call to
 	 * ensure no current IRQs pending
@@ -1243,7 +1259,7 @@ static int s3c24xx_i2c_resume(struct device *dev)
 	struct s3c24xx_i2c *i2c = platform_get_drvdata(pdev);
 
 	i2c->suspended = 0;
-	i2c->need_hw_init = 1;
+	i2c->need_hw_init = S3C2410_NEED_REG_INIT;
 
 	return 0;
 }
@@ -1256,7 +1272,7 @@ static int s3c24xx_i2c_runtime_resume(struct device *dev)
 	struct s3c24xx_i2c *i2c = platform_get_drvdata(pdev);
 
 	if (i2c->quirks & QUIRK_FIMC_I2C)
-		i2c->need_hw_init = 1;
+		i2c->need_hw_init = S3C2410_NEED_REG_INIT;
 
 	return 0;
 }

@@ -63,4 +63,29 @@ config HID_SENSOR_ALS
 	  Say yes here to build support for the HID SENSOR
 	  Ambient light sensor.
 
+config SENSORS_CM36652_IIO
+	depends on IIO
+	tristate "CM366852 driver"
+	default n
+	help
+	  This option enables proximity & light sensors using CM36652 driver.
+
+config SENSORS_CM3323_IIO
+	depends on IIO
+	tristate "CM3323 driver"
+	default n
+	help
+	  Say Y here if you use cm3323.
+	  This option enables RGB sensors using
+	  Capella cm3323 device driver.
+
+	  Say N here if you do not use cm3323.
+
+config SENSORS_CS5032_IIO
+	depends on IIO
+	tristate "CS5032 driver"
+	default n
+	help
+	  This option enables proximity & light sensors using CS5032 driver.
+
 endmenu

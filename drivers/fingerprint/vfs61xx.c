@@ -17,7 +17,9 @@
  * MA  02110-1301, USA.
  */
 
+#include "fingerprint.h"
 #include "vfs61xx.h"
+
 #ifdef CONFIG_OF
 #include <linux/of_gpio.h>
 #endif
@@ -32,6 +34,7 @@
 #include <linux/of_dma.h>
 #include <linux/amba/bus.h>
 #include <linux/amba/pl330.h>
+#include <mach/smc.h>
 
 struct sec_spi_info {
 	int		port;
@@ -109,16 +112,8 @@ struct vfsspi_devData {
 	struct pinctrl *p;
 	struct pinctrl_state *pins_sleep;
 	struct pinctrl_state *pins_idle;
-	unsigned int sensortype;
+	int sensortype;
 };
-
-enum {
-	SENSOR_FAILED = 0,
-	SENSOR_VIPER,
-	SENSOR_RAPTOR,
-};
-
-char sensor_status[3][7] = {"failed", "viper", "raptor"};
 
 struct vfsspi_devData *g_data;
 
@@ -131,8 +126,6 @@ struct vfsspi_devData *g_data;
 /* The coefficient which is multiplying with value retrieved from the
  * VFSSPI_IOCTL_SET_CLK IOCTL command for getting the final baud rate. */
 #define BAUD_RATE_COEF  1000
-
-#define VFSSPI_DEBUG_TIMER_SEC	(10 * HZ)
 
 #define DRDY_IRQ_ENABLE	1
 #define DRDY_IRQ_DISABLE	0
@@ -655,7 +648,8 @@ static int sec_spi_prepare(struct sec_spi_info *spi_info, struct spi_device *spi
 	if (!sdd)
 		return -EFAULT;
 
-	pm_runtime_get_sync(&sdd->pdev->dev);
+	clk_prepare_enable(sdd->clk);
+	clk_prepare_enable(sdd->src_clk);
 
 	/* set spi clock rate */
 	clk_set_rate(sdd->src_clk, spi_info->speed * 2);
@@ -683,7 +677,9 @@ static int sec_spi_unprepare(struct sec_spi_info *spi_info, struct spi_device *s
 	if(cs->line != (unsigned)NULL)
 		gpio_set_value(cs->line, 1);
 
-	pm_runtime_put(&sdd->pdev->dev);
+	clk_disable_unprepare(sdd->clk);
+	clk_disable_unprepare(sdd->src_clk);
+
 
 	return 0;
 }
@@ -747,6 +743,7 @@ long vfsspi_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	struct vfsspi_iocFreqTable tmpFreqData;
 #else
 	struct sec_spi_info *spi_info = NULL;
+	int type_check;
 #endif
 
 	pr_debug("%s\n", __func__);
@@ -1145,6 +1142,15 @@ long vfsspi_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 	case VFSSPI_IOCTL_RESET_SPI_CONFIGURATION:
 		break;
+
+	case VFSSPI_IOCTL_SET_SENSOR_TYPE:
+		if (copy_from_user(&type_check, (void *)arg,
+					sizeof(unsigned int)) != 0)
+					return -EFAULT;
+		vfsSpiDev->sensortype = (int)type_check;
+		pr_info("%s VFSSPI_IOCTL_SET_SENSOR_TYPE :%d \n",
+				__func__, vfsSpiDev->sensortype);
+		break;
 #endif
 	case VFSSPI_IOCTL_GET_SENSOR_ORIENT:
 		pr_info("%s: orient is %d(0: normal, 1: upsidedown)\n",
@@ -1526,14 +1532,31 @@ static ssize_t vfsspi_type_check_show(struct device *dev,
 {
 	struct vfsspi_devData *data = dev_get_drvdata(dev);
 
-	return snprintf(buf, PAGE_SIZE, "%u\n", data->sensortype);
+	return snprintf(buf, PAGE_SIZE, "%d\n", data->sensortype);
+}
+static ssize_t vfsspi_vendor_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%s\n", VENDOR);
+}
+
+static ssize_t vfsspi_name_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%s\n", CHIP_ID);
 }
 
 static DEVICE_ATTR(type_check, S_IRUGO,
 	vfsspi_type_check_show, NULL);
+static DEVICE_ATTR(vendor, S_IRUGO,
+	vfsspi_vendor_show, NULL);
+static DEVICE_ATTR(name, S_IRUGO,
+	vfsspi_name_show, NULL);
 
 static struct device_attribute *fp_attrs[] = {
 	&dev_attr_type_check,
+	&dev_attr_vendor,
+	&dev_attr_name,
 	NULL,
 };
 #endif
@@ -1554,20 +1577,20 @@ static void vfsspi_work_func_debug(struct work_struct *work)
 			__func__, gpio_get_value(g_data->ocp_en),
 			ldo_value, gpio_get_value(g_data->sleepPin),
 			g_data->tz_mode,
-			sensor_status[g_data->sensortype]);
+			sensor_status[g_data->sensortype + 1]);
 	else
 		pr_info("%s r ldo: %d,"
 			" sleep: %d, tz: %d, type: %s\n",
-			__func__, ldo_value, 
+			__func__, ldo_value,
 			gpio_get_value(g_data->sleepPin),
 			g_data->tz_mode,
-			sensor_status[g_data->sensortype]);
+			sensor_status[g_data->sensortype + 1]);
 }
 
 static void vfsspi_enable_debug_timer(void)
 {
 	mod_timer(&g_data->dbg_timer,
-		round_jiffies_up(jiffies + VFSSPI_DEBUG_TIMER_SEC));
+		round_jiffies_up(jiffies + FPSENSOR_DEBUG_TIMER_SEC));
 }
 
 static void vfsspi_disable_debug_timer(void)
@@ -1580,17 +1603,15 @@ static void vfsspi_timer_func(unsigned long ptr)
 {
 	queue_work(g_data->wq_dbg, &g_data->work_debug);
 	mod_timer(&g_data->dbg_timer,
-		round_jiffies_up(jiffies + VFSSPI_DEBUG_TIMER_SEC));
+		round_jiffies_up(jiffies + FPSENSOR_DEBUG_TIMER_SEC));
 }
-
-#define TEST_DEBUG
 
 int vfsspi_probe(struct spi_device *spi)
 {
 	int status = 0;
 	struct vfsspi_devData *vfsSpiDev = NULL;
 	struct device *dev = NULL;
-#ifdef TEST_DEBUG
+#ifndef ENABLE_SENSORS_FPRINT_SECURE
 	char tx_buf[64] = {5};
 	char rx_buf[64] = {0};
 	struct spi_transfer t;
@@ -1669,8 +1690,9 @@ int vfsspi_probe(struct spi_device *spi)
 		vfsspi_platformUninit(vfsSpiDev);
 		goto parse_dt_failed;
 	}
-
-#ifdef TEST_DEBUG
+#ifdef ENABLE_SENSORS_FPRINT_SECURE
+	vfsSpiDev->sensortype = SENSOR_RAPTOR;
+#else
 	vfsspi_regulator_onoff(vfsSpiDev, true);
 
 	/* check sensor if it is raptor */
@@ -1842,8 +1864,18 @@ static void vfsspi_shutdown(struct spi_device *spi)
 
 static int vfsspi_pm_suspend(struct device *dev)
 {
-	if (g_data != NULL)
+#if defined(ENABLE_SENSORS_FPRINT_SECURE) \
+	&& (!defined(CONFIG_SOC_EXYNOS5422) && !defined(CONFIG_SOC_EXYNOS5430))
+	int ret = 0;
+#endif
+	if (g_data != NULL) {
 		vfsspi_disable_debug_timer();
+#if defined(ENABLE_SENSORS_FPRINT_SECURE) \
+	&& (!defined(CONFIG_SOC_EXYNOS5422) && !defined(CONFIG_SOC_EXYNOS5430))
+		ret = exynos_smc(MC_FC_FP_PM_SUSPEND, 0, 0, 0);
+		pr_info("%s: suspend smc ret = %d\n", __func__, ret);
+#endif
+	}
 
 	pr_info("%s\n", __func__);
 	return 0;
@@ -1851,8 +1883,18 @@ static int vfsspi_pm_suspend(struct device *dev)
 
 static int vfsspi_pm_resume(struct device *dev)
 {
-	if (g_data != NULL)
+#if defined(ENABLE_SENSORS_FPRINT_SECURE) \
+	&& (!defined(CONFIG_SOC_EXYNOS5422) && !defined(CONFIG_SOC_EXYNOS5430))
+	int ret = 0;
+#endif
+	if (g_data != NULL) {
 		vfsspi_enable_debug_timer();
+#if defined(ENABLE_SENSORS_FPRINT_SECURE) \
+	&& (!defined(CONFIG_SOC_EXYNOS5422) && !defined(CONFIG_SOC_EXYNOS5430))
+		ret = exynos_smc(MC_FC_FP_PM_RESUME, 0, 0, 0);
+		pr_info("%s: resume smc ret = %d\n", __func__, ret);
+#endif
+	}
 
 	pr_info("%s\n", __func__);
 	return 0;

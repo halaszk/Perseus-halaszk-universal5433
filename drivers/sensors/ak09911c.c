@@ -80,6 +80,8 @@ struct ak09911c_p {
 	u8 asa[3];
 	int chip_pos;
 	int m_rst_n;
+	u64 timestamp;
+
 };
 
 static int ak09911c_i2c_read(struct i2c_client *client,
@@ -249,15 +251,26 @@ static void ak09911c_work_func(struct work_struct *work)
 {
 	int ret;
 	struct ak09911c_v mag;
+	struct timespec ts;
+	int time_hi, time_lo;
+
 	struct ak09911c_p *data = container_of((struct delayed_work *)work,
 			struct ak09911c_p, work);
 	unsigned long delay = nsecs_to_jiffies(atomic_read(&data->delay));
 
+	ts = ktime_to_timespec(ktime_get_boottime());
+	data->timestamp = ts.tv_sec * 1000000000ULL + ts.tv_nsec;
+	time_lo = (int)(data->timestamp & TIME_LO_MASK);
+	time_hi = (int)((data->timestamp & TIME_HI_MASK) >> TIME_HI_SHIFT);
+
 	ret = ak09911c_read_mag_xyz(data, &mag);
+
 	if (ret >= 0) {
 		input_report_rel(data->input, REL_X, mag.x);
 		input_report_rel(data->input, REL_Y, mag.y);
 		input_report_rel(data->input, REL_Z, mag.z);
+		input_report_rel(data->input, REL_RX, time_hi);
+		input_report_rel(data->input, REL_RY, time_lo);
 		input_sync(data->input);
 		data->magdata = mag;
 	}
@@ -760,6 +773,9 @@ static int ak09911c_input_init(struct ak09911c_p *data)
 	input_set_capability(dev, EV_REL, REL_X);
 	input_set_capability(dev, EV_REL, REL_Y);
 	input_set_capability(dev, EV_REL, REL_Z);
+	input_set_capability(dev, EV_REL, REL_RX); /* time_hi */
+	input_set_capability(dev, EV_REL, REL_RY); /* time_lo */
+
 	input_set_drvdata(dev, data);
 
 	ret = input_register_device(dev);

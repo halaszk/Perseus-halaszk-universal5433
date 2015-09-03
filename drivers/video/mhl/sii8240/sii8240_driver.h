@@ -990,7 +990,6 @@ struct sii8240_data {
 	enum mhl_state			state;
 	enum rgnd_state			rgnd;
 	enum mhl_attached_type		muic_state;
-	bool muic_smartdock;
 
 	bool				cbus_ready;
 	struct mutex			cbus_lock;

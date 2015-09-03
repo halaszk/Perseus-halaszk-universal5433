@@ -38,7 +38,7 @@
 
 static void print_sbd_config(struct sbd_link_device *sl)
 {
-#ifdef DEBUG_MODEM_IF
+#ifdef CONFIG_SEC_MODEM_DEBUG
 	int i;
 
 	pr_err("mif: SBD_IPC {shmem_base:0x%lX shmem_size:%d}\n",
@@ -430,6 +430,10 @@ int create_sbd_link_device(struct link_device *ld, struct sbd_link_device *sl,
 	for (i = 0; i < sl->num_channels; i++)
 		init_ipc_device(sl, i, sbd_id2dev(sl, i));
 
+	sl->pktlog = create_pktlog("lli");
+	if (!sl->pktlog)
+		mif_err("packet log device create fail\n");
+
 	return 0;
 }
 
@@ -482,6 +486,8 @@ int sbd_pio_tx(struct sbd_ring_buffer *rb, struct sk_buff *skb)
 	unsigned int count = skb->len;
 	unsigned int space = (rb->buff_size - rb->payload_offset);
 	u8 *dst;
+
+	pktlog_tx_bottom_skb(rb->sl, skb);
 
 	ret = check_rb_space(rb, qlen, in, out);
 	if (unlikely(ret < 0))
@@ -602,7 +608,41 @@ struct sk_buff *sbd_pio_rx(struct sbd_ring_buffer *rb)
 
 	check_more(rb, skb);
 
+	pktlog_rx_bottom_skb(rb->sl, skb);
+
 	return skb;
+}
+
+int tx_frames_to_rb(struct sbd_ring_buffer *rb)
+{
+	struct sk_buff_head *skb_txq = &rb->skb_q;
+	int tx_bytes = 0;
+	int ret = 0;
+
+	while (1) {
+		struct sk_buff *skb;
+
+		skb = skb_dequeue(skb_txq);
+		if (unlikely(!skb))
+			break;
+
+		ret = sbd_pio_tx(rb, skb);
+		if (unlikely(ret < 0)) {
+			/* Take the skb back to the skb_txq */
+			skb_queue_head(skb_txq, skb);
+			break;
+		}
+
+		tx_bytes += ret;
+
+		log_ipc_pkt(LNK_TX, rb->ch, skb);
+
+		trace_mif_event(skb, skb->len, FUNC);
+
+		dev_kfree_skb_any(skb);
+	}
+
+	return (ret < 0) ? ret : tx_bytes;
 }
 
 /**

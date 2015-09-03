@@ -37,6 +37,12 @@
 #define COLD_VOLT_OFFSET	(37500)
 #define LIMIT_COLD_VOLTAGE	(1250000)
 
+#if defined(CONFIG_EXYNOS5430_FHD)
+#define MIN_COLD_VOLTAGE	(925000)
+#else
+#define MIN_COLD_VOLTAGE	(0)
+#endif
+
 #define TIMING_RFCPB_MASK	(0x3F)
 
 #define DLL_ON_BASE_VOLT	(900000)
@@ -348,7 +354,19 @@ struct devfreq_clk_info aclk_mif_400[] = {
 	{LV7,   138000000,      0,      &aclk_mif_400_mem1_pll_list},
 	{LV8,   138000000,      0,      &aclk_mif_400_mem1_pll_list},
 };
-#elif defined(CONFIG_EXYNOS5430_FHD) || defined(CONFIG_EXYNOS5430_WQHD)
+#elif defined(CONFIG_EXYNOS5430_FHD)
+struct devfreq_clk_info aclk_mif_400[] = {
+	{LV0,   413000000,      0,      &aclk_mif_400_mem1_pll_list},
+	{LV1,   275000000,      0,      &aclk_mif_400_mem1_pll_list},
+	{LV2,   275000000,      0,      &aclk_mif_400_mem1_pll_list},
+	{LV3,   207000000,      0,      &aclk_mif_400_mem1_pll_list},
+	{LV4,   207000000,      0,      &aclk_mif_400_mem1_pll_list},
+	{LV5,   207000000,      0,      &aclk_mif_400_mem1_pll_list},
+	{LV6,   165000000,      0,      &aclk_mif_400_mem1_pll_list},
+	{LV7,   165000000,      0,      &aclk_mif_400_mem1_pll_list},
+	{LV8,   138000000,      0,      &aclk_mif_400_mem1_pll_list},
+};
+#elif defined(CONFIG_EXYNOS5430_WQHD)
 struct devfreq_clk_info aclk_mif_400[] = {
 	{LV0,   413000000,      0,      &aclk_mif_400_mem1_pll_list},
 	{LV1,   275000000,      0,      &aclk_mif_400_mem1_pll_list},
@@ -374,7 +392,19 @@ struct devfreq_clk_info aclk_mif_200[] = {
 	{LV7,	 69000000,      0,      NULL},
 	{LV8,	 69000000,      0,      NULL},
 };
-#elif defined(CONFIG_EXYNOS5430_FHD) || defined(CONFIG_EXYNOS5430_WQHD)
+#elif defined(CONFIG_EXYNOS5430_FHD)
+struct devfreq_clk_info aclk_mif_200[] = {
+	{LV0,	207000000,      0,      NULL},
+	{LV1,	138000000,      0,      NULL},
+	{LV2,	138000000,      0,      NULL},
+	{LV3,	104000000,      0,      NULL},
+	{LV4,	104000000,      0,      NULL},
+	{LV5,	104000000,      0,      NULL},
+	{LV6,	 83000000,      0,      NULL},
+	{LV7,	 83000000,      0,      NULL},
+	{LV8,	 69000000,      0,      NULL},
+};
+#elif defined(CONFIG_EXYNOS5430_WQHD)
 struct devfreq_clk_info aclk_mif_200[] = {
 	{LV0,	207000000,      0,      NULL},
 	{LV1,	138000000,      0,      NULL},
@@ -658,70 +688,70 @@ struct devfreq_mif_timing_parameter dmc_timing_parameter_2gb[] = {
 #elif defined(CONFIG_EXYNOS5430_FHD) || defined(CONFIG_EXYNOS5430_WQHD)
 struct devfreq_mif_timing_parameter dmc_timing_parameter_2gb[] = {
 	{	/* 825Mhz */
-		.timing_row	= 0x365A9713,
+		.timing_row	= 0x36588652,
 		.timing_data	= 0x4740085E,
-		.timing_power	= 0x543A0446,
+		.timing_power	= 0x4C3A0446,
 		.rd_fetch	= 0x00000003,
 		.timing_rfcpb	= 0x00001919,
 		.dvfs_con1      = 0x0E0E2121,
 		.dvfs_offset    = 0,
 	}, {	/* 633Mhz */
-		.timing_row	= 0x2A48758F,
+		.timing_row	= 0x2A4674CE,
 		.timing_data	= 0x3530084E,
-		.timing_power	= 0x402D0335,
+		.timing_power	= 0x3C2D0335,
 		.rd_fetch	= 0x00000002,
 		.timing_rfcpb	= 0x00001313,
 		.dvfs_con1      = 0x0E0E2121,
 		.dvfs_offset    = 0,
 	}, {	/* 543Mhz */
-		.timing_row	= 0x244764CD,
-		.timing_data	= 0x3530084E,
-		.timing_power	= 0x38270335,
+		.timing_row	= 0x2435644C,
+		.timing_data	= 0x3530083E,
+		.timing_power	= 0x34270335,
 		.rd_fetch	= 0x00000002,
 		.timing_rfcpb	= 0x00001111,
 		.dvfs_con1      = 0x0E0E2121,
 		.dvfs_offset    = 0,
 	}, {	/* 413Mhz */
-		.timing_row	= 0x1B35538A,
+		.timing_row	= 0x1B34534A,
 		.timing_data	= 0x2420083E,
-		.timing_power	= 0x2C1F0225,
+		.timing_power	= 0x281F0225,
 		.rd_fetch	= 0x00000002,
 		.timing_rfcpb	= 0x00000D0D,
 		.dvfs_con1      = 0x0E0E2121,
 		.dvfs_offset    = 15,
-	}, {	/* 275Mhz */
-		.timing_row	= 0x19244287,
+	}, {	/* 272Mhz */
+		.timing_row	= 0x19233247,
 		.timing_data	= 0x2320082E,
 		.timing_power	= 0x1C1F0225,
 		.rd_fetch	= 0x00000002,
-		.timing_rfcpb	= 0x00000A0A,
+		.timing_rfcpb	= 0x00000909,
 		.dvfs_con1      = 0x0E0E2121,
 		.dvfs_offset    = 30,
-	}, {	/* 206Mhz */
-		.timing_row	= 0x19233206,
+	}, {	/* 211Mhz */
+		.timing_row	= 0x192231C5,
 		.timing_data	= 0x2320082E,
-		.timing_power	= 0x181F0225,
+		.timing_power	= 0x141F0225,
 		.rd_fetch	= 0x00000002,
 		.timing_rfcpb	= 0x00000707,
 		.dvfs_con1      = 0x0E0E2121,
 		.dvfs_offset    = 30,
-	}, {	/* 165Mhz */
-		.timing_row	= 0x19223184,
+	}, {	/* 158Mhz */
+		.timing_row	= 0x19222144,
 		.timing_data	= 0x2320082E,
 		.timing_power	= 0x101F0225,
 		.rd_fetch	= 0x00000002,
 		.timing_rfcpb	= 0x00000505,
 		.dvfs_con1      = 0x0E0E2121,
 		.dvfs_offset    = 40,
-	}, {	/* 138Mhz */
+	}, {	/* 136Mhz */
 		.timing_row	= 0x19222144,
 		.timing_data	= 0x2320082E,
 		.timing_power	= 0x101F0225,
 		.rd_fetch	= 0x00000002,
-		.timing_rfcpb	= 0x00000404,
+		.timing_rfcpb	= 0x00000505,
 		.dvfs_con1      = 0x0E0E2121,
 		.dvfs_offset    = 40,
-	}, {	/* 103Mhz */
+	}, {	/* 109Mhz */
 		.timing_row	= 0x19222103,
 		.timing_data	= 0x2320082E,
 		.timing_power	= 0x101F0225,
@@ -735,63 +765,63 @@ struct devfreq_mif_timing_parameter dmc_timing_parameter_2gb[] = {
 
 struct devfreq_mif_timing_parameter dmc_timing_parameter_3gb[] = {
 	{	/* 825Mhz */
-		.timing_row	= 0x575A9713,
+		.timing_row	= 0x57588652,
 		.timing_data	= 0x4740085E,
-		.timing_power	= 0x545B0446,
+		.timing_power	= 0x4CAA0446,
 		.rd_fetch	= 0x00000003,
 		.timing_rfcpb	= 0x00002626,
 		.dvfs_con1      = 0x0E0E2121,
 		.dvfs_offset    = 0,
 	}, {	/* 633Mhz */
-		.timing_row	= 0x4348758F,
+		.timing_row	= 0x434674CE,
 		.timing_data	= 0x3530084E,
-		.timing_power	= 0x40460335,
+		.timing_power	= 0x3C820335,
 		.rd_fetch	= 0x00000002,
 		.timing_rfcpb	= 0x00001D1D,
 		.dvfs_con1      = 0x0E0E2121,
 		.dvfs_offset    = 0,
 	}, {	/* 543Mhz */
-		.timing_row	= 0x3A4764CD,
-		.timing_data	= 0x3530084E,
-		.timing_power	= 0x383C0335,
+		.timing_row	= 0x3A35644C,
+		.timing_data	= 0x3530083E,
+		.timing_power	= 0x34700335,
 		.rd_fetch	= 0x00000002,
 		.timing_rfcpb	= 0x00001919,
 		.dvfs_con1      = 0x0E0E2121,
 		.dvfs_offset    = 0,
 	}, {	/* 413Mhz */
-		.timing_row	= 0x2C35538A,
+		.timing_row	= 0x2C34534A,
 		.timing_data	= 0x2420083E,
-		.timing_power	= 0x2C2E0225,
+		.timing_power	= 0x28550225,
 		.rd_fetch	= 0x00000002,
 		.timing_rfcpb	= 0x00001313,
 		.dvfs_con1      = 0x0E0E2121,
 		.dvfs_offset    = 15,
 	}, {	/* 272Mhz */
-		.timing_row	= 0x1D244287,
+		.timing_row	= 0x1D233247,
 		.timing_data	= 0x2320082E,
-		.timing_power	= 0x1C1F0225,
+		.timing_power	= 0x1C380225,
 		.rd_fetch	= 0x00000002,
 		.timing_rfcpb	= 0x00000D0D,
 		.dvfs_con1      = 0x0E0E2121,
 		.dvfs_offset    = 30,
 	}, {	/* 211Mhz */
-		.timing_row	= 0x17233206,
+		.timing_row	= 0x192331C5,
 		.timing_data	= 0x2320082E,
-		.timing_power	= 0x181F0225,
+		.timing_power	= 0x142C0225,
 		.rd_fetch	= 0x00000002,
 		.timing_rfcpb	= 0x00000A0A,
 		.dvfs_con1      = 0x0E0E2121,
 		.dvfs_offset    = 30,
 	}, {	/* 158Mhz */
-		.timing_row	= 0x12223185,
+		.timing_row	= 0x19232144,
 		.timing_data	= 0x2320082E,
-		.timing_power	= 0x141F0225,
+		.timing_power	= 0x10210225,
 		.rd_fetch	= 0x00000002,
 		.timing_rfcpb	= 0x00000808,
 		.dvfs_con1      = 0x0E0E2121,
 		.dvfs_offset    = 40,
 	}, {	/* 136Mhz */
-		.timing_row	= 0x11222144,
+		.timing_row	= 0x19232144,
 		.timing_data	= 0x2320082E,
 		.timing_power	= 0x101F0225,
 		.rd_fetch	= 0x00000002,
@@ -799,7 +829,7 @@ struct devfreq_mif_timing_parameter dmc_timing_parameter_3gb[] = {
 		.dvfs_con1      = 0x0E0E2121,
 		.dvfs_offset    = 40,
 	}, {	/* 109Mhz */
-		.timing_row	= 0x11222103,
+		.timing_row	= 0x19232103,
 		.timing_data	= 0x2320082E,
 		.timing_power	= 0x101F0225,
 		.rd_fetch	= 0x00000002,
@@ -1822,6 +1852,11 @@ static unsigned int get_limit_voltage(unsigned int voltage, unsigned int volt_of
 
 	if (voltage + volt_offset > LIMIT_COLD_VOLTAGE)
 		return LIMIT_COLD_VOLTAGE;
+
+#if defined(CONFIG_EXYNOS5430_FHD)
+	if (volt_offset && (voltage + volt_offset) < MIN_COLD_VOLTAGE)
+		return MIN_COLD_VOLTAGE;
+#endif
 
 	return voltage + volt_offset;
 }

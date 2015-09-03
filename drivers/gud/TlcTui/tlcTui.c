@@ -348,12 +348,6 @@ bool tlcNotifyEvent(uint32_t eventType)
 		return false;
 	}
 
-	/* Wait for previous notification to be acknowledged */
-	while (pDci->nwdNotif != NOT_TUI_NONE) {
-		pr_debug("TLC waiting for previous notification ack\n");
-		usleep_range(10000, 10000);
-	};
-
 	/* Prepare notification message in DCI */
 	pr_debug("tlcNotifyEvent: eventType = %d\n", eventType);
 	pDci->nwdNotif = eventType;

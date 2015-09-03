@@ -895,6 +895,16 @@ config USBIRQ_BALANCING_LTE_HIGHTP
 		If you enable this option,
 		DWC interrupt work on cpu1.
 
+config USB_RNDIS_VZW_REQ
+	boolean "Samsung USB RNDIS 5.x function"
+	depends on USB_G_ANDROID
+	help
+	  Provides USB RNDIS version 5.x support
+	  for samsung gadget driver.
+	  If you enable this option,
+	  you can connect via RNDIS 5.x.
+	  It's VZW carrier concept.
+
 config USB_ANDROID_RNDIS_DWORD_ALIGNED
 	boolean "Use double word aligned"
 	depends on USB_G_ANDROID

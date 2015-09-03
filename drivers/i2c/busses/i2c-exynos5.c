@@ -432,7 +432,7 @@ static void exynos5_i2c_reset(struct exynos5_i2c *i2c)
 {
 	u32 i2c_ctl;
 
-	dev_err(i2c->dev, "exynos5_i2c_reset\n");
+	dev_dbg(i2c->dev, "exynos5_i2c_reset\n");
 
 	/* Set and clear the bit for reset */
 	i2c_ctl = readl(i2c->regs + HSI2C_CTL);
@@ -818,7 +818,7 @@ static int exynos5_i2c_xfer(struct i2c_adapter *adap,
 
 	clk_prepare_enable(i2c->clk);
 	if (i2c->need_hw_init){
-		dev_err(i2c->dev, "exynos5_i2c_xfer call exynos5_i2c_reset\n");
+		dev_dbg(i2c->dev, "exynos5_i2c_xfer call exynos5_i2c_reset\n");
 		exynos5_i2c_reset(i2c);
 	}
 	for (retry = 0; retry < adap->retries; retry++) {

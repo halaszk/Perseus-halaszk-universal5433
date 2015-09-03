@@ -1,7 +1,7 @@
 /*
  * Linux platform device for DHD WLAN adapter
  *
- * Copyright (C) 1999-2014, Broadcom Corporation
+ * Copyright (C) 1999-2015, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -45,13 +45,20 @@
 #endif /* CONFIG_DTS */
 
 #if !defined(CONFIG_WIFI_CONTROL_FUNC)
+#if     (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 58))
+#define WLAN_PLAT_NODFS_FLAG    0x01
+#endif
 struct wifi_platform_data {
 	int (*set_power)(int val);
 	int (*set_reset)(int val);
 	int (*set_carddetect)(int val);
 	void *(*mem_prealloc)(int section, unsigned long size);
 	int (*get_mac_addr)(unsigned char *buf);
+#if     (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 58))
+	void *(*get_country_code)(char *ccode, u32 flags);
+#else
 	void *(*get_country_code)(char *ccode);
+#endif
 };
 #endif /* CONFIG_WIFI_CONTROL_FUNC */
 
@@ -244,7 +251,11 @@ void *wifi_platform_get_country_code(wifi_adapter_info_t *adapter, char *ccode)
 
 	DHD_TRACE(("%s\n", __FUNCTION__));
 	if (plat_data->get_country_code) {
+#if     (LINUX_VERSION_CODE < KERNEL_VERSION(3, 10, 58))
+		return plat_data->get_country_code(ccode, WLAN_PLAT_NODFS_FLAG);
+#else
 		return plat_data->get_country_code(ccode);
+#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 58)) */
 	}
 #endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)) */
 

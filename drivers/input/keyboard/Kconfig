@@ -18,6 +18,12 @@ config KEYBOARD_ABOV_TOUCH
 	help
 	  Say Y here if you want to use ABOV MC96FT16XX chip as touchkey.
 
+config KEYBOARD_ABOV_TOUCH_A8
+	tristate "Abov FT16XX touchkey"
+	depends on I2C
+	help
+	  Say Y here if you want to use ABOV MC96FT16XX chip as touchkey.
+
 config KEYBOARD_ADP5520
 	tristate "Keypad Support for ADP5520 PMIC"
 	depends on PMIC_ADP5520
@@ -652,6 +658,12 @@ config KEYBOARD_TC300K
 	depends on I2C
 	help
 	 Say Y if you want use Coreriver TC300K chip as touchkey.
+
+config KEYBOARD_KLIMTVE
+	tristate "Cypress touchkey support"
+	default n
+	help
+	  Say Y here to disable the flip mode and inform charger for touchkey
 
 source "drivers/input/keyboard/cypress/Kconfig"
 source "drivers/input/keyboard/cypress_20055/Kconfig"

@@ -159,4 +159,18 @@ config ARM_EXYNOS_BUS_DEVFREQ_SYSFS_MAX_TEMP
 	help
 	 This option expose sysfs which show max temperature level
 
+config ARM_EXYNOS5433_BUS_DEVFREQ_TEMP_INT_MINLOCK
+	bool "Temprorary 400Mhz Int freq minlock for Tab S2"
+	default n
+	help
+	 This option is temproray 400MHz Int freq minlock.
+
+config ARM_EXYNOS5433_BUS_DEVFREQ_THERMAL_POLICY_3_4
+	bool "change thermal policy (3/4x)"
+	depends on ARM_EXYNOS5433_BUS_DEVFREQ
+	default n
+	help
+	  - change MR4 default polling period : 1000msec --> 300msec
+	  - change default AREF rate : 1x --> 3/4x
+
 endif # PM_DEVFREQ

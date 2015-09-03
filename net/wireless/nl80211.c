@@ -5846,7 +5846,9 @@ static int nl80211_dump_survey(struct sk_buff *skb,
 static bool nl80211_valid_wpa_versions(u32 wpa_versions)
 {
 	return !(wpa_versions & ~(NL80211_WPA_VERSION_1 |
-				  NL80211_WPA_VERSION_2));
+				  NL80211_WPA_VERSION_2 |
+/*WAPI*/
+				  NL80211_WAPI_VERSION_1 ));
 }
 
 static int nl80211_authenticate(struct sk_buff *skb, struct genl_info *info)
@@ -7203,7 +7205,9 @@ static int nl80211_tx_mgmt(struct sk_buff *skb, struct genl_info *info)
 		if (wait < NL80211_MIN_REMAIN_ON_CHANNEL_TIME ||
 #if defined(CONFIG_BCM4354) || defined(CONFIG_BCM4354_MODULE) || \
 	defined(CONFIG_BCM4356) || defined(CONFIG_BCM4356_MODULE) || \
-	defined(CONFIG_BCM4358) || defined(CONFIG_BCM4358_MODULE)
+	defined(CONFIG_BCM4358) || defined(CONFIG_BCM4358_MODULE) || \
+	defined(CONFIG_BCM43455) || defined(CONFIG_BCM43455_MODULE) || \
+	defined(CONFIG_BCM4334) || defined(CONFIG_BCM4334_MODULE)
 			/* To reduce GAS initial request / response time, 
 			 * we modified the Broadcom official driver structure 
 			 * ex) wait[31:25] -> retry counts until receiving ACK 

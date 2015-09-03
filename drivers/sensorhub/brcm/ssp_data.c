@@ -62,7 +62,7 @@ static void get_timestamp(struct ssp_data *data, char *pchRcvDataFrame,
 				sensorsdata->timestamp = data->timestamp;
 		}
 	} else {
-		if (((sensortime->irq_diff * 10) > (data->adDelayBuf[iSensorData] * 18))
+		if (((sensortime->irq_diff * 10) > (data->adDelayBuf[iSensorData] * 15))
 			&& ((sensortime->irq_diff * 10) < (data->adDelayBuf[iSensorData] * 100))) {
 			generate_data(data, sensorsdata, iSensorData, data->timestamp);
 		}

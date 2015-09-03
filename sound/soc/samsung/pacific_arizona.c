@@ -33,6 +33,8 @@
 #include "i2s-regs.h"
 #include "../codecs/wm5102.h"
 #include "../codecs/florida.h"
+#include "../codecs/vegas.h"
+
 
 #if defined(CONFIG_SND_SOC_MAX98504A)
 #include "../codecs/max98504a.h"
@@ -70,6 +72,7 @@ enum {
 
 struct arizona_machine_priv {
 	int mic_bias_gpio;
+	int sub_mic_bias_gpio;
 	struct snd_soc_codec *codec;
 	struct snd_soc_dai *aif[3];
 	int voice_uevent;
@@ -86,7 +89,7 @@ struct arizona_machine_priv {
 
 	int sysclk_rate;
 	int asyncclk_rate;
-	u32 imp_shift;
+
 	u32 aif_format[3];
 	int (*external_amp)(int onoff);
 };
@@ -96,7 +99,12 @@ static struct device *keyword_dev;
 unsigned int keyword_type;
 
 static struct arizona_machine_priv pacific_wm5102_priv = {
-	.sysclk_rate = 4915200,
+	.sysclk_rate = 49152000,
+	.asyncclk_rate = 49152000,
+};
+
+static struct arizona_machine_priv pacific_wm1814_priv = {
+	.sysclk_rate = 49152000,
 	.asyncclk_rate = 49152000,
 };
 
@@ -204,21 +212,38 @@ void pacific_arizona_micd_cb(bool mic)
 	dev_info(the_codec->dev, "%s: ear_mic = %d\n", __func__, priv->ear_mic);
 }
 
-void pacific_update_impedance_table(unsigned int shift)
+void pacific_update_impedance_table(struct device_node *np)
 {
-	int i;
+	int len = ARRAY_SIZE(hp_gain_table);
+	u32 data[len * 3];
+	int i, shift;
 
 	WARN_ON(!the_codec);
 	if (!the_codec)
 		return;
 
-	dev_info(the_codec->dev, "%s: shift = %d\n", __func__, shift);
+	if (!of_property_read_u32_array(np, "imp_table", data, (len * 3))) {
+		dev_info(the_codec->dev, "%s: data from DT\n", __func__);
 
-	for (i = 0; i < ARRAY_SIZE(hp_gain_table); i++) {
-		if (hp_gain_table[i].min != 0)
-			hp_gain_table[i].min += shift;
-		if ((hp_gain_table[i].max + shift) < INT_MAX)
-			hp_gain_table[i].max += shift;
+		for (i = 0; i < len; i++) {
+			hp_gain_table[i].min = data[i * 3];
+			hp_gain_table[i].max = data[(i * 3) + 1];
+			hp_gain_table[i].gain = data[(i * 3) + 2];
+			dev_info(the_codec->dev, "%s: min=%d,max=%d ==> gain=%d\n", __func__, 
+				hp_gain_table[i].min,hp_gain_table[i].max,
+				hp_gain_table[i].gain);
+		}
+	}
+
+	if (!of_property_read_u32(np, "imp_shift", &shift)) {
+		dev_info(the_codec->dev, "%s: shift = %d\n", __func__, shift);
+
+		for (i = 0; i < len; i++) {
+			if (hp_gain_table[i].min != 0)
+				hp_gain_table[i].min += shift;
+			if ((hp_gain_table[i].max + shift) < INT_MAX)
+				hp_gain_table[i].max += shift;
+		}
 	}
 }
 
@@ -573,6 +598,50 @@ static int pacific_ext_mainmicbias(struct snd_soc_dapm_widget *w,
 	return 0;
 }
 
+#ifdef CONFIG_SND_USE_SUBMIC_BIAS
+static int wm5102_ext_submicbias(struct snd_soc_dapm_widget *w,
+			struct snd_kcontrol *kcontrol,  int event)
+{
+	struct snd_soc_card *card = w->dapm->card;
+	struct arizona_machine_priv *priv = card->drvdata;
+
+	switch (event) {
+	case SND_SOC_DAPM_PRE_PMU:
+		gpio_set_value(priv->sub_mic_bias_gpio,  1);
+		break;
+	case SND_SOC_DAPM_POST_PMD:
+		gpio_set_value(priv->sub_mic_bias_gpio,  0);
+		break;
+	}
+
+	dev_err(w->dapm->dev, "Sub Mic BIAS: %d mic_bias_gpio %d %d\n",
+		event, priv->sub_mic_bias_gpio, gpio_get_value(priv->sub_mic_bias_gpio));
+
+	return 0;
+}
+#endif
+
+static int wm1814_ext_submicbias(struct snd_soc_dapm_widget *w,
+			struct snd_kcontrol *kcontrol,  int event)
+{
+	struct snd_soc_card *card = w->dapm->card;
+	struct arizona_machine_priv *priv = card->drvdata;
+
+	switch (event) {
+	case SND_SOC_DAPM_PRE_PMU:
+		gpio_set_value(priv->sub_mic_bias_gpio,  1);
+		break;
+	case SND_SOC_DAPM_POST_PMD:
+		gpio_set_value(priv->sub_mic_bias_gpio,  0);
+		break;
+	}
+
+	dev_err(w->dapm->dev, "Sub Mic BIAS: %d mic_bias_gpio %d %d\n",
+		event, priv->sub_mic_bias_gpio, gpio_get_value(priv->sub_mic_bias_gpio));
+
+	return 0;
+}
+
 static const struct snd_kcontrol_new pacific_codec_controls[] = {
 	SOC_ENUM_EXT("AIF2 Mode", aif2_mode_enum[0],
 		get_aif2_mode, set_aif2_mode),
@@ -626,6 +695,26 @@ static const struct snd_kcontrol_new pacific_controls[] = {
 	SOC_DAPM_PIN_SWITCH("VI SENSING"),
 };
 
+const struct snd_soc_dapm_widget wm5102_dapm_widgets[] = {
+	SND_SOC_DAPM_OUTPUT("HDMIL"),
+	SND_SOC_DAPM_OUTPUT("HDMIR"),
+	SND_SOC_DAPM_HP("HP", NULL),
+	SND_SOC_DAPM_SPK("SPK", pacific_external_amp),
+	SND_SOC_DAPM_SPK("RCV", NULL),
+	SND_SOC_DAPM_LINE("VPS", NULL),
+	SND_SOC_DAPM_LINE("HDMI", NULL),
+
+	SND_SOC_DAPM_MIC("Headset Mic", NULL),
+	SND_SOC_DAPM_MIC("Main Mic", NULL),
+ #ifdef CONFIG_SND_USE_SUBMIC_BIAS
+	SND_SOC_DAPM_MIC("Sub Mic", wm5102_ext_submicbias),
+ #else
+	SND_SOC_DAPM_MIC("Sub Mic", NULL),
+ #endif
+	SND_SOC_DAPM_MIC("Third Mic", NULL),
+	SND_SOC_DAPM_MIC("VI SENSING", NULL),
+};
+
 const struct snd_soc_dapm_widget pacific_dapm_widgets[] = {
 	SND_SOC_DAPM_OUTPUT("HDMIL"),
 	SND_SOC_DAPM_OUTPUT("HDMIR"),
@@ -642,7 +731,69 @@ const struct snd_soc_dapm_widget pacific_dapm_widgets[] = {
 	SND_SOC_DAPM_MIC("VI SENSING", NULL),
 };
 
-const struct snd_soc_dapm_route pacific_dapm_routes[] = {
+const struct snd_soc_dapm_widget wm1814_dapm_widgets[] = {
+	SND_SOC_DAPM_OUTPUT("HDMIL"),
+	SND_SOC_DAPM_OUTPUT("HDMIR"),
+	SND_SOC_DAPM_HP("HP", NULL),
+	SND_SOC_DAPM_SPK("SPK", NULL),
+	SND_SOC_DAPM_SPK("RCV", NULL),
+	SND_SOC_DAPM_LINE("VPS", NULL),
+	SND_SOC_DAPM_LINE("HDMI", NULL),
+	SND_SOC_DAPM_MIC("Headset Mic", NULL),
+	SND_SOC_DAPM_MIC("Main Mic", NULL),
+	SND_SOC_DAPM_MIC("Sub Mic", wm1814_ext_submicbias),
+};
+
+const struct snd_soc_dapm_route pacific_wm5102_dapm_routes[] = {
+	{ "HDMIL", NULL, "AIF1RX1" },
+	{ "HDMIR", NULL, "AIF1RX2" },
+	{ "HDMI", NULL, "HDMIL" },
+	{ "HDMI", NULL, "HDMIR" },
+
+	{ "HP", NULL, "HPOUT1L" },
+	{ "HP", NULL, "HPOUT1R" },
+
+	{ "SPK", NULL, "SPKOUTLN" },
+	{ "SPK", NULL, "SPKOUTLP" },
+	{ "SPK", NULL, "SPKOUTRN" },
+	{ "SPK", NULL, "SPKOUTRP" },
+
+	{ "VPS", NULL, "HPOUT2L" },
+	{ "VPS", NULL, "HPOUT2R" },
+
+	{ "RCV", NULL, "EPOUTN" },
+	{ "RCV", NULL, "EPOUTP" },
+
+	/* SEL of main mic is connected to GND */
+#ifdef CONFIG_SND_USE_ANALOG_MIC
+	{ "IN1L", NULL, "Main Mic" },
+#else
+	{ "IN1R", NULL, "Main Mic" },
+#endif
+	{ "Main Mic", NULL, "MICBIAS2" },
+
+	/* Headset mic is Analog Mic */
+	{ "Headset Mic", NULL, "MICBIAS1" },
+	{ "IN1R", NULL, "Headset Mic" },
+
+	/* SEL of 2nd mic is connected to MICBIAS2 */
+#if defined(CONFIG_SND_USE_ANALOG_MIC)
+	{ "Sub Mic", NULL, "MICBIAS3" },
+	{ "IN2L", NULL, "Sub Mic" },
+#elif defined(CONFIG_SND_USE_3MICS)
+	{ "Sub Mic", NULL, "MICBIAS3" },
+	{ "IN3L", NULL, "Sub Mic" },
+#else
+	{ "Sub Mic", NULL, "MICBIAS3" },
+	{ "IN3R", NULL, "Sub Mic" },
+#endif
+	/* SEL of 3rd mic is connected to GND */
+	{ "Third Mic", NULL, "MICBIAS2" },
+	{ "Third Mic", NULL, "MICBIAS3" },
+	{ "IN3R", NULL, "Third Mic" },
+};
+
+const struct snd_soc_dapm_route pacific_wm5110_dapm_routes[] = {
 	{ "HDMIL", NULL, "AIF1RX1" },
 	{ "HDMIR", NULL, "AIF1RX2" },
 	{ "HDMI", NULL, "HDMIL" },
@@ -660,24 +811,21 @@ const struct snd_soc_dapm_route pacific_dapm_routes[] = {
 	{ "SPK", NULL, "HPOUT2L" },
 	{ "SPK", NULL, "HPOUT2R" },
 #endif
+
 	{ "VPS", NULL, "HPOUT2L" },
 	{ "VPS", NULL, "HPOUT2R" },
 
-#ifdef CONFIG_MFD_FLORIDA
 	{ "RCV", NULL, "HPOUT3L" },
 	{ "RCV", NULL, "HPOUT3R" },
-#else
-	{ "RCV", NULL, "EPOUTN" },
-	{ "RCV", NULL, "EPOUTP" },
-#endif
 
 	/* SEL of main mic is connected to GND */
 #ifdef CONFIG_SND_USE_ANALOG_MIC
 	{ "IN1L", NULL, "Main Mic" },
 #else
 	{ "IN1R", NULL, "Main Mic" },
-	{ "Main Mic", NULL, "MICBIAS2" },
 #endif
+	{ "Main Mic", NULL, "MICBIAS2" },
+
 	/* Headset mic is Analog Mic */
 	{ "Headset Mic", NULL, "MICBIAS1" },
 	{ "IN2R", NULL, "Headset Mic" },
@@ -698,9 +846,36 @@ const struct snd_soc_dapm_route pacific_dapm_routes[] = {
 	{ "Third Mic", NULL, "MICBIAS3" },
 	{ "IN3R", NULL, "Third Mic" },
 
+#if defined(CONFIG_SND_SOC_MAX98504) || defined(CONFIG_SND_SOC_MAX98504A)
 	{ "VI SENSING", NULL, "MICVDD" },
 	{ "IN4R", NULL, "VI SENSING" },
 	{ "IN4L", NULL, "VI SENSING" },
+#endif
+};
+
+const struct snd_soc_dapm_route pacific_wm1814_dapm_routes[] = {
+	{ "HDMIL", NULL, "AIF1RX1" },
+	{ "HDMIR", NULL, "AIF1RX2" },
+	{ "HDMI", NULL, "HDMIL" },
+	{ "HDMI", NULL, "HDMIR" },
+	{ "HP", NULL, "HPOUTL" },
+	{ "HP", NULL, "HPOUTR" },
+	{ "RCV", NULL, "EPOUT" },
+	{ "SPK", NULL, "SPKOUTLN" },
+	{ "SPK", NULL, "SPKOUTLP" },
+	{ "SPK", NULL, "SPKOUTRN" },
+	{ "SPK", NULL, "SPKOUTRP" },
+	{ "VPS", NULL, "LINEOUTL" },
+	{ "VPS", NULL, "LINEOUTR" },
+	/* SEL of main mic is connected to GND */
+	{ "Main Mic", NULL, "MICBIAS2" },
+	{ "IN1BL", NULL, "Main Mic" },
+	/* Sub mic is Analog Mic */
+	{ "Sub Mic", NULL, "MICBIAS3" },
+	{ "IN1BR", NULL, "Sub Mic" },
+	/* Headset mic is Analog Mic */
+	{ "Headset Mic", NULL, "MICBIAS1" },
+	{ "IN2B", NULL, "Headset Mic" },
 };
 
 int pacific_set_media_clocking(struct arizona_machine_priv *priv)
@@ -1031,17 +1206,84 @@ static struct snd_soc_ops pacific_aif3_ops = {
 };
 
 
+static struct snd_soc_dai_link pacific_wm1814_dai[] = {
+	{ /* playback & recording */
+		.name = "playback-pri",
+		.stream_name = "playback-pri",
+		.codec_dai_name = "vegas-aif1",
+		.ops = &pacific_aif1_ops,
+	},
+	{ /* voice call */
+		.name = "baseband",
+		.stream_name = "baseband",
+		.cpu_dai_name = "snd-soc-dummy-dai",
+		.platform_name = "snd-soc-dummy",
+		.codec_dai_name = "vegas-aif2",
+		.ops = &pacific_aif2_ops,
+		.ignore_suspend = 1,
+	},
+	{ /* bluetooth sco */
+		.name = "bluetooth sco",
+		.stream_name = "bluetooth sco",
+		.cpu_dai_name = "snd-soc-dummy-dai",
+		.platform_name = "snd-soc-dummy",
+		.codec_dai_name = "vegas-aif3",
+		.ops = &pacific_aif3_ops,
+		.ignore_suspend = 1,
+	},
+	{ /* deep buffer playback */
+		.name = "playback-sec",
+		.stream_name = "playback-sec",
+		.cpu_dai_name = "samsung-i2s-sec",
+		.platform_name = "samsung-i2s-sec",
+		.codec_dai_name = "vegas-aif1",
+		.ops = &pacific_aif1_ops,
+	},
+	{ /* eax0 playback */
+		.name = "playback-eax0",
+		.stream_name = "playback-eax0",
+		.cpu_dai_name = "samsung-eax.0",
+		.platform_name = "samsung-eax.0",
+		.codec_dai_name = "vegas-aif1",
+		.ops = &pacific_aif1_ops,
+	},
+	{ /* eax1 playback */
+		.name = "playback-eax1",
+		.stream_name = "playback-eax1",
+		.cpu_dai_name = "samsung-eax.1",
+		.platform_name = "samsung-eax.1",
+		.codec_dai_name = "vegas-aif1",
+		.ops = &pacific_aif1_ops,
+	},
+	{ /* eax2 playback */
+		.name = "playback-eax2",
+		.stream_name = "playback-eax2",
+		.cpu_dai_name = "samsung-eax.2",
+		.platform_name = "samsung-eax.2",
+		.codec_dai_name = "vegas-aif1",
+		.ops = &pacific_aif1_ops,
+	},
+	{ /* eax3playback */
+		.name = "playback-eax3",
+		.stream_name = "playback-eax3",
+		.cpu_dai_name = "samsung-eax.3",
+		.platform_name = "samsung-eax.3",
+		.codec_dai_name = "vegas-aif1",
+		.ops = &pacific_aif1_ops,
+	},
+};
+
 static struct snd_soc_dai_link pacific_wm5102_dai[] = {
 	{ /* playback & recording */
 		.name = "playback-pri",
-		.stream_name = "i2s0-pri",
+		.stream_name = "playback-pri",
 		.codec_dai_name = "wm5102-aif1",
 		.ops = &pacific_aif1_ops,
 	},
 	{ /* voice call */
 		.name = "baseband",
-		.stream_name = "pacific-ext voice call",
-		.cpu_dai_name = "pacific-ext voice call",
+		.stream_name = "baseband",
+		.cpu_dai_name = "snd-soc-dummy-dai",
 		.platform_name = "snd-soc-dummy",
 		.codec_dai_name = "wm5102-aif2",
 		.ops = &pacific_aif2_ops,
@@ -1049,8 +1291,8 @@ static struct snd_soc_dai_link pacific_wm5102_dai[] = {
 	},
 	{ /* bluetooth sco */
 		.name = "bluetooth sco",
-		.stream_name = "pacific-ext bluetooth sco",
-		.cpu_dai_name = "pacific-ext bluetooth sco",
+		.stream_name = "bluetooth sco",
+		.cpu_dai_name = "snd-soc-dummy-dai",
 		.platform_name = "snd-soc-dummy",
 		.codec_dai_name = "wm5102-aif3",
 		.ops = &pacific_aif3_ops,
@@ -1058,7 +1300,7 @@ static struct snd_soc_dai_link pacific_wm5102_dai[] = {
 	},
 	{ /* deep buffer playback */
 		.name = "playback-sec",
-		.stream_name = "i2s0-sec",
+		.stream_name = "playback-sec",
 		.cpu_dai_name = "samsung-i2s-sec",
 		.platform_name = "samsung-i2s-sec",
 		.codec_dai_name = "wm5102-aif1",
@@ -1066,17 +1308,17 @@ static struct snd_soc_dai_link pacific_wm5102_dai[] = {
 	},
 	{ /* eax0 playback */
 		.name = "playback-eax0",
-		.stream_name = "eax0",
-		.cpu_dai_name = "samsung-eax.0",
-		.platform_name = "samsung-eax.0",
+		.stream_name = "playback-eax0",
+		.cpu_dai_name = "snd-soc-dummy-dai",
+		.platform_name = "snd-soc-dummy",
 		.codec_dai_name = "wm5102-aif1",
 		.ops = &pacific_aif1_ops,
 	},
 	{ /* eax1 playback */
 		.name = "playback-eax1",
-		.stream_name = "eax1",
-		.cpu_dai_name = "samsung-eax.1",
-		.platform_name = "samsung-eax.1",
+		.stream_name = "playback-eax1",
+		.cpu_dai_name = "snd-soc-dummy-dai",
+		.platform_name = "snd-soc-dummy",
 		.codec_dai_name = "wm5102-aif1",
 		.ops = &pacific_aif1_ops,
 	},
@@ -1176,20 +1418,30 @@ static int pacific_of_get_pdata(struct snd_soc_card *card)
 		return -EINVAL;
 	}
 
-	priv->mic_bias_gpio = of_get_named_gpio(pdata_np, "mic_bias_gpio", 0);
+	if (of_find_property(pdata_np, "mic_bias_gpio", NULL)) {
+		priv->mic_bias_gpio = of_get_named_gpio(pdata_np, "mic_bias_gpio", 0);
 
-	if (priv->mic_bias_gpio >= 0) {
-		ret = gpio_request(priv->mic_bias_gpio, "MICBIAS_EN_AP");
-		if (ret)
-			dev_err(card->dev, "Failed to request gpio: %d\n", ret);
+		if (priv->mic_bias_gpio >= 0) {
+			ret = gpio_request(priv->mic_bias_gpio, "MICBIAS_EN_AP");
+			if (ret)
+				dev_err(card->dev, "Failed to request gpio: %d\n", ret);
 
-		gpio_direction_output(priv->mic_bias_gpio, 0);
+			gpio_direction_output(priv->mic_bias_gpio, 0);
+		}
 	}
 
-	if (of_property_read_u32(pdata_np, "imp_shift", &priv->imp_shift))
-		priv->imp_shift = 0;
+	if (of_find_property(pdata_np, "sub_mic_bias_gpio", NULL)) {
+		priv->sub_mic_bias_gpio = of_get_named_gpio(pdata_np, "sub_mic_bias_gpio", 0);
+		if (priv->sub_mic_bias_gpio >= 0) {
+			ret = gpio_request(priv->sub_mic_bias_gpio, "MICBIAS_EN_AP");
+			if (ret)
+				dev_err(card->dev, "Failed to request gpio: %d\n", ret);
 
-	pacific_update_impedance_table(priv->imp_shift);
+			gpio_direction_output(priv->sub_mic_bias_gpio, 0);
+		}
+	}
+
+	pacific_update_impedance_table(pdata_np);
 
 	priv->seamless_voicewakeup =
 		of_property_read_bool(pdata_np, "seamless_voicewakeup");
@@ -1697,10 +1949,10 @@ static struct snd_soc_card pacific_cards[] = {
 
 		.controls = pacific_controls,
 		.num_controls = ARRAY_SIZE(pacific_controls),
-		.dapm_widgets = pacific_dapm_widgets,
-		.num_dapm_widgets = ARRAY_SIZE(pacific_dapm_widgets),
-		.dapm_routes = pacific_dapm_routes,
-		.num_dapm_routes = ARRAY_SIZE(pacific_dapm_routes),
+		.dapm_widgets = wm5102_dapm_widgets,
+		.num_dapm_widgets = ARRAY_SIZE(wm5102_dapm_widgets),
+		.dapm_routes = pacific_wm5102_dapm_routes,
+		.num_dapm_routes = ARRAY_SIZE(pacific_wm5102_dapm_routes),
 
 		.late_probe = pacific_late_probe,
 
@@ -1723,8 +1975,8 @@ static struct snd_soc_card pacific_cards[] = {
 		.num_controls = ARRAY_SIZE(pacific_controls),
 		.dapm_widgets = pacific_dapm_widgets,
 		.num_dapm_widgets = ARRAY_SIZE(pacific_dapm_widgets),
-		.dapm_routes = pacific_dapm_routes,
-		.num_dapm_routes = ARRAY_SIZE(pacific_dapm_routes),
+		.dapm_routes = pacific_wm5110_dapm_routes,
+		.num_dapm_routes = ARRAY_SIZE(pacific_wm5110_dapm_routes),
 
 		.late_probe = pacific_late_probe,
 
@@ -1736,10 +1988,34 @@ static struct snd_soc_card pacific_cards[] = {
 
 		.drvdata = &pacific_wm5110_priv,
 	},
+	{
+		.name = "Pacific WM1814 Sound",
+		.owner = THIS_MODULE,
+
+		.dai_link = pacific_wm1814_dai,
+		.num_links = ARRAY_SIZE(pacific_wm1814_dai),
+
+		.controls = pacific_controls,
+		.num_controls = ARRAY_SIZE(pacific_controls),
+		.dapm_widgets = wm1814_dapm_widgets,
+		.num_dapm_widgets = ARRAY_SIZE(wm1814_dapm_widgets),
+		.dapm_routes = pacific_wm1814_dapm_routes,
+		.num_dapm_routes = ARRAY_SIZE(pacific_wm1814_dapm_routes),
+
+		.late_probe = pacific_late_probe,
+
+		.suspend_post = pacific_suspend_post,
+		.resume_pre = pacific_resume_pre,
+
+		.set_bias_level = pacific_set_bias_level,
+		.set_bias_level_post = pacific_set_bias_level_post,
+
+		.drvdata = &pacific_wm1814_priv,
+	},
 };
 
 const char *card_ids[] = {
-	"wm5102", "wm5110"
+	"wm5102", "wm5110", "wm1814"
 };
 
 static int pacific_audio_probe(struct platform_device *pdev)
@@ -1760,7 +2036,7 @@ static int pacific_audio_probe(struct platform_device *pdev)
 	}
 
 	if (n == ARRAY_SIZE(card_ids)) {
-		dev_err(&pdev->dev, "couldn't find card\n");
+		dev_err(&pdev->dev, "%s :couldn't find card\n", __func__);
 		return -EINVAL;
 	}
 
@@ -1769,7 +2045,7 @@ static int pacific_audio_probe(struct platform_device *pdev)
 
 	priv->mclk = devm_clk_get(card->dev, "mclk");
 	if (IS_ERR(priv->mclk)) {
-		dev_dbg(card->dev, "Device tree node not found for mclk");
+		dev_dbg(card->dev, "%s :Device tree node not found for mclk", __func__);
 		priv->mclk = NULL;
 	} else
 		clk_prepare(priv->mclk);
@@ -1845,3 +2121,4 @@ module_platform_driver(pacific_audio_driver);
 MODULE_DESCRIPTION("ALSA SoC PACIFIC ARIZONA");
 MODULE_LICENSE("GPL");
 MODULE_ALIAS("platform:pacific-audio");
+

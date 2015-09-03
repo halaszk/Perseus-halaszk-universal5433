@@ -133,7 +133,11 @@ static void exynos_adc_hw_init(struct exynos_adc *info)
 		writel(con1, ADC_V2_CON1(info->regs));
 
 		con2 = ADC_V2_CON2_OSEL | ADC_V2_CON2_ESEL |
+#ifdef CONFIG_JACK_ADC_MORE_CTIME
+			ADC_V2_CON2_HIGHF | ADC_V2_CON2_C_TIME(6);
+#else
 			ADC_V2_CON2_HIGHF | ADC_V2_CON2_C_TIME(0);
+#endif
 		writel(con2, ADC_V2_CON2(info->regs));
 
 		/* Enable interrupts */
@@ -155,7 +159,11 @@ static void exynos_adc_hw_deinit(struct exynos_adc *info)
 	if (info->version == ADC_V2) {
 		con2 = readl(ADC_V2_CON2(info->regs));
 		con2 &= ~(ADC_V2_CON2_OSEL | ADC_V2_CON2_ESEL |
+#ifdef CONFIG_JACK_ADC_MORE_CTIME
+			ADC_V2_CON2_HIGHF | ADC_V2_CON2_C_TIME(6));
+#else
 			ADC_V2_CON2_HIGHF | ADC_V2_CON2_C_TIME(0));
+#endif
 		writel(con2, ADC_V2_CON2(info->regs));
 
 		/* Disable interrupts */

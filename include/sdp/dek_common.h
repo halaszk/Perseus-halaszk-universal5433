@@ -4,12 +4,15 @@
 // ==== kernel configs
 #include <linux/limits.h>
 #include <linux/ioctl.h>
+#include <linux/device.h>
+
 #include <sdp/common.h>
 
 // ==== common configs
-#define SDPK_DEFAULT_ALGOTYPE (SDPK_ALGOTYPE_ASYMM_DH)
+#define SDPK_DEFAULT_ALGOTYPE (SDPK_ALGOTYPE_ASYMM_ECDH)
 #define SDPK_ALGOTYPE_ASYMM_RSA 0
-#define SDPK_ALGOTYPE_ASYMM_DH	1
+#define SDPK_ALGOTYPE_ASYMM_DH  1
+#define SDPK_ALGOTYPE_ASYMM_ECDH  2
 
 //#define DEK_ENGINE_LOCAL_KEK
 #define KEK_RSA_KEY_BITS        2048
@@ -28,16 +31,17 @@
 #define KEK_SS_LEN              (KEK_SS_BITS/8)
 #define DEK_AES_HEADER          44
 #define FEK_MAXLEN				32
-#define EFEK_MAXLEN				(FEK_MAXLEN+1)
+#define EFEK_MAXLEN				(FEK_MAXLEN+16)
 
 #define AES_BLOCK_SIZE 			16
 
 // DEK types
-#define DEK_TYPE_PLAIN 		0
-#define DEK_TYPE_RSA_ENC 	1
-#define DEK_TYPE_AES_ENC 	2
-//#define DEK_TYPE_DH_PUB 	4
-#define DEK_TYPE_DH_ENC		5
+#define DEK_TYPE_PLAIN          0
+#define DEK_TYPE_RSA_ENC        1
+#define DEK_TYPE_AES_ENC        2
+//#define DEK_TYPE_DH_PUB       4
+#define DEK_TYPE_DH_ENC         5
+#define DEK_TYPE_ECDH256_ENC    6
 
 // KEK types
 #define KEK_TYPE_SYM 		10
@@ -45,13 +49,17 @@
 #define KEK_TYPE_RSA_PRIV 	12
 #define KEK_TYPE_DH_PUB 	13
 #define KEK_TYPE_DH_PRIV 	14
+#define KEK_TYPE_ECDH256_PUB    15
+#define KEK_TYPE_ECDH256_PRIV   16
 
 #define SDPK_PATH_MAX	256
 #define SDPK_PATH_FMT    "/data/system/users/%d/SDPK_%s"
-#define SDPK_DPRI_NAME   "Dpri"
-#define SDPK_DPUB_NAME   "Dpub"
 #define SDPK_RPRI_NAME   "Rpri"
 #define SDPK_RPUB_NAME   "Rpub"
+#define SDPK_DPRI_NAME   "Dpri"
+#define SDPK_DPUB_NAME   "Dpub"
+#define SDPK_EDPRI_NAME   "EDpri"
+#define SDPK_EDPUB_NAME   "EDpub"
 #define SDPK_SYM_NAME     "sym"
 
 typedef struct _password{
@@ -68,7 +76,7 @@ typedef struct _key{
 typedef struct _kek{
 	unsigned int type;
 	unsigned int len;
-	unsigned char buf[KEK_MAX_LEN];
+	unsigned char buf[KEK_MAXLEN];
 }kek_t;
 
 typedef struct _payload{
@@ -87,5 +95,19 @@ typedef struct _payload{
 #define DEK_LOGD(...)
 #endif /* DEK_DEBUG */
 #define DEK_LOGE(...) printk("dek: "__VA_ARGS__)
+
+void key_dump(unsigned char *buf, int len);
+
+int is_kek_available(int userid, int kek_type);
+
+int dek_create_sysfs_asym_alg(struct device *d);
+int dek_create_sysfs_key_dump(struct device *d);
+int get_sdp_sysfs_asym_alg(void);
+int get_sdp_sysfs_key_dump(void);
+
+int is_root(void);
+int is_current_epmd(void);
+int is_current_adbd(void);
+int is_system_server(void);
 
 #endif

@@ -8,7 +8,7 @@
 #include <linux/types.h>
 #include <linux/highmem.h>
 
-#ifdef CONFIG_SOC_EXYNOS5433
+#if defined(CONFIG_SOC_EXYNOS5433) || defined(CONFIG_SOC_EXYNOS5430)
 #if defined(__GNUC__) && \
 	defined(__GNUC_MINOR__) && \
 	defined(__GNUC_PATCHLEVEL__) && \
@@ -39,7 +39,7 @@ static inline u32 exynos_smc_verity(u32 cmd, u32 arg1, u32 arg2, u32 arg3)
 
 static int verity_scm_call(void)
 {
-#ifdef CONFIG_SOC_EXYNOS5433
+#if defined(CONFIG_SOC_EXYNOS5433) || defined(CONFIG_SOC_EXYNOS5430)
 #define	CMD_READ_SYSTEM_IMAGE_CHECK_STATUS 3
 	return exynos_smc_verity(0x83000006, CMD_READ_SYSTEM_IMAGE_CHECK_STATUS, 0, 0);
 #else

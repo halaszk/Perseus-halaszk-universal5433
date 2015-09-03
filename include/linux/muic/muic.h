@@ -169,9 +169,6 @@ struct muic_platform_data {
 	int usb_path;
 	int uart_path;
 
-	/* muic path status value (suspend/resume) for rustproof */
-	u8 path_status;
-
 	bool rustproof_on;
 	bool afc_disable;
 

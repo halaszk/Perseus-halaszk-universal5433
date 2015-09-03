@@ -46,6 +46,14 @@ enum mhl_attached_type {
 	MHL_DETTACHED = 0,
 	MHL_ATTACHED,
 };
+
+enum mhl_attached_type_ex {
+	MHL_UNHANDLED = 0,
+	MHL_MUIC_DEV,
+	MHL_SMART_DOCK,
+	MHL_MM_DOCK,
+};
+
 struct sii8240_platform_data {
 
 	/* Called to setup board-specific power operations */
@@ -64,6 +72,7 @@ struct sii8240_platform_data {
 	/* to handle board-specific connector info & callback */
 	enum dongle_type dongle;
 	enum connector_type conn;
+	enum mhl_attached_type_ex	mhl_muic_type;
 
 	u8 power_state;
 	u32	swing_level;

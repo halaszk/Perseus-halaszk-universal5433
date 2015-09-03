@@ -99,12 +99,10 @@ static s32 i2c_dataread(HANDLE handle, u8 chip, u16 addr, u8 *data, u16 length)
 	return i2c_bulkread(handle, chip, addr, data, length);
 }
 
-s32 fc8080_i2c_init(HANDLE handle, u16 param1, u16 param2)
+s32 fc8080_i2c_init(HANDLE handle, unsigned long param)
 {
-	static u32 fc8080_i2c_temp;
-	fc8080_i2c_temp = param2;
-	fc8080_i2c_temp <<= 16;
-	fc8080_i2c_temp |= param1;
+	static unsigned long fc8080_i2c_temp;
+	fc8080_i2c_temp = param;
 
 	fc8080_i2c = (struct i2c_client *)fc8080_i2c_temp;
 	DPRINTK("%s : 0x%p\n", __func__, fc8080_i2c);

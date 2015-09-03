@@ -388,6 +388,7 @@ int dw_pcie_link_up(struct pcie_port *pp)
 
 extern int check_rev(void);
 extern int l1ss_enable;
+
 void dw_pcie_config_l1ss(struct pcie_port *pp)
 {
 	u32 val;
@@ -742,12 +743,13 @@ static int dw_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
 		return -EINVAL;
 	}
 
+	spin_lock_irqsave(&pp->conf_lock, flags);
 	if (dw_pcie_valid_config(pp, bus, PCI_SLOT(devfn)) == 0) {
+		spin_unlock_irqrestore(&pp->conf_lock, flags);
 		*val = 0xffffffff;
 		return PCIBIOS_DEVICE_NOT_FOUND;
 	}
 
-	spin_lock_irqsave(&pp->conf_lock, flags);
 	if (bus->number != pp->root_bus_nr)
 		ret = dw_pcie_rd_other_conf(pp, bus, devfn,
 						where, size, val);
@@ -770,10 +772,12 @@ static int dw_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
 		return -EINVAL;
 	}
 
-	if (dw_pcie_valid_config(pp, bus, PCI_SLOT(devfn)) == 0)
-		return PCIBIOS_DEVICE_NOT_FOUND;
-
 	spin_lock_irqsave(&pp->conf_lock, flags);
+	if (dw_pcie_valid_config(pp, bus, PCI_SLOT(devfn)) == 0) {
+		spin_unlock_irqrestore(&pp->conf_lock, flags);
+		return PCIBIOS_DEVICE_NOT_FOUND;
+	}
+
 	if (bus->number != pp->root_bus_nr)
 		ret = dw_pcie_wr_other_conf(pp, bus, devfn,
 						where, size, val);

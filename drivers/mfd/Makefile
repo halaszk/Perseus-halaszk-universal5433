@@ -46,8 +46,14 @@ endif
 ifneq ($(CONFIG_MFD_WM8997),n)
 obj-$(CONFIG_MFD_ARIZONA)	+= wm8997-tables.o
 endif
-ifneq ($(CONFIG_MFD_WM8998),n)
-obj-$(CONFIG_MFD_WM8998)	+= wm8998-tables.o
+ifneq ($(CONFIG_MFD_VEGAS),n)
+obj-$(CONFIG_MFD_ARIZONA)	+= vegas-tables.o
+endif
+ifneq ($(CONFIG_MFD_CLEARWATER),n)
+obj-$(CONFIG_MFD_ARIZONA)	+= clearwater-tables.o
+endif
+ifneq ($(CONFIG_MFD_CS47L24),n)
+obj-$(CONFIG_MFD_ARIZONA)	+= cs47l24-tables.o
 endif
 obj-$(CONFIG_MFD_WM8400)	+= wm8400-core.o
 wm831x-objs			:= wm831x-core.o wm831x-irq.o wm831x-otp.o
@@ -60,6 +66,7 @@ wm8350-objs			+= wm8350-irq.o
 obj-$(CONFIG_MFD_WM8350)	+= wm8350.o
 obj-$(CONFIG_MFD_WM8350_I2C)	+= wm8350-i2c.o
 obj-$(CONFIG_MFD_WM8994)	+= wm8994-core.o wm8994-irq.o wm8994-regmap.o
+obj-$(CONFIG_MFD_RT5511)	+= rt5511-core.o
 
 obj-$(CONFIG_TPS6105X)		+= tps6105x.o
 obj-$(CONFIG_TPS65010)		+= tps65010.o
@@ -117,6 +124,7 @@ obj-$(CONFIG_MFD_MAX77804K)	+= max77804.o max77804k-irq.o
 obj-$(CONFIG_MFD_MAX77823)	+= max77823.o
 obj-$(CONFIG_MFD_MAX77828)	+= max77828.o max77828-irq.o
 obj-$(CONFIG_MFD_MAX77843)	+= max77843.o max77843-irq.o
+obj-$(CONFIG_MFD_MAX77849)	+= max77849.o max77849-irq.o
 obj-$(CONFIG_MFD_MAX77888)	+= max77888.o max77888-irq.o
 obj-$(CONFIG_MFD_MAX8907)	+= max8907.o
 max8925-objs			:= max8925-core.o max8925-i2c.o
@@ -166,4 +174,7 @@ obj-$(CONFIG_MFD_SYSCON)	+= syscon.o
 obj-$(CONFIG_MFD_LM3533)	+= lm3533-core.o lm3533-ctrlbank.o
 obj-$(CONFIG_VEXPRESS_CONFIG)	+= vexpress-config.o vexpress-sysreg.o
 obj-$(CONFIG_MFD_RETU)		+= retu-mfd.o
+obj-$(CONFIG_MFD_RT5033)	+= rt5033_core.o rt5033_irq.o
 obj-$(CONFIG_MFD_AS3711)	+= as3711.o
+
+obj-$(CONFIG_MFD_SM5703)	+= sm5703_core.o sm5703_irq.o

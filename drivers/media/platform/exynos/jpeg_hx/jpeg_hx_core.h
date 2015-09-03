@@ -119,15 +119,6 @@ enum jpeg_result {
 	ERR_UNKNOWN,
 };
 
-enum  jpeg_img_quality_level {
-	QUALITY_LEVEL_1 = 0,	/* high */
-	QUALITY_LEVEL_2,
-	QUALITY_LEVEL_3,
-	QUALITY_LEVEL_4,
-	QUALITY_LEVEL_5,
-	QUALITY_LEVEL_6,	/* low */
-};
-
 /* raw data image format */
 enum jpeg_frame_format {
 	YCRCB_444_2P,
@@ -221,7 +212,7 @@ struct jpeg_enc_param {
 
 	enum jpeg_frame_format in_fmt;
 	enum jpeg_stream_format out_fmt;
-	enum jpeg_img_quality_level quality;
+	int quality;
 };
 
 struct jpeg_frame {

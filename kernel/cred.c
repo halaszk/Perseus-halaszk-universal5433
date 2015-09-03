@@ -439,7 +439,9 @@ int copy_creds(struct task_struct *p, unsigned long clone_flags)
 	 * create a new one, while all other threads in the same thread group still
 	 * reference the old one, whose reference counter decreases by 2.
 	 */
-#ifndef CONFIG_TIMA_RKP_RO_CRED
+#ifdef CONFIG_TIMA_RKP_RO_CRED
+	if(!rkp_cred_enable){
+#endif /*CONFIG_TIMA_RKP_RO_CRED*/
 	if (
 #ifdef CONFIG_KEYS
 		!p->cred->thread_keyring &&
@@ -455,7 +457,9 @@ int copy_creds(struct task_struct *p, unsigned long clone_flags)
 		atomic_inc(&p->cred->user->processes);
 		return 0;
 	}
-#endif  /* CONFIG_TIMA_RKP_RO_CRED */
+#ifdef CONFIG_TIMA_RKP_RO_CRED
+	}
+#endif /*CONFIG_TIMA_RKP_RO_CRED*/
 
 	new = prepare_creds();
 	if (!new)
@@ -488,26 +492,33 @@ int copy_creds(struct task_struct *p, unsigned long clone_flags)
 
 	atomic_inc(&new->user->processes);
 #ifdef CONFIG_TIMA_RKP_RO_CRED
-	new_ro = kmem_cache_alloc(cred_jar_ro, GFP_KERNEL);
-	if (!new_ro)
-		panic("copy_creds(): kmem_cache_alloc() failed");
+	if(rkp_cred_enable){
+		new_ro = kmem_cache_alloc(cred_jar_ro, GFP_KERNEL);
+		if (!new_ro)
+			panic("copy_creds(): kmem_cache_alloc() failed");
 
-//#ifndef CONFIG_TIMA_RKP_COHERENT_TT	
-	v7_flush_kern_dcache_area(new_ro, sizeof(struct cred));
-	v7_flush_kern_dcache_area(new, sizeof(struct cred));
-//#endif	
-	tima_send_cmd3((unsigned int)new_ro, (unsigned int)new,(unsigned int)p,0x47);
-//#ifndef CONFIG_TIMA_RKP_COHERENT_TT		
-	v7_flush_kern_dcache_area(new_ro, sizeof(struct cred));
-//#endif
-	rkp_use_cnt = atomic_read(&new->usage);
-	rkp_use_cnt = rkp_use_cnt + 1;
+		//#ifndef CONFIG_TIMA_RKP_COHERENT_TT	
+		v7_flush_kern_dcache_area(new_ro, sizeof(struct cred));
+		v7_flush_kern_dcache_area(new, sizeof(struct cred));
+		//#endif	
+		tima_send_cmd3((unsigned int)new_ro, (unsigned int)new,(unsigned int)p,0x47);
+		//#ifndef CONFIG_TIMA_RKP_COHERENT_TT		
+		v7_flush_kern_dcache_area(new_ro, sizeof(struct cred));
+		//#endif
+		rkp_use_cnt = atomic_read(&new->usage);
+		rkp_use_cnt = rkp_use_cnt + 1;
 
-	rocred_uc_set(new_ro,rkp_use_cnt);
-	p->cred = p->real_cred = new_ro;
+		rocred_uc_set(new_ro,rkp_use_cnt);
+		p->cred = p->real_cred = new_ro;
 
-	validate_creds(new_ro);
-	kmem_cache_free(cred_jar, new);
+		validate_creds(new_ro);
+		kmem_cache_free(cred_jar, new);
+	}
+	else {
+		p->cred = p->real_cred = get_cred(new);
+		alter_cred_subscribers(new, 2);
+		validate_creds(new);
+	}
 #else
 	p->cred = p->real_cred = get_cred(new);
 	alter_cred_subscribers(new, 2);
@@ -586,9 +597,13 @@ int commit_creds(struct cred *new)
 #endif
 	BUG_ON(atomic_read(&new->usage) < 1);
 
-#ifndef CONFIG_TIMA_RKP_RO_CRED
+#ifdef CONFIG_TIMA_RKP_RO_CRED
+	if(!rkp_cred_enable) {
+#endif  /* CONFIG_TIMA_RKP_RO_CRED */
 	get_cred(new); /* we will require a ref for the subj creds too */
-#endif
+#ifdef CONFIG_TIMA_RKP_RO_CRED
+	}
+#endif  /* CONFIG_TIMA_RKP_RO_CRED */
 
 	/* dumpability changes */
 	if (!uid_eq(old->euid, new->euid) ||
@@ -616,6 +631,7 @@ int commit_creds(struct cred *new)
 	if (new->user != old->user)
 		atomic_inc(&new->user->processes);
 #ifdef CONFIG_TIMA_RKP_RO_CRED
+	if(rkp_cred_enable) {
 	new_ro = kmem_cache_alloc(cred_jar_ro, GFP_KERNEL);
 	if (!new_ro)
 		panic("commit_creds(): kmem_cache_alloc() failed");
@@ -631,6 +647,11 @@ int commit_creds(struct cred *new)
 	rcu_assign_pointer(task->real_cred, new_ro);
 	rcu_assign_pointer(task->cred, new_ro);
 	rocred_uc_set(new_ro,2);
+	}
+	else {
+		rcu_assign_pointer(task->real_cred, new);
+		rcu_assign_pointer(task->cred, new);
+	}
 #else
 	rcu_assign_pointer(task->real_cred, new);
 	rcu_assign_pointer(task->cred, new);
@@ -652,9 +673,8 @@ int commit_creds(struct cred *new)
 	    !gid_eq(new->fsgid, old->fsgid))
 		proc_id_connector(task, PROC_EVENT_GID);
 #ifdef CONFIG_TIMA_RKP_RO_CRED
-	alter_cred_subscribers(new, -1);
-	
-	if (!tima_ro_page((unsigned long)new)) {
+	if (rkp_cred_enable && 
+		!tima_ro_page((unsigned long)new)) {
 		rkp_use_cnt = atomic_read(&new->usage);
 		if(rkp_use_cnt == 1) {
 			atomic_set(&new->usage, 0);
@@ -722,23 +742,30 @@ const struct cred *override_creds(const struct cred *new)
 	validate_creds(old);
 	validate_creds(new);
 #ifdef CONFIG_TIMA_RKP_RO_CRED
-	new_ro = kmem_cache_alloc(cred_jar_ro, GFP_KERNEL);
-	if (!new_ro)
-		panic("override_creds(): kmem_cache_alloc() failed");
-	
-	/* Cache flushes to make sure we don't crash! */
-	v7_flush_kern_dcache_area(new_ro, sizeof(struct cred));
-	v7_flush_kern_dcache_area((struct cred *)new, sizeof(struct cred));
-	tima_send_cmd4((unsigned int)new_ro, (unsigned int)new,1,rkp_use_count,0x46);
-	v7_flush_kern_dcache_area(new_ro, sizeof(struct cred));
+	if(rkp_cred_enable) {
+		new_ro = kmem_cache_alloc(cred_jar_ro, GFP_KERNEL);
+		if (!new_ro)
+			panic("override_creds(): kmem_cache_alloc() failed");
 
-	rocred_uc_set(new_ro,2);
-	rcu_assign_pointer(current->cred, new_ro);
-	if(!tima_ro_page((unsigned long)new)){
-		if(atomic_read(&new->usage) == 1) {
-			kmem_cache_free(cred_jar, (void *)(*cnew));
-			*cnew = new_ro; 
+		/* Cache flushes to make sure we don't crash! */
+		v7_flush_kern_dcache_area(new_ro, sizeof(struct cred));
+		v7_flush_kern_dcache_area((struct cred *)new, sizeof(struct cred));
+		tima_send_cmd4((unsigned int)new_ro, (unsigned int)new,1,rkp_use_count,0x46);
+		v7_flush_kern_dcache_area(new_ro, sizeof(struct cred));
+
+		rocred_uc_set(new_ro,2);
+		rcu_assign_pointer(current->cred, new_ro);
+		if(!tima_ro_page((unsigned long)new)){
+			if(atomic_read(&new->usage) == 1) {
+				kmem_cache_free(cred_jar, (void *)(*cnew));
+				*cnew = new_ro; 
+			}
 		}
+	} 
+	else {
+		get_cred(new);
+		alter_cred_subscribers(new, 1);
+		rcu_assign_pointer(current->cred, new);
 	}
 #else
 	get_cred(new);
@@ -781,20 +808,20 @@ void revert_creds(const struct cred *old)
 	rcu_assign_pointer(current->cred, old);
 	alter_cred_subscribers(override, -1);
 #ifdef CONFIG_TIMA_RKP_RO_CRED
-	rkp_use_cnt = rkp_get_usecount((struct cred*)override);
-	if (tima_ro_page((unsigned long)override)) {
-		rkp_use_cnt = rocred_uc_read(override);
-		
-		if( (override->type) && (rkp_use_cnt == 2)){
-			rocred_uc_set(override, 0);
-			kmem_cache_free(cred_jar_ro, (struct cred *)override);
-			return;
+	if(rkp_cred_enable) {
+		rkp_use_cnt = rkp_get_usecount((struct cred*)override);
+		if (tima_ro_page((unsigned long)override)) {
+			rkp_use_cnt = rocred_uc_read(override);
+
+			if( (override->type) && (rkp_use_cnt == 2)){
+				rocred_uc_set(override, 0);
+				kmem_cache_free(cred_jar_ro, (struct cred *)override);
+				return;
+			}
 		}
 	}
-	put_cred(override);
-#else
-	put_cred(override);
 #endif  /* CONFIG_TIMA_RKP_RO_CRED */
+	put_cred(override);
 }
 EXPORT_SYMBOL(revert_creds);
 
@@ -814,22 +841,25 @@ void __init cred_init(void)
 	cred_jar = kmem_cache_create("cred_jar", sizeof(struct cred),
 				     0, SLAB_HWCACHE_ALIGN|SLAB_PANIC, NULL);
 #ifdef CONFIG_TIMA_RKP_RO_CRED
-	cred_jar_ro = kmem_cache_create("cred_jar_ro", sizeof(struct cred),
+	if(rkp_cred_enable)
+	{
+		cred_jar_ro = kmem_cache_create("cred_jar_ro", sizeof(struct cred),
 			0, SLAB_HWCACHE_ALIGN|SLAB_PANIC, cred_ctor);
-	tima_send_cmd((unsigned int)cred_jar_ro->size,0x49);
+		tima_send_cmd((unsigned int)cred_jar_ro->size,0x49);
 
 /* Code for initializing Credential Protection */
-	tima_send_cmd5((unsigned long)__rkp_ro_start, (unsigned long)__rkp_ro_end,
+	
+		tima_send_cmd5((unsigned long)__rkp_ro_start, (unsigned long)__rkp_ro_end,
 					sizeof(struct cred), offsetof(struct task_struct, cred),
 					offsetof(struct task_struct, active_mm), 0x40);		
-	tima_send_cmd5(offsetof(struct cred, uid), offsetof(struct cred, euid), 
+		tima_send_cmd5(offsetof(struct cred, uid), offsetof(struct cred, euid), 
 					offsetof(struct cred, bp_pgd), offsetof(struct cred, bp_task), 
 					offsetof(struct cred, type), 0x41);
-	tima_send_cmd5(offsetof(struct cred,security),offsetof(struct task_struct,pid),
+		tima_send_cmd5(offsetof(struct cred,security),offsetof(struct task_struct,pid),
 					offsetof(struct task_struct,real_parent),offsetof(struct task_struct,comm),
 					offsetof(struct mm_struct,pgd),0x42);
-
 	printk(KERN_ERR"RKP CRED INIT %x\n", sizeof(struct cred));
+	}
 
 #endif  /* CONFIG_TIMA_RKP_RO_CRED */
 }

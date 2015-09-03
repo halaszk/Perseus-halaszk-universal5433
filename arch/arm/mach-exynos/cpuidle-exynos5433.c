@@ -205,6 +205,10 @@ extern int check_wifi_op(void);
 extern void exynos_pci_lpa_resume(void);
 #endif
 
+#ifdef CONFIG_BCM4358
+extern int wl_check_wifi_scanning(void);
+#endif
+
 #ifdef CONFIG_BT
 extern int check_bt_op(void);
 #endif
@@ -320,12 +324,12 @@ static int exynos_check_lpc(void)
 		return 1;
 #endif
 
-#if 0
-#if defined(CONFIG_GPS_BCMxxxxx)
+//#if 0
+#if defined(CONFIG_GPS_BCMxxxxx) && !defined(CONFIG_GPS_BCM4773)
 	if (check_gps_op())
 		return 1;
 #endif
-#endif
+//#endif
 
 #if defined(CONFIG_VIDEO_EXYNOS_FIMG2D)
 	if (exynos_check_reg_status(exynos5_lpc_power_domain,
@@ -1042,6 +1046,11 @@ static int exynos_enter_c2(struct cpuidle_device *dev,
 
 #ifdef CONFIG_SEC_PM
 	if (!(enable_mask & ENABLE_C2))
+		return exynos_enter_idle(dev, drv, 0);
+#endif
+
+#ifdef CONFIG_BCM4358
+	if (wl_check_wifi_scanning())
 		return exynos_enter_idle(dev, drv, 0);
 #endif
 

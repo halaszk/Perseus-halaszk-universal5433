@@ -75,13 +75,12 @@ static int cryptomgr_probe(void *data)
 	/* change@dtl.ksingh
 	 * Below if condition needs to test for valid point
 	 * but instead it was testing for NULL. Crypto APIs never
-	 * return NULL, hence in failure case this was causing
+	 * return NULL, hence in failure case this was causing 
 	 * kernel panic
 	 */
 	if (!tmpl || IS_ERR(tmpl))
 		goto out;
 #endif
-
 	do {
 		if (tmpl->create) {
 			err = tmpl->create(tmpl, param->tb);

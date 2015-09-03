@@ -28,8 +28,7 @@ void jpeg_set_dec_in_fmt(void __iomem *base, enum jpeg_frame_format in_fmt);
 void jpeg_set_dec_out_fmt(void __iomem *base, enum jpeg_frame_format out_fmt);
 void jpeg_set_enc_in_fmt(void __iomem *base, enum jpeg_frame_format in_fmt);
 void jpeg_set_enc_out_fmt(void __iomem *base, enum jpeg_frame_format out_fmt);
-void jpeg_set_enc_tbl(void __iomem *base,
-		enum jpeg_img_quality_level level);
+void jpeg_set_enc_tbl(void __iomem *base, unsigned int quality_factor);
 void jpeg_set_dec_tbl(void __iomem *base,
 		struct jpeg_tables *tables);
 void jpeg_set_interrupt(void __iomem *base);
@@ -42,8 +41,7 @@ void jpeg_set_stream_buf_address(void __iomem *base, unsigned int address);
 void jpeg_set_stream_size(void __iomem *base,
 		unsigned int x_value, unsigned int y_value);
 void jpeg_set_frame_buf_address(void __iomem *base, enum jpeg_frame_format fmt, unsigned int address, unsigned int width, unsigned int height);
-void jpeg_set_encode_tbl_select(void __iomem *base,
-		enum jpeg_img_quality_level level);
+void jpeg_set_encode_tbl_select(void __iomem *base);
 void jpeg_set_decode_tbl_select(void __iomem *base,
 		struct jpeg_tables_info *tinfo);
 void jpeg_set_encode_hoff_cnt(void __iomem *base, enum jpeg_frame_format fmt);

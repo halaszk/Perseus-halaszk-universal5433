@@ -27,8 +27,7 @@ void jpeg_hx_set_enc_in_fmt(void __iomem *base,
 					enum jpeg_frame_format in_fmt);
 void jpeg_hx_set_enc_out_fmt(void __iomem *base,
 					enum jpeg_stream_format out_fmt);
-void jpeg_hx_set_enc_tbl(void __iomem *base,
-					enum jpeg_img_quality_level level);
+void jpeg_hx_set_enc_tbl(void __iomem *base, int level);
 void jpeg_hx_set_interrupt(void __iomem *base);
 unsigned int jpeg_hx_get_int_status(void __iomem *base);
 unsigned int jpeg_hx_get_timer_status(void __iomem *base);
@@ -41,8 +40,7 @@ void jpeg_hx_set_stream_buf_address(void __iomem *base, unsigned int address);
 void jpeg_hx_set_stream_size(void __iomem *base,
 		unsigned int x_value, unsigned int y_value);
 void jpeg_hx_set_frame_buf_address(void __iomem *base, enum jpeg_frame_format fmt, unsigned int address, unsigned int width, unsigned int height);
-void jpeg_hx_set_encode_tbl_select(void __iomem *base,
-		enum jpeg_img_quality_level level);
+void jpeg_hx_set_encode_tbl_select(void __iomem *base);
 void jpeg_hx_set_encode_hoff_cnt(void __iomem *base, enum jpeg_stream_format fmt);
 void jpeg_hx_set_dec_bitstream_size(void __iomem *base, unsigned int size);
 unsigned int jpeg_hx_get_stream_size(void __iomem *base);

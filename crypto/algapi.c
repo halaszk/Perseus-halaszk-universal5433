@@ -895,7 +895,7 @@ struct crypto_instance *crypto_alloc_instance(const char *name,
 	struct crypto_spawn *spawn;
 	int err;
 
- #ifdef CONFIG_CRYPTO_FIPS
+#ifdef CONFIG_CRYPTO_FIPS
 	if (unlikely(in_fips_err()))
 		return ERR_PTR(-EACCES);
 #endif
@@ -1048,7 +1048,7 @@ static int __init crypto_algapi_init(void)
 #ifndef CONFIG_CRYPTO_FIPS
 	crypto_init_proc();
 #else
-	//Moved to testmgr*/
+	//Moved to testmgr
 #endif
 	return 0;
 }
@@ -1058,7 +1058,7 @@ static void __exit crypto_algapi_exit(void)
 #ifndef CONFIG_CRYPTO_FIPS
 	crypto_exit_proc();
 #else
-	//Moved to testmgr*/
+	//Moved to testmgr
 #endif
 }
 

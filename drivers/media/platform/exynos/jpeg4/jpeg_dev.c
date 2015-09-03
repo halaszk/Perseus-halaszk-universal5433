@@ -500,7 +500,7 @@ static void jpeg_device_run(void *priv)
 
 	if (jpeg->mode == ENCODING) {
 		jpeg_set_enc_tbl(jpeg->reg_base, param.quality);
-		jpeg_set_encode_tbl_select(jpeg->reg_base, param.quality);
+		jpeg_set_encode_tbl_select(jpeg->reg_base);
 
 		jpeg_set_enc_out_fmt(jpeg->reg_base, param.out_fmt);
 		jpeg_set_enc_in_fmt(jpeg->reg_base, param.in_fmt);

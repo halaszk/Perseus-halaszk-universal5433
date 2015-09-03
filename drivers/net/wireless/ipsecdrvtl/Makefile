@@ -56,6 +56,7 @@ $(TARGET_NAME)-objs := \
   bw.o\
   bx.o\
   by.o\
+  bz.o\
 
 EXTRA_CFLAGS += $(_CFLAGS)
 EXTRA_CFLAGS += -D__linux -DDEVL -D_CPUDPENCAP -DIPSECDRVTL_EXPORTS -DNO_HAS160 -DNO_NES -DNO_CRYPT\

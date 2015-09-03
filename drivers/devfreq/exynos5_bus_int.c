@@ -38,6 +38,10 @@ extern struct devfreq_opp_table devfreq_int_opp_list[];
 extern int exynos5_devfreq_int_tmu_notifier(struct notifier_block *nb, unsigned long event,
 						void *v);
 
+#ifdef CONFIG_ARM_EXYNOS5433_BUS_DEVFREQ_TEMP_INT_MINLOCK
+extern unsigned int system_rev;
+#endif
+
 #ifdef CONFIG_EXYNOS_THERMAL
 extern unsigned int get_limit_voltage(unsigned int voltage, unsigned int volt_offset);
 #endif
@@ -352,19 +356,26 @@ static int exynos5_devfreq_int_remove(struct platform_device *pdev)
 
 static int exynos5_devfreq_int_suspend(struct device *dev)
 {
+#ifdef CONFIG_ARM_EXYNOS5433_BUS_DEVFREQ_TEMP_INT_MINLOCK
+	if (pm_qos_request_active(&exynos5_int_qos) && (system_rev >= 4))
+		pm_qos_update_request(&exynos5_int_qos, exynos5_devfreq_int_profile.initial_freq);
+#else
 	if (pm_qos_request_active(&exynos5_int_qos))
 		pm_qos_update_request(&exynos5_int_qos, exynos5_devfreq_int_profile.initial_freq);
-
+#endif
 	return 0;
 }
 
 static int exynos5_devfreq_int_resume(struct device *dev)
 {
 	struct exynos_devfreq_platdata *pdata = dev->platform_data;
-
+#ifdef CONFIG_ARM_EXYNOS5433_BUS_DEVFREQ_TEMP_INT_MINLOCK
+	if (pm_qos_request_active(&exynos5_int_qos) && (system_rev >= 4))
+		pm_qos_update_request(&exynos5_int_qos, pdata->default_qos);
+#else
 	if (pm_qos_request_active(&exynos5_int_qos))
 		pm_qos_update_request(&exynos5_int_qos, pdata->default_qos);
-
+#endif
 	return 0;
 }
 
@@ -394,9 +405,18 @@ static int __init exynos5_devfreq_int_qos_init(void)
 	pm_qos_add_request(&min_int_thermal_qos, PM_QOS_DEVICE_THROUGHPUT, exynos5433_qos_int.default_qos);
 	pm_qos_add_request(&boot_int_qos, PM_QOS_DEVICE_THROUGHPUT, exynos5433_qos_int.default_qos);
 	pm_qos_add_request(&exynos5_int_bts_qos, PM_QOS_DEVICE_THROUGHPUT, exynos5433_qos_int.default_qos);
+#ifdef CONFIG_ARM_EXYNOS5433_BUS_DEVFREQ_TEMP_INT_MINLOCK
+	if(system_rev >= 4) {
+		pm_qos_update_request_timeout(&exynos5_int_qos,
+					exynos5_devfreq_int_profile.initial_freq, 40000 * 1000);
+	} else {
+		pr_info("DEVFREQ(INT) : Set 400 INT MINLOCK because HWREV is %d(under HWREV 04)\n", system_rev);
+	        pm_qos_update_request(&exynos5_int_qos,exynos5_devfreq_int_profile.initial_freq);
+	}
+#else
 	pm_qos_update_request_timeout(&exynos5_int_qos,
 					exynos5_devfreq_int_profile.initial_freq, 40000 * 1000);
-
+#endif
 	return 0;
 }
 device_initcall(exynos5_devfreq_int_qos_init);

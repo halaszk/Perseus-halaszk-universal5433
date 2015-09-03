@@ -122,7 +122,7 @@ static void mtv319_power_off(void)
 	}
 }
 
-static bool mtv319_power_on(void)
+static bool mtv319_power_on(int param)
 {
 	DPRINTK("mtv319_power_on\n");
 

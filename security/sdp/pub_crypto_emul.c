@@ -142,6 +142,8 @@ static int __do_dek_crypt(pub_crypto_request_t *req, char *ret) {
 	switch(req->opcode) {
 	case OP_DH_ENC:
 	case OP_DH_DEC:
+    case OP_ECDH_ENC:
+    case OP_ECDH_DEC:
 		dump(req->result.dek.buf, req->result.dek.len, "req->result.dek");
 		memcpy(ret, &(req->result.dek), sizeof(dek_t));
 		//dump(req->result.dek.buf, req->result.dek.len, "req->result.dek");
@@ -258,17 +260,14 @@ int do_dek_crypt(int opcode, dek_t *in, dek_t *out, kek_t *key){
 		switch(req->opcode) {
 		case OP_RSA_ENC:
 		case OP_RSA_DEC:
-			req->msg.rsa.request_id = req->id;
-			req->msg.rsa.opcode = req->opcode;
-			memcpy(&req->msg.rsa.in, (void *) in, sizeof(dek_t));
-			memcpy(&req->msg.rsa.key, (void *) key, sizeof(kek_t));
-			break;
 		case OP_DH_ENC:
 		case OP_DH_DEC:
-			req->msg.dh.request_id = req->id;
-			req->msg.dh.opcode = req->opcode;
-			memcpy(&req->msg.rsa.in, (void *) in, sizeof(dek_t));
-			memcpy(&req->msg.rsa.key, (void *) key, sizeof(kek_t));
+        case OP_ECDH_ENC:
+        case OP_ECDH_DEC:
+			req->cipher_param.request_id = req->id;
+			req->cipher_param.opcode = req->opcode;
+			memcpy(&req->cipher_param.in, (void *) in, sizeof(dek_t));
+			memcpy(&req->cipher_param.key, (void *) key, sizeof(kek_t));
 			break;
 		default:
 			PUB_CRYPTO_LOGE("opcode[%d] failed, not supported\n", opcode);
@@ -312,6 +311,14 @@ int dh_decryptEDEK(dek_t *edek, dek_t *dek, kek_t *key){
 	return do_dek_crypt(OP_DH_DEC, edek, dek, key);
 }
 
+int ecdh_encryptDEK(dek_t *dek, dek_t *edek, kek_t *key){
+    return do_dek_crypt(OP_ECDH_ENC, dek, edek, key);
+}
+
+int ecdh_decryptEDEK(dek_t *edek, dek_t *dek, kek_t *key){
+    return do_dek_crypt(OP_ECDH_DEC, edek, dek, key);
+}
+
 static int pub_crypto_request_get_msg(pub_crypto_request_t *req, char **msg)
 {
 	int msg_len = -1;
@@ -319,13 +326,12 @@ static int pub_crypto_request_get_msg(pub_crypto_request_t *req, char **msg)
 	switch(req->opcode) {
 		case OP_RSA_ENC:
 		case OP_RSA_DEC:
-			*msg = (char *)&req->msg.rsa;
-			msg_len = sizeof(struct rsa_send_msg);
-			break;
 		case OP_DH_DEC:
 		case OP_DH_ENC:
-			*msg = (char *)&req->msg.dh;
-			msg_len = sizeof(struct dh_send_msg);
+        case OP_ECDH_DEC:
+        case OP_ECDH_ENC:
+			*msg = (char *)&req->cipher_param;
+			msg_len = sizeof(cipher_param_t);
 			break;
 		default:
 			*msg = NULL;

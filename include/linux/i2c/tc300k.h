@@ -24,6 +24,7 @@ struct tc300k_platform_data {
 	int gpio_int;
 	int gpio_sda;
 	int gpio_scl;
+	int gpio_sub_det;
 	int i2c_gpio;
 	int (*power) (bool on);
 	int (*power_isp) (bool on);
@@ -33,12 +34,14 @@ struct tc300k_platform_data {
 	u32 scl_gpio_flags;
 	const char *regulator_ic;
 	const char *regulator_led;
+	bool boot_on_ldo;
 
 	int *keycode;
 	int key_num;
 	const char *fw_name;
-	u32 fw_version;
 	u32 sensing_ch_num;
+	u32 use_bitmap;
+	u32 tsk_ic_num;
 };
 
 #endif /* __LINUX_TC300K_H */

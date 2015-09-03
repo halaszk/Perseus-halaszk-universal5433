@@ -73,6 +73,10 @@ struct mipi_dsim_config g_dsim_config = {
 	.dsim_ddi_pd = &s6e3fa0_mipi_lcd_driver,
 #elif defined(CONFIG_DECON_LCD_S6E3FA2)
 	.dsim_ddi_pd = &s6e3fa2_mipi_lcd_driver,
+#elif defined(CONFIG_DECON_LCD_S6TNMR7)
+	.dsim_ddi_pd = &s6tnmr7_mipi_lcd_driver,
+#elif defined(CONFIG_DECON_LCD_S6E3HA1)
+	.dsim_ddi_pd = &s6e3ha1_mipi_lcd_driver,
 #endif
 };
 

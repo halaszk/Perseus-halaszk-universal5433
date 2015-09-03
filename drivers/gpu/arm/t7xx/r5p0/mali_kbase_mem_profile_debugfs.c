@@ -75,6 +75,9 @@ static int kbasep_mem_profile_seq_show(struct seq_file *sfile, void *data)
 #if SLSI_INTEGRATION
 	if (!kbasep_mem_profile_check_kctx(kctx))
 		return 0;
+
+ 	if (kctx->destroying_context)               
+		return 0;
 #endif
 
 	spin_lock(&kctx->mem_profile_lock);

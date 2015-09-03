@@ -21,6 +21,7 @@
 #define __SEC_BATTERY_H __FILE__
 
 #include <linux/battery/sec_charging_common.h>
+#include <linux/of_gpio.h>
 #if defined(ANDROID_ALARM_ACTIVATED)
 #include <linux/android_alarm.h>
 #else
@@ -39,12 +40,14 @@
 #include <linux/sec_batt.h>
 
 #if defined(CONFIG_BATTERY_SWELLING)
-#define BATT_SWELLING_HIGH_TEMP_BLOCK		500
-#define BATT_SWELLING_HIGH_TEMP_RECOV		450
-#define BATT_SWELLING_LOW_TEMP_BLOCK		100
-#define BATT_SWELLING_LOW_TEMP_RECOV		150
+#define BATT_SWELLING_HIGH_TEMP_BLOCK	500
+#define BATT_SWELLING_HIGH_TEMP_RECOV	450
+#define BATT_SWELLING_LOW_TEMP_BLOCK	50
+#define BATT_SWELLING_LOW_TEMP_RECOV	100
+#define BATT_SWELLING_NORMAL_VOLTAGE	4400
 #define BATT_SWELLING_RECHG_VOLTAGE		4150
-#define BATT_SWELLING_BLOCK_TIME	10 * 60 /* 10 min */
+#define BATT_SWELLING_DROP_VOLTAGE		4250
+#define BATT_SWELLING_BLOCK_TIME		10 * 60 /* 10 min */
 #endif
 
 #define ADC_CH_COUNT		10
@@ -79,6 +82,7 @@ struct sec_battery_info {
 	int voltage_avg;		/* average voltage (mV) */
 	int voltage_ocv;		/* open circuit voltage (mV) */
 	int current_now;		/* current (mA) */
+	int inbat_adc;                  /* inbat adc */
 	int current_avg;		/* average current (mA) */
 	int current_max;		/* input current limit (mA) */
 	int current_adc;
@@ -174,6 +178,7 @@ struct sec_battery_info {
 	/* test mode */
 	int test_mode;
 	bool factory_mode;
+	bool store_mode;
 	bool slate_mode;
 
 	int siop_level;
@@ -181,9 +186,10 @@ struct sec_battery_info {
 	int stability_test;
 	int eng_not_full_status;
 #endif
+
+	bool charging_block;
 #if defined(CONFIG_BATTERY_SWELLING)
 	bool swelling_mode;
-	bool swelling_block;
 	unsigned long swelling_block_start;
 	unsigned long swelling_block_passed;
 	int swelling_full_check_cnt;
@@ -191,6 +197,13 @@ struct sec_battery_info {
 #if defined(CONFIG_AFC_CHARGER_MODE)
 	char *hv_chg_name;
 #endif
+#if defined(CONFIG_BATTERY_SWELLING_SELF_DISCHARGING)
+	bool factory_self_discharging_mode_on;
+	bool force_discharging;
+	bool self_discharging;
+	int self_discharging_adc;
+#endif
+	int cycle;
 };
 
 ssize_t sec_bat_show_attrs(struct device *dev,
@@ -260,6 +273,7 @@ enum {
 	WC_STATUS,
 	WC_ENABLE,
 	FACTORY_MODE,
+	STORE_MODE,
 	UPDATE,
 	TEST_MODE,
 
@@ -288,7 +302,14 @@ enum {
 	BATT_TEST_CHARGE_CURRENT,
 	BATT_STABILITY_TEST,
 #endif
+	BATT_CAPACITY_MAX,
 	BATT_INBAT_VOLTAGE,
+#if defined(CONFIG_BATTERY_SWELLING_SELF_DISCHARGING)
+	BATT_DISCHARGING_CHECK,
+	BATT_DISCHARGING_CHECK_ADC,
+	BATT_SELF_DISCHARGING_CONTROL,
+#endif
+	BATTERY_CYCLE,
 };
 
 #ifdef CONFIG_OF

@@ -24,13 +24,11 @@
 #include <linux/irq.h>
 #include <linux/interrupt.h>
 #include <linux/pinctrl/consumer.h>
-#include <mach/gpio.h>
-
 
 #define TDMB_DEBUG
 
 #ifdef TDMB_DEBUG
-#define DPRINTK(x...) printk(KERN_DEBUG "TDMB " x)
+#define DPRINTK(fmt,...) printk(KERN_DEBUG "TDMB " fmt, ##__VA_ARGS__)
 #else
 #define DPRINTK(x...) /* null */
 #endif
@@ -95,14 +93,14 @@ struct sub_ch_info_type {
 	/* FIG 0/2	*/
 	unsigned char tmid; /* 2 bits */
 	unsigned char svc_type; /* 6 bits */
-	unsigned long svc_id; /* 16/32 bits */
+	unsigned int svc_id; /* 16/32 bits */
 	unsigned char svc_label[SVC_LABEL_MAX+1]; /* 16*8 bits */
 	unsigned char ecc;	/* 8 bits */
 	unsigned char scids;	/* 4 bits */
 } ;
 
 struct ensemble_info_type {
-	unsigned long ensem_freq;	/* 4 bytes */
+	unsigned int ensem_freq;	/* 4 bytes */
 	unsigned char tot_sub_ch;	/* MAX: 64 */
 
 	unsigned short ensem_id;
@@ -159,10 +157,11 @@ struct tdmb_dt_platform_data {
 	int tdmb_rst;
 	int tdmb_use_rst;
 	int tdmb_use_irq;
-#if defined(CONFIG_TDMB_SLSI)
-	struct pinctrl *tdmb_irq_pinctrl;
-	struct pinctrl_state *irq_on, *irq_off;
+#ifdef CONFIG_TDMB_XTAL_FREQ
+	int tdmb_xtal_freq;
 #endif
+	struct pinctrl *tdmb_pinctrl;
+	struct pinctrl_state *pwr_on, *pwr_off;
 #ifdef CONFIG_TDMB_ANT_DET
 	int tdmb_ant_irq;
 #endif
@@ -182,7 +181,7 @@ bool tdmb_store_data(unsigned char *data, unsigned long len);
 
 struct tdmb_drv_func {
 	bool (*init) (void);
-	bool (*power_on) (void);
+	bool (*power_on) (int param);
 	void (*power_off) (void);
 	bool (*scan_ch) (struct ensemble_info_type *ensembleInfo,
 						unsigned long freq);
@@ -198,12 +197,6 @@ extern unsigned int *tdmb_ts_tail;
 extern char *tdmb_ts_buffer;
 extern unsigned int tdmb_ts_size;
 
-#if defined(CONFIG_TDMB_T3900) || defined(CONFIG_TDMB_T39F0)
-struct tdmb_drv_func *t3900_drv_func(void);
-#endif
-#if defined(CONFIG_TDMB_FC8050)
-struct tdmb_drv_func *fc8050_drv_func(void);
-#endif
 #if defined(CONFIG_TDMB_FC8080)
 struct tdmb_drv_func *fc8080_drv_func(void);
 #endif
@@ -223,10 +216,12 @@ extern unsigned long tdmb_get_if_handle(void);
 #if defined(CONFIG_TDMB_TSIF_SLSI) || defined(CONFIG_TDMB_TSIF_QC)
 extern int tdmb_tsi_start(void (*callback)(u8 *data, u32 length), int packet_cnt);
 extern int tdmb_tsi_stop(void);
+extern void tdmb_tsi_deinit(void);
 #endif
 
+/*
 #ifdef CONFIG_SAMSUNG_LPM_MODE
 extern int poweroff_charging;
 #endif
-
+*/
 #endif

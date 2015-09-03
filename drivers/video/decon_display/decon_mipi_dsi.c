@@ -519,6 +519,7 @@ int s5p_mipi_dsi_rd_data(struct mipi_dsim_device *dsim, u32 data_id,
 		dev_dbg(dsim->dev, "Short Packet was received from LCD module.\n");
 		for (i = 0; i <= count; i++)
 			buf[i] = (rx_fifo >> (8 + i * 8)) & 0xff;
+		rx_size = count;
 		break;
 	case MIPI_DSI_RX_DCS_LONG_READ_RESPONSE:
 	case MIPI_DSI_RX_GENERIC_LONG_READ_RESPONSE:
@@ -526,6 +527,9 @@ int s5p_mipi_dsi_rd_data(struct mipi_dsim_device *dsim, u32 data_id,
 		rx_size = (rx_fifo & 0x00ffff00) >> 8;
 		dev_info(dsim->dev, "rx fifo : %8x, response : %x, rx_size : %d\n",
 				rx_fifo, rx_fifo & 0xff, rx_size);
+		/* prevent Stack crash */
+		if(rx_size > count)
+			rx_size = count;
 		/* Read data from RX packet payload */
 		for (i = 0; i < rx_size >> 2; i++) {
 			rx_fifo = readl(dsim->reg_base + S5P_DSIM_RXFIFO);

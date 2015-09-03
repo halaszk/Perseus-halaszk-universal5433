@@ -97,6 +97,15 @@ static inline void set_copro_access(unsigned int val)
 #endif /* ifdef CONFIG_CPU_CP15 / else */
 
 #ifdef CONFIG_TIMA_RKP
+#define RKP_DEFERRED_INIT 0xe
+
+struct rkp_init_struct {
+	volatile unsigned long _text;
+	volatile unsigned long _stext;
+	volatile unsigned long _etext;
+	volatile unsigned long __v7_setup_stack;
+} __attribute__((packed));
+
 #define FC_ID 		0x83800000
 #define BUILD_CMD_ID(cmdid)	(FC_ID | (((cmdid) & 0x3ff) << 12))
 int tima_is_pg_protected(unsigned long va);

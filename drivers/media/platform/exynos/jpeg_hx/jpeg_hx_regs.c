@@ -313,16 +313,7 @@ void jpeg_hx_coef(void __iomem *base, enum jpeg_mode mode, struct jpeg_dev *jpeg
 	}
 }
 
-void jpeg_hx_set_qtbl(void __iomem *base, const unsigned char *qtbl,
-		   unsigned long tab, int len)
-{
-	int i;
-
-	for (i = 0; i < len; i++)
-		writel((unsigned int)qtbl[i], base + tab + (i * 0x04));
-}
-
-void jpeg_hx_set_htbl(void __iomem *base, const unsigned char *htbl,
+static void jpeg_hx_set_htbl(void __iomem *base, const unsigned char *htbl,
 		   unsigned long tab, int len)
 {
 	int i;
@@ -330,68 +321,57 @@ void jpeg_hx_set_htbl(void __iomem *base, const unsigned char *htbl,
 		writel((unsigned int)htbl[i], base + tab + (i * 0x04));
 }
 
-void jpeg_hx_set_enc_tbl(void __iomem *base,
-	enum jpeg_img_quality_level level)
+/*
+ * Quantization tables provided by IOC/IEC 10918-1 K.1 and K.2
+ * for YUV420 and YUV422
+ */
+static const unsigned char default_luma_qtable[64] __aligned(64) = {
+	16, 11, 10, 16, 24,  40,  51,  61,
+	12, 12, 14, 19, 26,  58,  60,  55,
+	14, 13, 16, 24, 40,  57,  69,  56,
+	14, 17, 22, 29, 51,  87,  80,  62,
+	18, 22, 37, 56, 68,  109, 103, 77,
+	24, 35, 55, 64, 81,  104, 113, 92,
+	49, 64, 78, 87, 103, 121, 120, 101,
+	72, 92, 95, 98, 112, 100, 103, 99
+};
+
+static const unsigned char default_chroma_qtable[64] __aligned(64) = {
+	17, 18, 24, 47, 99, 99, 99, 99,
+	18, 21, 26, 66, 99, 99, 99, 99,
+	24, 26, 56, 99, 99, 99, 99, 99,
+	47, 66, 99, 99, 99, 99, 99, 99,
+	99, 99, 99, 99, 99, 99, 99, 99,
+	99, 99, 99, 99, 99, 99, 99, 99,
+	99, 99, 99, 99, 99, 99, 99, 99,
+	99, 99, 99, 99, 99, 99, 99, 99
+};
+
+/*
+ * Calculate quantizer values according to the formula
+ * suggestedby IETF RFC2435.
+ */
+static inline u32 getq(unsigned char deffact, unsigned int factor)
 {
-	unsigned int i, j;
+	return max(min(((deffact * factor + 50) / 100) & 0xFF, 255U), 1U);
+}
 
-	switch (level) {
-	case QUALITY_LEVEL_1:
-		for (i = 0; i < 4; i++) {
-			j = i % 2;
-			jpeg_hx_set_qtbl(base, qtbl[0][j], JPEG_QTBL_CONTENT(j),
-					ARRAY_SIZE(qtbl[0][j]));
-		}
-		break;
+void jpeg_hx_set_enc_tbl(void __iomem *base, int quality_factor)
+{
+	unsigned int i;
 
-	case QUALITY_LEVEL_2:
-		for (i = 0; i < 4; i++) {
-			j = i % 2;
-			jpeg_hx_set_qtbl(base, qtbl[1][j], JPEG_QTBL_CONTENT(j),
-					ARRAY_SIZE(qtbl[1][j]));
-		}
-		break;
+	quality_factor = min(quality_factor, 100);
+	quality_factor = max(quality_factor, 1);
+	quality_factor = (quality_factor < 50) ?
+			5000 / quality_factor : 200 - (quality_factor * 2);
 
-	case QUALITY_LEVEL_3:
-		for (i = 0; i < 4; i++) {
-			j = i % 2;
-			jpeg_hx_set_qtbl(base, qtbl[2][j], JPEG_QTBL_CONTENT(j),
-					ARRAY_SIZE(qtbl[2][j]));
-		}
-		break;
-
-	case QUALITY_LEVEL_4:
-		for (i = 0; i < 4; i++) {
-			j = i % 2;
-			jpeg_hx_set_qtbl(base, qtbl[3][j], JPEG_QTBL_CONTENT(j),
-					ARRAY_SIZE(qtbl[3][j]));
-		}
-		break;
-
-	case QUALITY_LEVEL_5:
-		for (i = 0; i < 4; i++) {
-			j = i % 2;
-			jpeg_hx_set_qtbl(base, qtbl[4][j], JPEG_QTBL_CONTENT(j),
-					ARRAY_SIZE(qtbl[4][j]));
-		}
-		break;
-
-	case QUALITY_LEVEL_6:
-		for (i = 0; i < 4; i++) {
-			j = i % 2;
-			jpeg_hx_set_qtbl(base, qtbl[5][j], JPEG_QTBL_CONTENT(j),
-					ARRAY_SIZE(qtbl[5][j]));
-		}
-		break;
-
-	default:
-		for (i = 0; i < 4; i++) {
-			j = i % 2;
-			jpeg_hx_set_qtbl(base, qtbl[0][j], JPEG_QTBL_CONTENT(j),
-					ARRAY_SIZE(qtbl[0][j]));
-		}
-		break;
+	for (i = 0; i < 64; i++) {
+		__raw_writel(getq(default_luma_qtable[i], quality_factor),
+				base + JPEG_QTBL0 + i * 4);
+		__raw_writel(getq(default_chroma_qtable[i], quality_factor),
+				base + JPEG_QTBL1 + i * 4);
 	}
+
 	jpeg_hx_set_htbl(base, len_dc_luminance, JPEG_HDCTBL(0), ARRAY_SIZE(len_dc_luminance));
 	jpeg_hx_set_htbl(base, val_dc_luminance, JPEG_HDCTBLG(0), ARRAY_SIZE(val_dc_luminance));
 	jpeg_hx_set_htbl(base, len_ac_luminance, JPEG_HACTBL(0), ARRAY_SIZE(len_ac_luminance));
@@ -402,52 +382,15 @@ void jpeg_hx_set_enc_tbl(void __iomem *base,
 	jpeg_hx_set_htbl(base, val_ac_chrominance, JPEG_HACTBLG(1), ARRAY_SIZE(val_ac_chrominance));
 }
 
-void jpeg_hx_set_encode_tbl_select(void __iomem *base,
-	enum jpeg_img_quality_level level)
+void jpeg_hx_set_encode_tbl_select(void __iomem *base)
 {
 
 	unsigned int	reg;
-	switch (level) {
-	case QUALITY_LEVEL_1:
-		reg = JPEG_Q_TBL_Y_0 | JPEG_Q_TBL_Cb_1 |
+	reg = JPEG_Q_TBL_Y_0 | JPEG_Q_TBL_Cb_1 |
 		JPEG_Q_TBL_Cr_1 |
 		JPEG_HUFF_TBL_Y_AC_0 | JPEG_HUFF_TBL_Y_DC_0 |
 		JPEG_HUFF_TBL_Cb_AC_1 | JPEG_HUFF_TBL_Cb_DC_1 |
 		JPEG_HUFF_TBL_Cr_AC_1 | JPEG_HUFF_TBL_Cr_DC_1;
-		break;
-
-	case QUALITY_LEVEL_2:
-		reg = JPEG_Q_TBL_Y_0 | JPEG_Q_TBL_Cb_1 |
-		JPEG_Q_TBL_Cr_1 |
-		JPEG_HUFF_TBL_Y_AC_0 | JPEG_HUFF_TBL_Y_DC_0 |
-		JPEG_HUFF_TBL_Cb_AC_1 | JPEG_HUFF_TBL_Cb_DC_1 |
-		JPEG_HUFF_TBL_Cr_AC_1 | JPEG_HUFF_TBL_Cr_DC_1;
-		break;
-
-	case QUALITY_LEVEL_3:
-		reg = JPEG_Q_TBL_Y_0 | JPEG_Q_TBL_Cb_1 |
-		JPEG_Q_TBL_Cr_1 |
-		JPEG_HUFF_TBL_Y_AC_0 | JPEG_HUFF_TBL_Y_DC_0 |
-		JPEG_HUFF_TBL_Cb_AC_1 | JPEG_HUFF_TBL_Cb_DC_1 |
-		JPEG_HUFF_TBL_Cr_AC_1 | JPEG_HUFF_TBL_Cr_DC_1;
-		break;
-
-	case QUALITY_LEVEL_4:
-		reg = JPEG_Q_TBL_Y_0 | JPEG_Q_TBL_Cb_1 |
-		JPEG_Q_TBL_Cr_1 |
-		JPEG_HUFF_TBL_Y_AC_0 | JPEG_HUFF_TBL_Y_DC_0 |
-		JPEG_HUFF_TBL_Cb_AC_1 | JPEG_HUFF_TBL_Cb_DC_1 |
-		JPEG_HUFF_TBL_Cr_AC_1 | JPEG_HUFF_TBL_Cr_DC_1;
-		break;
-
-	default:
-		reg = JPEG_Q_TBL_Y_0 | JPEG_Q_TBL_Cb_1 |
-		JPEG_Q_TBL_Cr_1 |
-		JPEG_HUFF_TBL_Y_AC_0 | JPEG_HUFF_TBL_Y_DC_0 |
-		JPEG_HUFF_TBL_Cb_AC_1 | JPEG_HUFF_TBL_Cb_DC_1 |
-		JPEG_HUFF_TBL_Cr_AC_1 | JPEG_HUFF_TBL_Cr_DC_1;
-		break;
-	}
 	writel(reg, base + JPEG_QHTBL);
 }
 

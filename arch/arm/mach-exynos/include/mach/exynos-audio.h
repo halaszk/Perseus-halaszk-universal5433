@@ -10,7 +10,9 @@
 
 #ifndef _EXYNOS_AUDIO_H
 #define _EXYNOS_AUDIO_H __FILE__
-
+#ifdef CONFIG_2MIC_AUDIENCE_ES325
+#include <linux/io.h>
+#endif
 #include <mach/regs-pmu.h>
 
 static inline void exynos5_audio_set_mclk(bool enable, bool forced)

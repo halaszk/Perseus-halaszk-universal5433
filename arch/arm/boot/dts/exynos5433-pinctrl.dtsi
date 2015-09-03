@@ -363,21 +363,21 @@
 		sd0_bus1: sd0-bus-width1 {
 			samsung,pins = "gpr1-0";
 			samsung,pin-function = <2>;
-			samsung,pin-pud = <3>;
+			samsung,pin-pud = <0>;
 			samsung,pin-drv = <3>;
 		};
 
 		sd0_bus4: sd0-bus-width4 {
 			samsung,pins = "gpr1-1", "gpr1-2", "gpr1-3";
 			samsung,pin-function = <2>;
-			samsung,pin-pud = <3>;
+			samsung,pin-pud = <0>;
 			samsung,pin-drv = <3>;
 		};
 
 		sd0_bus8: sd0-bus-width8 {
 			samsung,pins = "gpr1-4", "gpr1-5", "gpr1-6", "gpr1-7";
 			samsung,pin-function = <2>;
-			samsung,pin-pud = <3>;
+			samsung,pin-pud = <0>;
 			samsung,pin-drv = <3>;
 		};
 
@@ -447,14 +447,14 @@
 		sd2_bus1: sd2-bus-width1 {
 			samsung,pins = "gpr4-3";
 			samsung,pin-function = <2>;
-			samsung,pin-pud = <3>;
+			samsung,pin-pud = <0>;
 			samsung,pin-drv = <2>;
 		};
 
 		sd2_bus4: sd2-bus-width4 {
 			samsung,pins = "gpr4-4", "gpr4-5", "gpr4-6";
 			samsung,pin-function = <2>;
-			samsung,pin-pud = <3>;
+			samsung,pin-pud = <0>;
 			samsung,pin-drv = <2>;
 		};
 
@@ -789,7 +789,7 @@
 		hs_i2c11_bus: hs-i2c11-bus {
 			samsung,pins = "gpg3-3", "gpg3-2";
 			samsung,pin-function = <4>;
-			samsung,pin-pud = <3>;
+			samsung,pin-pud = <0>;
 			samsung,pin-drv = <0>;
 		};
 

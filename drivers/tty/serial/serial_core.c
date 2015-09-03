@@ -37,7 +37,7 @@
 #include <asm/irq.h>
 #include <asm/uaccess.h>
 
-#if defined(CONFIG_BT_BCM4339) || defined(CONFIG_BT_BCM4354) || defined(CONFIG_BT_BCM4358) /* This is just temporary features*/
+#if defined(CONFIG_BT_BCM4339) || defined(CONFIG_BT_BCM4354) || defined(CONFIG_BT_BCM4358) || defined(CONFIG_BT_BCM43455)/* This is just temporary features*/
 #if defined(CONFIG_SOC_EXYNOS5430) || defined(CONFIG_SOC_EXYNOS5433)
 #define BT4339_LINE 3
 #else
@@ -191,7 +191,7 @@ static int uart_port_startup(struct tty_struct *tty, struct uart_state *state,
 		if (tty_port_cts_enabled(port)) {
 			spin_lock_irq(&uport->lock);
 			if (!(uport->ops->get_mctrl(uport) & TIOCM_CTS))
-#if defined(CONFIG_BT_BCM4339) || defined(CONFIG_BT_BCM4354) || defined(CONFIG_BT_BCM4358)
+#if defined(CONFIG_BT_BCM4339) || defined(CONFIG_BT_BCM4354) || defined(CONFIG_BT_BCM4358) || defined(CONFIG_BT_BCM43455)
 				if (uport->line != BT4339_LINE)
 				tty->hw_stopped = 1;
 #else
@@ -1318,7 +1318,7 @@ static void uart_set_termios(struct tty_struct *tty,
 	else if (!(old_termios->c_cflag & CRTSCTS) && (cflag & CRTSCTS)) {
 		spin_lock_irqsave(&uport->lock, flags);
 		if (!(uport->ops->get_mctrl(uport) & TIOCM_CTS)) {
-#if defined(CONFIG_BT_BCM4339) || defined(CONFIG_BT_BCM4354) || defined(CONFIG_BT_BCM4358)
+#if defined(CONFIG_BT_BCM4339) || defined(CONFIG_BT_BCM4354) || defined(CONFIG_BT_BCM4358) || defined(CONFIG_BT_BCM43455)
 			if (uport->line != BT4339_LINE)
 				tty->hw_stopped = 1;
 #else

@@ -395,19 +395,6 @@ void kbase_pm_suspend(struct kbase_device *kbdev)
 	int nr_keep_gpu_powered_ctxs;
 	KBASE_DEBUG_ASSERT(kbdev);
 
-	mutex_lock(&kbdev->pm.lock);
-	KBASE_DEBUG_ASSERT(!kbase_pm_is_suspending(kbdev));
-	kbdev->pm.suspending = MALI_TRUE;
-	mutex_unlock(&kbdev->pm.lock);
-
-	/* From now on, the active count will drop towards zero. Sometimes, it'll
-	 * go up briefly before going down again. However, once it reaches zero it
-	 * will stay there - guaranteeing that we've idled all pm references */
-
-	/* Suspend job scheduler and associated components, so that it releases all
-	 * the PM active count references */
-	kbasep_js_suspend(kbdev);
-
 #if SLSI_INTEGRATION
 	if (kbdev->hwcnt.prev_mm) {
 		struct exynos_context *platform = (struct exynos_context *) kbdev->platform_context;
@@ -429,7 +416,24 @@ void kbase_pm_suspend(struct kbase_device *kbdev)
 			kbase_instr_hwcnt_suspend(kbdev);
 
 		mutex_unlock(&kbdev->hwcnt.mlock);
-	} else
+	}
+#endif
+
+	mutex_lock(&kbdev->pm.lock);
+	KBASE_DEBUG_ASSERT(!kbase_pm_is_suspending(kbdev));
+	kbdev->pm.suspending = MALI_TRUE;
+	mutex_unlock(&kbdev->pm.lock);
+
+	/* From now on, the active count will drop towards zero. Sometimes, it'll
+	 * go up briefly before going down again. However, once it reaches zero it
+	 * will stay there - guaranteeing that we've idled all pm references */
+
+	/* Suspend job scheduler and associated components, so that it releases all
+	 * the PM active count references */
+	kbasep_js_suspend(kbdev);
+
+#if SLSI_INTEGRATION
+	if (!kbdev->hwcnt.prev_mm)
 #endif
 	/* Suspend any counter collection that might be happening */
 	kbase_instr_hwcnt_suspend(kbdev);

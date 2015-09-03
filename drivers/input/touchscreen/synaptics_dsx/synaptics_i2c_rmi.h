@@ -53,7 +53,7 @@
 #define CHECK_PR_NUMBER
 #define REPORT_2D_W
 
-#define USE_DETECTION_FLAG_2
+//#define USE_DETECTION_FLAG_2
 #define USE_STYLUS
 /* #define SKIP_UPDATE_FW_ON_PROBE */
 /* #define REPORT_2D_Z */
@@ -204,7 +204,7 @@
 #define OBJ_TYPE_GLOVE			(1 << 5)
 #define OBJ_TYPE_NARROW_SWIPE	(1 << 6)
 #define OBJ_TYPE_HANDEDGE		(1 << 7)
-#define OBJ_TYPE_DEFAULT			(0x85)
+#define OBJ_TYPE_DEFAULT		(0x85)
 /*OBJ_TYPE_FINGER, OBJ_TYPE_UNCLASSIFIED, OBJ_TYPE_HANDEDGE*/
 
 /* Define for Data report enable Mask(F12_2D_CTRL28) */

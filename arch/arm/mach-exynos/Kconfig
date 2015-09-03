@@ -281,6 +281,12 @@ config ASV_MARGIN_TEST
 	help
 	  Support to ASV voltage margin test
 
+config SKIP_HW_BREAKPOINT
+	bool "support skip hw breakpoint"
+	default n
+	help
+	  Support early param for T32 onchip breakpoint
+
 config SAMSUNG_PRODUCT_SHIP
 	bool "set up for product shipping"
 	default n
@@ -793,6 +799,10 @@ config MACH_KALTE_KOR_LGT
 	bool "LG U+"
 endchoice
 
+config MACH_A7LTE
+	bool "A7 LTE Helsinki feature"
+	default n
+
 config TIMA
 	bool "Enable TIMA(Trustzone based Integrity Measurement Archtecture feature"
 	default n
@@ -807,6 +817,13 @@ config TIMA_RKP
 	bool "Enable RKP (Realtime Kernel Protection) TIMA feature"
 	depends on TIMA
 	default n
+
+config RKP_DBLMAP_PROT
+	bool "Page Double Mapping protection"
+	depends on TIMA
+	default y
+	help
+	Prevents unauthorized cred modification.
 
 config HYP_RKP
 	bool "Enable Hypervisor RKP"
@@ -836,7 +853,7 @@ config TIMA_RKP_L1_TABLES
 config TIMA_RKP_L2_TABLES
 	bool
 	depends on TIMA_RKP
-	default y
+	default n
 	help
 	  TIMA taking over management L2 tables too.
 
@@ -857,21 +874,21 @@ config TIMA_RKP_LAZY_MMU
 config TIMA_IOMMU_OPT
 	bool
 	depends on TIMA_RKP_L2_TABLES
-	default	y
+	default	n
 	help
 	  TIMA IOMMU optimization for L2 pages
 	
 config TIMA_KMAP_OPT
 	bool
 	depends on TIMA_RKP_L2_TABLES
-	default	y
+	default	n
 	help
 	  TIMA KMAP optimization for L2 pages
 
 config TIMA_DALVIKHEAP_OPT
 	bool
 	depends on TIMA_RKP_L2_TABLES
-	default	y 
+	default	n 
 	help
 	  TIMA DALVIK HEAP optimization for L2 pages
 
@@ -941,3 +958,9 @@ config EXYNOS_RUN_QUEUE_STATS
 	 This option enalbes statistics collection on Run Queue. A daemon
          in user mode, called MPDecision will be using this data to decide
          on when to switch off/on the other cores.
+
+config SEC_BAT_AUT
+	bool "Samsung TN Bat Automation Test Feature"
+	default n
+	help
+	  Samsung TN Bat Automation Test

@@ -98,6 +98,11 @@ static atomic_t timer_log_idx[NR_CPUS];
 #ifdef CONFIG_SEC_DEBUG_RT_THROTTLE_ACTIVE
 #define AUX_LOG_IRQ_MAX 128
 #endif
+#define AUX_LOG_WIFI_MAX 256
+#ifdef CONFIG_SEC_DEBUG_AUX_SUSPEND
+#define AUX_LOG_SUSPEND_MAX 128
+#endif
+
 #define AUX_LOG_LENGTH 128
 
 struct auxiliary_info {
@@ -112,6 +117,10 @@ struct auxiliary_log {
 	struct auxiliary_info ThermalLog[AUX_LOG_THERMAL_MAX];
 #ifdef CONFIG_SEC_DEBUG_RT_THROTTLE_ACTIVE
 	struct auxiliary_info IrqLog[AUX_LOG_IRQ_MAX];
+#endif
+	struct auxiliary_info WifiLog[AUX_LOG_WIFI_MAX];
+#ifdef CONFIG_SEC_DEBUG_AUX_SUSPEND
+	struct auxiliary_info SuspendLog[AUX_LOG_SUSPEND_MAX];
 #endif
 };
 
@@ -326,6 +335,10 @@ static atomic_t gExcpAuxThermalLogIdx = ATOMIC_INIT(-1);
 #ifdef CONFIG_SEC_DEBUG_RT_THROTTLE_ACTIVE
 static atomic_t gExcpAuxIrqLogIdx = ATOMIC_INIT(-1);
 #endif
+static atomic_t gExcpAuxWifiLogIdx = ATOMIC_INIT(-1);
+#endif
+#ifdef CONFIG_SEC_DEBUG_AUX_SUSPEND
+static atomic_t gExcpAuxSuspendLogIdx = ATOMIC_INIT(-1);
 #endif
 
 static int bStopLogging;
@@ -882,7 +895,7 @@ void sec_debug_check_crash_key(unsigned int code, int value)
 			}
 		}
 
-#if defined(CONFIG_SEC_DEBUG_TSP_LOG) && defined(CONFIG_TOUCHSCREEN_FTS)
+#if defined(CONFIG_SEC_DEBUG_TSP_LOG) && (defined(CONFIG_TOUCHSCREEN_FTS) || defined(CONFIG_TOUCHSCREEN_MELFAS_MMS449))
 		/* dump TSP rawdata
 		 *	Hold volume up key first
 		 *	and then press home key twice
@@ -893,14 +906,24 @@ void sec_debug_check_crash_key(unsigned int code, int value)
 				pr_info
 				    ("%s: count to dump tsp rawdata : %d\n",
 				     __func__, ++loopcount);
-				if (loopcount == 2)
+				if (loopcount == 2) {
+#if defined(CONFIG_TOUCHSCREEN_FTS)
 					tsp_dump();
+#endif
+#if defined(CONFIG_TOUCHSCREEN_MELFAS_MMS449)
+					mms_tsp_dump();
+#endif
+				}
 			}
 		}
 #endif
 	} else {
-		if (code == VOLUME_UP)
+		if (code == VOLUME_UP) {
+#if defined(CONFIG_SEC_DEBUG_TSP_LOG) && defined(CONFIG_TOUCHSCREEN_MELFAS_MMS449)
+			loopcount = 0;
+#endif
 			volup_p = false;
+		}
 		if (code == VOLUME_DOWN) {
 			loopcount = 0;
 			voldown_p = false;
@@ -1200,6 +1223,25 @@ void sec_debug_aux_log(int idx, char *fmt, ...)
 			buf, AUX_LOG_LENGTH);
 		break;
 #endif
+	case SEC_DEBUG_AUXLOG_WIFI:
+		i = atomic_inc_return(&gExcpAuxWifiLogIdx)
+			& (AUX_LOG_WIFI_MAX - 1);
+		(*gExcpAuxLogPtr).WifiLog[i].time = cpu_clock(cpu);
+		(*gExcpAuxLogPtr).WifiLog[i].cpu = cpu;
+		strncpy((*gExcpAuxLogPtr).WifiLog[i].log,
+			buf, AUX_LOG_LENGTH);
+		break;
+#ifdef CONFIG_SEC_DEBUG_AUX_SUSPEND
+	case SEC_DEBUG_AUXLOG_SUSPEND:
+		i = atomic_inc_return(&gExcpAuxSuspendLogIdx)
+			& (AUX_LOG_SUSPEND_MAX - 1);
+		(*gExcpAuxLogPtr).SuspendLog[i].time = cpu_clock(cpu);
+		(*gExcpAuxLogPtr).SuspendLog[i].cpu = cpu;
+		strncpy((*gExcpAuxLogPtr).SuspendLog[i].log,
+			buf, AUX_LOG_LENGTH);
+		break;
+#endif
+
 	default:
 		break;
 	}

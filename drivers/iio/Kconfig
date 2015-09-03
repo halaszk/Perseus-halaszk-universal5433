@@ -71,5 +71,5 @@ source "drivers/iio/imu/Kconfig"
 source "drivers/iio/inv_test/Kconfig"
 source "drivers/iio/light/Kconfig"
 source "drivers/iio/magnetometer/Kconfig"
-
+source "drivers/iio/grip/Kconfig"
 endif # IIO

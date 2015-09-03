@@ -856,28 +856,38 @@ static netdev_tx_t eth_start_xmit(struct sk_buff *skb,
 	 * or the hardware can't use skb buffers.
 	 * or there's not enough space for extra headers we need
 	 */
+	spin_lock_irqsave(&dev->lock, flags);
 	if (dev->wrap) {
-		unsigned long	flags;
-
-		spin_lock_irqsave(&dev->lock, flags);
 		if (dev->port_usb)
 			skb = dev->wrap(dev->port_usb, skb);
-		spin_unlock_irqrestore(&dev->lock, flags);
-		if (!skb)
-				goto drop;
+		if (!skb) {
+			spin_unlock_irqrestore(&dev->lock, flags);
+			goto drop;
+		}
 #ifdef CONFIG_USB_RNDIS_MULTIPACKET
 	}
-	spin_lock_irqsave(&dev->req_lock, flags);
-	dev->tx_skb_hold_count++;
-	spin_unlock_irqrestore(&dev->req_lock, flags);
 
 	if (multi_pkt_xfer) {
+
+		pr_debug("req->length:%d header_len:%u\n"
+				"skb->len:%d skb->data_len:%d\n",
+				req->length, dev->header_len,
+				skb->len, skb->data_len);
+		/* Add RNDIS Header */
+		memcpy(req->buf + req->length, dev->port_usb->header,
+						dev->header_len);
+		/* Increment req length by header size */
+		req->length += dev->header_len;
+		spin_unlock_irqrestore(&dev->lock, flags);
+		/* Copy received IP data from SKB */
 		memcpy(req->buf + req->length, skb->data, skb->len);
-		req->length = req->length + skb->len;
+		/* Increment req length by skb data length */
+		req->length += skb->len;
 		length = req->length;
 		dev_kfree_skb_any(skb);
 
 		spin_lock_irqsave(&dev->req_lock, flags);
+		dev->tx_skb_hold_count++;
 		if (dev->tx_skb_hold_count < dev->dl_max_pkts_per_xfer) {
 			if (dev->no_tx_req_used > TX_REQ_THRESHOLD) {
 				list_add(&req->list, &dev->tx_reqs);
@@ -887,12 +897,10 @@ static netdev_tx_t eth_start_xmit(struct sk_buff *skb,
 		}
 
 		dev->no_tx_req_used++;
-		spin_unlock_irqrestore(&dev->req_lock, flags);
-
-		spin_lock_irqsave(&dev->lock, flags);
 		dev->tx_skb_hold_count = 0;
-		spin_unlock_irqrestore(&dev->lock, flags);
+		spin_unlock_irqrestore(&dev->req_lock, flags);
 	} else {
+		spin_unlock_irqrestore(&dev->lock, flags);
 		length = skb->len;
 		req->buf = skb->data;
 		req->context = skb;
@@ -900,6 +908,7 @@ static netdev_tx_t eth_start_xmit(struct sk_buff *skb,
 #else
 		length = skb->len;
 	}
+	spin_unlock_irqrestore(&dev->lock, flags);
 	req->buf = skb->data;
 	req->context = skb;
 #endif
@@ -955,7 +964,11 @@ drop:
 		spin_lock_irqsave(&dev->req_lock, flags);
 		if (list_empty(&dev->tx_reqs))
 			netif_start_queue(net);
+#ifdef CONFIG_USB_RNDIS_MULTIPACKET
+		list_add_tail(&req->list, &dev->tx_reqs);
+#else
 		list_add(&req->list, &dev->tx_reqs);
+#endif
 		spin_unlock_irqrestore(&dev->req_lock, flags);
 	}
 #ifdef CONFIG_USB_RNDIS_MULTIPACKET
@@ -1216,6 +1229,16 @@ struct net_device *gether_connect(struct gether *link)
 	if (!dev)
 		return ERR_PTR(-EINVAL);
 
+#ifdef CONFIG_USB_RNDIS_MULTIPACKET
+	link->header = kzalloc(sizeof(struct rndis_packet_msg_type),
+							GFP_ATOMIC);
+	if (!link->header) {
+		pr_err("RNDIS header memory allocation failed.\n");
+		result = -ENOMEM;
+		goto fail;
+	}
+#endif
+
 	link->in_ep->driver_data = dev;
 	result = usb_ep_enable(link->in_ep);
 	if (result != 0) {
@@ -1276,8 +1299,13 @@ fail1:
 	}
 fail0:
 	/* caller is responsible for cleanup on error */
-	if (result < 0)
+	if (result < 0) {
+#ifdef CONFIG_USB_RNDIS_MULTIPACKET
+	kfree(link->header);
+fail:
+#endif
 		return ERR_PTR(result);
+	}
 	return dev->net;
 }
 
@@ -1331,6 +1359,12 @@ void gether_disconnect(struct gether *link)
 		usb_ep_free_request(link->in_ep, req);
 		spin_lock(&dev->req_lock);
 	}
+#ifdef CONFIG_USB_RNDIS_MULTIPACKET
+	/* Free rndis header buffer memory */
+	kfree(link->header);
+	link->header = NULL;
+#endif
+
 	spin_unlock(&dev->req_lock);
 #ifdef CONFIG_USB_RNDIS_MULTIPACKET
 	spin_lock(&dev->rx_frames.lock);

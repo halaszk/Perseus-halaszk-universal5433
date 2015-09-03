@@ -22,6 +22,8 @@
 
 #ifdef CONFIG_CPU_CACHE_VIPT
 
+extern int boot_mode_security;
+
 static void flush_pfn_alias(unsigned long pfn, unsigned long vaddr)
 {
 	unsigned long to = FLUSH_ALIAS_START + (CACHE_COLOUR(vaddr) << PAGE_SHIFT);
@@ -377,16 +379,18 @@ void __flush_anon_page(struct vm_area_struct *vma, struct page *page, unsigned l
 /* Added here for TIMA lazy MMU. */
 void flush_tlb_l2_page(pmd_t *pmd)
 {
-        unsigned int l2_va = (unsigned int)(
-                        __va(*pmd & ~0x3ff) - PTE_HWTABLE_OFF);
+	if(boot_mode_security) {
+		unsigned int l2_va = (unsigned int)(
+						__va(*pmd & ~0x3ff) - PTE_HWTABLE_OFF);
 
-        asm (
+		asm (
 			 //                "mcr p15, 0, %0, c8, c6, 1\n"
-             //   "mcr p15, 0, %0, c8, c5, 1\n"
+			 //   "mcr p15, 0, %0, c8, c5, 1\n"
 			 //    "mcr p15, 0, %0, c8, c7, 1\n"
-                "mcr p15, 0, %0, c8, c3, 1\n"
-                :
-                : "r" (l2_va)
-        );
+				"mcr p15, 0, %0, c8, c3, 1\n"
+				:
+				: "r" (l2_va)
+		);
+	}
 }
 #endif

@@ -94,6 +94,7 @@ struct mipi_lli {
 	unsigned int		irq;		/* irq allocated */
 	unsigned int		irq_sig;	/* irq_sig allocated */
 	bool			sig_irq_active;
+	bool			sb_mask_active; /* flag for activation of sideband signal mask */
 	void __iomem		*regs;		/* device memory/io */
 	void __iomem		*remote_regs;	/* device memory/io */
 	void __iomem		*sys_regs;	/* device memory/io */
@@ -112,6 +113,7 @@ struct mipi_lli {
 	bool			is_master;
 	bool			is_suspended;
 	bool			is_runtime_suspended;
+	bool			is_debug_possible;
 
 	struct mipi_lli_ipc_handler hd;
 };
@@ -132,6 +134,9 @@ struct lli_driver {
 	int	(*debug_info)(struct mipi_lli *lli);
 
 	int	(*intr_enable)(struct mipi_lli *lli);
+	int	(*intr_disable)(struct mipi_lli *lli);
+	int     (*mask_sb_intr)(struct mipi_lli *lli, bool flag);
+
 	int	(*suspend)(struct mipi_lli *lli);
 	int	(*resume)(struct mipi_lli *lli);
 };
@@ -154,6 +159,7 @@ extern void mipi_lli_reset_interrupt(void);
 extern u32 mipi_lli_read_interrupt(void);
 extern void mipi_lli_debug_info(void);
 extern void mipi_lli_intr_enable(void);
+extern void mipi_lli_intr_disable(void);
 extern void mipi_lli_reset(void);
 extern void mipi_lli_reload(void);
 

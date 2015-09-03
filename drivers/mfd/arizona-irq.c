@@ -1,6 +1,7 @@
 /*
  * Arizona interrupt support
  *
+ * Copyright 2014 CirrusLogic, Inc.
  * Copyright 2012 Wolfson Microelectronics plc
  *
  * Author: Mark Brown <broonie@opensource.wolfsonmicro.com>
@@ -30,11 +31,16 @@ static int arizona_map_irq(struct arizona *arizona, int irq)
 {
 	int ret;
 
-	ret = regmap_irq_get_virq(arizona->aod_irq_chip, irq);
-	if (ret < 0)
-		ret = regmap_irq_get_virq(arizona->irq_chip, irq);
+	if (arizona->aod_irq_chip) {
+		ret = regmap_irq_get_virq(arizona->aod_irq_chip, irq);
+		if (ret >= 0)
+			return ret;
+	}
 
-	return ret;
+	if (arizona->irq_chip)
+		return regmap_irq_get_virq(arizona->irq_chip, irq);
+
+	return 0;
 }
 
 int arizona_request_irq(struct arizona *arizona, int irq, char *name,
@@ -95,7 +101,7 @@ static irqreturn_t arizona_irq_thread(int irq, void *data)
 {
 	struct arizona *arizona = data;
 	bool poll;
-	unsigned int val;
+	unsigned int val, nest_irq;
 	int ret;
 
 	ret = pm_runtime_get_sync(arizona->dev);
@@ -107,20 +113,25 @@ static irqreturn_t arizona_irq_thread(int irq, void *data)
 	do {
 		poll = false;
 
-		/* Always handle the AoD domain */
-		handle_nested_irq(irq_find_mapping(arizona->virq, 0));
+		if (arizona->aod_irq_chip)
+			handle_nested_irq(irq_find_mapping(arizona->virq, 0));
 
-		/*
-		 * Check if one of the main interrupts is asserted and only
-		 * check that domain if it is.
-		 */
-		ret = regmap_read(arizona->regmap, ARIZONA_IRQ_PIN_STATUS,
-				  &val);
-		if (ret == 0 && val & ARIZONA_IRQ1_STS) {
-			handle_nested_irq(irq_find_mapping(arizona->virq, 1));
-		} else if (ret != 0) {
-			dev_err(arizona->dev,
-				"Failed to read main IRQ status: %d\n", ret);
+		if (arizona->irq_chip) {
+			/*
+			 * Check if one of the main interrupts is asserted and
+			 * only check that domain if it is.
+			 */
+			ret = regmap_read(arizona->regmap,
+					  ARIZONA_IRQ_PIN_STATUS,
+					  &val);
+			if (ret == 0 && val & ARIZONA_IRQ1_STS) {
+				nest_irq = irq_find_mapping(arizona->virq, 1);
+				handle_nested_irq(nest_irq);
+			} else if (ret != 0) {
+				dev_err(arizona->dev,
+					"Failed to read main IRQ status: %d\n",
+					ret);
+			}
 		}
 
 		/*
@@ -148,6 +159,13 @@ static void arizona_irq_dummy(struct irq_data *data)
 {
 }
 
+static int arizona_irq_set_wake(struct irq_data *data, unsigned int on)
+{
+	struct arizona *arizona = irq_data_get_irq_chip_data(data);
+
+	return irq_set_irq_wake(arizona->irq, on);
+}
+
 static struct irq_chip arizona_irq_chip = {
 	.name			= "arizona",
 	.irq_disable		= arizona_irq_dummy,
@@ -155,6 +173,7 @@ static struct irq_chip arizona_irq_chip = {
 	.irq_ack		= arizona_irq_dummy,
 	.irq_mask		= arizona_irq_dummy,
 	.irq_unmask		= arizona_irq_dummy,
+	.irq_set_wake		= arizona_irq_set_wake,
 };
 
 static int arizona_irq_map(struct irq_domain *h, unsigned int virq,
@@ -189,6 +208,7 @@ int arizona_irq_init(struct arizona *arizona)
 	const struct regmap_irq_chip *aod, *irq;
 	bool ctrlif_error = true;
 	struct irq_data *irq_data;
+	unsigned int irq_ctrl_reg = ARIZONA_IRQ_CTRL_1;
 
 	switch (arizona->type) {
 #ifdef CONFIG_MFD_WM5102
@@ -216,6 +236,25 @@ int arizona_irq_init(struct arizona *arizona)
 		ctrlif_error = false;
 		break;
 #endif
+#ifdef CONFIG_MFD_CLEARWATER
+	case WM8285:
+	case WM1840:
+		aod = &clearwater_irq;
+		irq = NULL;
+
+		ctrlif_error = false;
+		irq_ctrl_reg = CLEARWATER_IRQ1_CTRL;
+		break;
+#endif
+#ifdef CONFIG_MFD_CS47L24
+	case WM1831:
+	case CS47L24:
+		aod = NULL;
+		irq = &cs47l24_irq;
+
+		ctrlif_error = false;
+		break;
+#endif
 #ifdef CONFIG_MFD_WM8997
 	case WM8997:
 		aod = &wm8997_aod;
@@ -224,11 +263,11 @@ int arizona_irq_init(struct arizona *arizona)
 		ctrlif_error = false;
 		break;
 #endif
-#ifdef CONFIG_MFD_WM8998
+#ifdef CONFIG_MFD_VEGAS
 	case WM8998:
 	case WM1814:
-		aod = &wm8998_aod;
-		irq = &wm8998_irq;
+		aod = &vegas_aod;
+		irq = &vegas_irq;
 
 		ctrlif_error = false;
 		break;
@@ -238,8 +277,19 @@ int arizona_irq_init(struct arizona *arizona)
 		return -EINVAL;
 	}
 
-	/* Disable all wake sources by default */
-	regmap_write(arizona->regmap, ARIZONA_WAKE_CONTROL, 0);
+	switch (arizona->type) {
+	case WM5102:
+	case WM5110:
+	case WM8997:
+	case WM8998:
+	case WM1814:
+	case WM8280:
+		/* Disable all wake sources by default */
+		regmap_write(arizona->regmap, ARIZONA_WAKE_CONTROL, 0);
+		break;
+	default:
+		break;
+	}
 
 	/* Read the flags from the interrupt controller if not specified */
 	if (!arizona->pdata.irq_flags) {
@@ -268,7 +318,7 @@ int arizona_irq_init(struct arizona *arizona)
 
 	if (arizona->pdata.irq_flags & (IRQF_TRIGGER_HIGH |
 					IRQF_TRIGGER_RISING)) {
-		ret = regmap_update_bits(arizona->regmap, ARIZONA_IRQ_CTRL_1,
+		ret = regmap_update_bits(arizona->regmap, irq_ctrl_reg,
 					 ARIZONA_IRQ_POL, 0);
 		if (ret != 0) {
 			dev_err(arizona->dev, "Couldn't set IRQ polarity: %d\n",
@@ -288,22 +338,27 @@ int arizona_irq_init(struct arizona *arizona)
 		goto err;
 	}
 
-	ret = regmap_add_irq_chip(arizona->regmap,
-				  irq_create_mapping(arizona->virq, 0),
-				  IRQF_ONESHOT, -1, aod,
-				  &arizona->aod_irq_chip);
-	if (ret != 0) {
-		dev_err(arizona->dev, "Failed to add AOD IRQs: %d\n", ret);
-		goto err_domain;
+	if (aod) {
+		ret = regmap_add_irq_chip(arizona->regmap,
+					irq_create_mapping(arizona->virq, 0),
+					IRQF_ONESHOT, 0, aod,
+					&arizona->aod_irq_chip);
+		if (ret != 0) {
+			dev_err(arizona->dev, "Failed to add AOD IRQs: %d\n",
+				ret);
+			goto err_domain;
+		}
 	}
 
-	ret = regmap_add_irq_chip(arizona->regmap,
-				  irq_create_mapping(arizona->virq, 1),
-				  IRQF_ONESHOT, -1, irq,
-				  &arizona->irq_chip);
-	if (ret != 0) {
-		dev_err(arizona->dev, "Failed to add main IRQs: %d\n", ret);
-		goto err_aod;
+	if (irq) {
+		ret = regmap_add_irq_chip(arizona->regmap,
+					  irq_create_mapping(arizona->virq, 1),
+					  IRQF_ONESHOT, 0, irq,
+					  &arizona->irq_chip);
+		if (ret != 0) {
+			dev_err(arizona->dev, "Failed to add main IRQs: %d\n", ret);
+			goto err_aod;
+		}
 	}
 
 	/* Make sure the boot done IRQ is unmasked for resumes */

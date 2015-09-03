@@ -97,7 +97,10 @@
 #define JPEG_VER		0x1fc /* JPEG Version Register */
 
 /* JPEG quantizer table register */
-#define JPEG_QTBL_CONTENT(n)		(0x400 + (n) * 0x100)
+#define JPEG_QTBL0		0x400
+#define JPEG_QTBL1		0x500
+#define JPEG_QTBL2		0x600
+#define JPEG_QTBL3		0x700
 
 /* JPEG DC Huffman table register */
 #define JPEG_HDCTBL(n)		(0x800 + (n) * 0x400)

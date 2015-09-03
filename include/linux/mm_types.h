@@ -51,7 +51,10 @@ struct ptrack {
 	u64 when;		/* When did the operation occur */
 };
 
-enum ptrack_item { PTRACK_ALLOC, PTRACK_FREE };
+enum ptrack_item {
+	PTRACK_ALLOC = 0,
+	PTRACK_FREE,
+	PTRACK_ITEM_NUM};
 #endif
 
 struct page {
@@ -196,6 +199,9 @@ struct page {
 
 #ifdef CONFIG_PTRACK_DEBUG
 	struct ptrack * ptrack;
+#ifdef CONFIG_BUFFERED_PTRACK
+	int ptrack_curr[PTRACK_ITEM_NUM];
+#endif
 #endif
 }
 /*

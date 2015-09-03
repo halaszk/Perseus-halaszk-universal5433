@@ -443,6 +443,10 @@ extern struct mipi_dsim_lcd_driver s6e3ha0k_mipi_lcd_driver;
 extern struct mipi_dsim_lcd_driver s6e3ha2k_mipi_lcd_driver;
 #elif defined(CONFIG_DECON_LCD_S6E3FA2)
 extern struct mipi_dsim_lcd_driver s6e3fa2_mipi_lcd_driver;
+#elif defined(CONFIG_DECON_LCD_S6E3FA2_A7)
+extern struct mipi_dsim_lcd_driver s6e3fa2_mipi_lcd_driver;
+#elif defined(CONFIG_DECON_LCD_S6E3FA3X01)
+extern struct mipi_dsim_lcd_driver s6e3fa3x01_mipi_lcd_driver;
 #elif defined(CONFIG_DECON_LCD_S6E3HA0)
 extern struct mipi_dsim_lcd_driver s6e3ha0_mipi_lcd_driver;
 #elif defined(CONFIG_DECON_LCD_EA8064G)
@@ -453,8 +457,10 @@ extern struct mipi_dsim_lcd_driver s6e3ha2_mipi_lcd_driver;
 extern struct mipi_dsim_lcd_driver s6e3hf2_mipi_lcd_driver;
 #elif defined(CONFIG_DECON_LCD_S6TNMR7)
 extern struct mipi_dsim_lcd_driver s6tnmr7_mipi_lcd_driver;
-#elif defined(CONFIG_DECON_LCD_S6E3HA1)
-extern struct mipi_dsim_lcd_driver s6e3ha1_mipi_lcd_driver;
+#elif defined(CONFIG_DECON_LCD_ANA38401)
+extern struct mipi_dsim_lcd_driver ana38401_mipi_lcd_driver;
+#elif defined(CONFIG_DECON_LCD_S6E3HA2_TABS2)
+extern struct mipi_dsim_lcd_driver s6e3ha2_mipi_lcd_driver;
 #endif
 
 

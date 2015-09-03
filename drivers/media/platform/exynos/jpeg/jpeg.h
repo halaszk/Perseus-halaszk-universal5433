@@ -24,6 +24,7 @@
 
 #define JPEG_MIN_SIZE	8
 #define DCTSIZE		64
+#define NUM_QTABLE_VALUES 64
 #define NUM_QUANT_TBLS	2
 #define NUM_HUFF_TBLS	2
 #define MAX_COMPS	3
@@ -75,10 +76,13 @@ struct jpeg_fmt {
 	char			mem_planes;
 };
 
+#define EXYNOS_JPEG_CTX_CUSTOM_QTBL (1 << 4)
+
 struct jpeg_ctx {
 	u32 width;
 	u32 height;
 	int quality;
+	unsigned int flags;
 
 	struct jpeg_fmt *in_fmt;
 	struct jpeg_fmt *out_fmt;
@@ -86,6 +90,7 @@ struct jpeg_ctx {
 	struct jpeg_dev *jpeg_dev;
 	struct m2m1shot_context *m21ctx;
 
+	unsigned char *custom_qtbl;
 };
 
 struct jpeg_dev {

@@ -157,4 +157,8 @@ config VIPERBOARD_ADC
 	  Say yes here to access the ADC part of the Nano River
 	  Technologies Viperboard.
 
+config JACK_ADC_MORE_CTIME
+	bool "JACK ADC conversion time add"
+	depends on INPUT
+	default n
 endmenu

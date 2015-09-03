@@ -59,6 +59,7 @@ obj-$(CONFIG_SEC_MODEM_V1)	+= modem_v1/
 obj-$(CONFIG_SEC_MODEM_V2)	+= modem_v2/
 obj-$(CONFIG_QC_MODEM)		+= mdm_if/
 obj-$(CONFIG_LED_COVER)		+= led_cover_pwr.o
+obj-$(CONFIG_SEC_DEV_JACK)	+= sec_jack.o
 
 # Secure OS Mobicore Interface
 obj-$(CONFIG_MOBICORE_DRIVER)  += tzic.o

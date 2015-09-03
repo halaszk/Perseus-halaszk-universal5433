@@ -50,6 +50,7 @@
 #include "xattr.h"
 #include "acl.h"
 #include "mballoc.h"
+#include "../mount.h"
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/ext4.h>
@@ -2464,6 +2465,25 @@ static ssize_t lifetime_write_kbytes_show(struct ext4_attr *a,
 			  EXT4_SB(sb)->s_sectors_written_start) >> 1)));
 }
 
+static ssize_t r_blocks_count_show(struct ext4_attr *a,
+		struct ext4_sb_info *sbi, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%llu\n",
+			(unsigned long long) atomic64_read(&sbi->s_r_blocks_count));
+}
+
+static ssize_t r_blocks_count_store(struct ext4_attr *a,
+		struct ext4_sb_info *sbi, const char *buf, size_t count)
+{
+	unsigned long long val;
+
+	if (parse_strtoull(buf, -1ULL, &val))
+		return -EINVAL;
+	atomic64_set(&sbi->s_r_blocks_count, val);
+
+	return count;
+}
+
 static ssize_t inode_readahead_blks_store(struct ext4_attr *a,
 					  struct ext4_sb_info *sbi,
 					  const char *buf, size_t count)
@@ -2563,6 +2583,7 @@ static struct ext4_attr ext4_attr_##name = __ATTR(name, mode, show, store)
 EXT4_RO_ATTR(delayed_allocation_blocks);
 EXT4_RO_ATTR(session_write_kbytes);
 EXT4_RO_ATTR(lifetime_write_kbytes);
+EXT4_RW_ATTR(r_blocks_count);
 EXT4_RW_ATTR(reserved_clusters);
 EXT4_ATTR_OFFSET(inode_readahead_blks, 0644, sbi_ui_show,
 		 inode_readahead_blks_store, s_inode_readahead_blks);
@@ -2581,6 +2602,7 @@ static struct attribute *ext4_attrs[] = {
 	ATTR_LIST(delayed_allocation_blocks),
 	ATTR_LIST(session_write_kbytes),
 	ATTR_LIST(lifetime_write_kbytes),
+	ATTR_LIST(r_blocks_count),
 	ATTR_LIST(reserved_clusters),
 	ATTR_LIST(inode_readahead_blks),
 	ATTR_LIST(inode_goal),
@@ -4029,6 +4051,8 @@ no_journal:
 		ext4_msg(sb, KERN_INFO, "required extra inode space not"
 			 "available");
 	}
+	
+	atomic64_set(&sbi->s_r_blocks_count, ext4_r_blocks_count(es));
 
 	err = ext4_reserve_clusters(sbi, ext4_calculate_resv_clusters(sb));
 	if (err) {
@@ -4909,8 +4933,8 @@ static int ext4_statfs(struct dentry *dentry, struct kstatfs *buf)
 	/* prevent underflow in case that few free space is available */
 	buf->f_bfree = EXT4_C2B(sbi, max_t(s64, bfree, 0));
 	buf->f_bavail = buf->f_bfree -
-			(ext4_r_blocks_count(es) + resv_blocks);
-	if (buf->f_bfree < (ext4_r_blocks_count(es) + resv_blocks))
+			(atomic64_read(&sbi->s_r_blocks_count) + resv_blocks);
+	if (buf->f_bfree < (atomic64_read(&sbi->s_r_blocks_count) + resv_blocks))
 		buf->f_bavail = 0;
 	buf->f_files = le32_to_cpu(es->s_inodes_count);
 	buf->f_ffree = percpu_counter_sum_positive(&sbi->s_freeinodes_counter);
@@ -5315,12 +5339,21 @@ void print_block_data(struct super_block *sb, sector_t blocknr
 	char row_data[17] = { 0, };
 	char row_hex[50] = { 0, };
 	char ch;
+	struct mount *mnt = NULL;
 
 	printk(KERN_ERR "As EXT4-fs error, printing data in hex\n");
-	printk(KERN_ERR " [partition info] s_id : %s, start block# : %llu\n"
+	printk(KERN_ERR " [partition info] s_id : %s, start sector# : %llu\n"
 			, sb->s_id, sb->s_bdev->bd_part->start_sect);
-	printk(KERN_ERR " dump block# : %llu, start offset(byte) :", blocknr);
-	printk(KERN_ERR " %d, length(byte) : %d\n", start, len);
+	printk(KERN_ERR " dump block# : %llu, start offset(byte) : %d\n"
+			, blocknr, start);
+	printk(KERN_ERR " length(byte) : %d, data_to_dump 0x%p\n"
+			, len, (void *)data_to_dump);
+	if (!list_empty(&sb->s_mounts)) {
+		mnt = list_first_entry(&sb->s_mounts, struct mount, mnt_instance);
+		if (mnt)
+			printk(KERN_ERR " mountpoint : %s\n"
+					, mnt->mnt_mountpoint->d_name.name);
+	}
 	printk(KERN_ERR "-------------------------------------------------\n");
 
 	for (i = 0; i < (len + 15) / 16; i++) {

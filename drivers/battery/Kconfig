@@ -12,6 +12,26 @@ config BATTERY_SWELLING
 	help
 	  Say Y to include support for prevent battery swelling
 
+config BATTERY_SWELLING_SELF_DISCHARGING
+	bool "prevent battery swelling with self discharging"
+	depends on BATTERY_SWELLING
+	help
+	  Say Y to include support for prevent battery swelling with self discharging
+
+config INBATTERY
+	bool "is inbattery or not"
+	help
+	  Say Y to include support for inbattery
+
+config FUELGAUGE_RT5033
+	tristate "RT5033 fuel gauge driver"
+	depends on BATTERY_SAMSUNG
+	help
+	 Say Y to include support
+	 for Richtek RT5033 fuel gauge driver.
+	 This driver source code implemented
+	 all functions for RT5033 fuel gauge.
+
 # Fuel Gauge
 
 config FUELGAUGE_DUMMY
@@ -133,6 +153,51 @@ config FUELGAUGE_MAX77823_COULOMB_COUNTING
 	 as coulomb counting (including voltage tracking).
 	 This mode is for target that consumes high current
 	 like tablet.
+
+config FUELGAUGE_MAX77849
+	tristate "MAX77849 fuel gauge driver"
+	default n
+	depends on BATTERY_SAMSUNG
+	help
+	 Say Y to include support
+	 It is based on the MAX17050 fuel gauge driver.
+	 This fuel-gauge can be used in voltage-tracking mode
+	 or coulomb-counting mode.
+
+config FUELGAUGE_SM5703
+	 tristate "SM5703 fuel gauge driver"
+	 default n
+	 depends on BATTERY_SAMSUNG
+	 help
+	  Say Y to include support SM5703 FUELGAUGE.
+	  Using coulomb counting.
+
+config FUELGAUGE_MAX77849_VOLTAGE_TRACKING
+	tristate "use MAX77849 fuel gauge only as voltage tracking"
+	default n
+	depends on FUELGAUGE_MAX77849
+	help
+	 Say Y to use MAX77849 fuel gauge
+	 only as voltage tracking.
+	 This mode is for target that consumes low current
+	 like smart-phone.
+
+config FUELGAUGE_MAX77849_COULOMB_COUNTING
+	tristate "use MAX77849 fuel gauge as coulomb counting (including voltage tracking)"
+	default n
+	depends on FUELGAUGE_MAX77849
+	help
+	 Say Y to use MAX77849 fuel gauge
+	 as coulomb counting (including voltage tracking).
+	 This mode is for target that consumes high current
+	 like tablet.
+
+config PREVENT_SOC_JUMP
+	tristate "prevent soc jump at full-charged"
+	default n
+	depends on BATTERY_SAMSUNG
+	help
+	 Say Y to prevent soc jump
 
 # Charger
 
@@ -261,6 +326,31 @@ config CHARGER_MAX77888
 	  flash driver.
 	  You have to define MFD_MAX77888
 
+config CHARGER_MAX77849
+	tristate "MAX77849 battery charger support"
+	depends on MFD_MAX77849 && I2C
+	help
+	  Say Y here to enable support for the MAX77849 charger
+	  MAX77849 incluse muic, pmic, haptic, led,
+	  flash driver.
+	  You have to define MFD_MAX7784
+
+config CHARGER_SM5703
+	tristate "SM5703 battery charger support"
+	depends on MFD_SM5703 && I2C
+	help
+	  Say Y here to enable support for the SM5703 charger
+	  SM5703 incluse led, flash driver.
+	  You have to define MFD_SM5703
+	  
+config CHARGER_SM5703_SOFT_START_CHARGING
+	bool "SM5703 soft step charging"
+	default n
+	depends on CHARGER_SM5703
+	help
+	  Say Y here to enable support for SM5703 soft step charging
+	  You have to define CHARGER_SM5703
+
 config AFC_CHARGER_MODE
 	bool "afc charging support in sec battery driver"
 	default n
@@ -276,6 +366,25 @@ config SAMSUNG_LPM_MODE
 	  This value defined at bootloader.
 	  Before enable this feature,
 	  implemet power off charging in the bootloader.
+
+config CHARGER_RT5033
+	tristate "RT5033 charger driver"
+	depends on MFD_RT5033 && I2C
+	default n
+	help
+	 Say Y to include support
+	 for Richtek RT5033 charger driver.
+
+config DISABLE_SAVE_CAPACITY_MAX
+	bool "Disable to save capacity max in efs"
+	default n
+	depends on BATTERY_SAMSUNG
+	help
+	  Say Y to include support to disable it
+	  capacity_max is saved in /efs/Battery/batt_capacity_max
+	  capacity_max is restored after boot up
+	  You can find the code in healthd
+
 
 config EN_OOPS
 	bool "enable oops filter"

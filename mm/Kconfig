@@ -592,12 +592,33 @@ config SWAP_ENABLE_READAHEAD
 	  This behaviour is good at disk-based system, but not on in-memory
 	  compression (e.g. zram).
 
+config BALANCE_ANON_FILE_RECLAIM
+	bool "During reclaim treat anon and file backed pages equally"
+	depends on SWAP
+	default n
+	help
+	  When performing memory reclaim treat anonymous and file backed pages
+	  equally.
+	  Swapping anonymous pages out to memory can be efficient enough to justify
+	  treating anonymous and file backed pages equally.
+
 config ZOOM_KILLER
 	bool "Samsung extension. Selet victim who has largest lowmem with same score"
 	depends on !OOM_KILLER_TIMEOUT && !SEC_OOM_KILLER
 	default y
 	help
 	  When OOM select victim, choose process which has largest lowmem
+
+config ACCURATE_FREE_PAGES_CHECK
+	bool "Samsung WA: prevent process overkill"
+		default n
+	help
+		zone_watermark_ok function called for checking zone free page
+		status at page alloc/free. In this function, zone NR_FREE_PAGES
+		state and free_area[o].nr_free is used for determin free space.
+		But, two vaules sometimes imbalance cause by zone state update
+		buffering feature. this patch fix free_pages to actual buddy sysem
+		value.
 
 config OOM_SCAN_WA_PREVENT_WRONG_SEARCH
     bool "Samsung WA: prevent to search the wrong thread"

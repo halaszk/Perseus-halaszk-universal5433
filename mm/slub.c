@@ -129,6 +129,8 @@ do {							\
  * 			the fast path and disables lockless freelists.
  */
 
+extern int boot_mode_security;
+
 static inline int kmem_cache_debug(struct kmem_cache *s)
 {
 #ifdef CONFIG_SLUB_DEBUG
@@ -359,7 +361,7 @@ static void set_freepointer(struct kmem_cache *s, void *object, void *fp)
 {
 
 #ifdef CONFIG_TIMA_RKP_RO_CRED
-	if (s->name && !strcmp(s->name, "cred_jar_ro")) {
+	if (rkp_cred_enable && s->name && !strcmp(s->name, "cred_jar_ro")) {
 //#ifndef CONFIG_TIMA_RKP_COHERENT_TT
 		tima_cache_flush(((unsigned long) object) + ((unsigned long) s->offset));
 //#endif
@@ -738,6 +740,19 @@ static void slab_err(struct kmem_cache *s, struct page *page, const char *fmt, .
 		panic("SLUB ERROR: slab_err");
 }
 
+static void slab_err_nopanic(struct kmem_cache *s, struct page *page, const char *fmt, ...)
+{
+	va_list args;
+	char buf[100];
+
+	va_start(args, fmt);
+	vsnprintf(buf, sizeof(buf), fmt, args);
+	va_end(args);
+	slab_bug(s, "%s", buf);
+	print_page_info(page);
+	dump_stack();
+}
+
 static void init_object(struct kmem_cache *s, void *object, u8 val)
 {
 	u8 *p = object;
@@ -780,10 +795,10 @@ static int check_bytes_and_report(struct kmem_cache *s, struct page *page,
 					fault, end - 1, fault[0], value);
 	print_trailer(s, page, object);
 
-	restore_bytes(s, what, value, fault, end);
-
 	if (slub_debug)
 		panic("SLUB ERROR: check_bytes_and_report. Can it be restored?");
+
+	restore_bytes(s, what, value, fault, end);
 
 	return 0;
 }
@@ -871,8 +886,11 @@ static int slab_pad_check(struct kmem_cache *s, struct page *page)
 	while (end > fault && end[-1] == POISON_INUSE)
 		end--;
 
-	slab_err(s, page, "Padding overwritten. 0x%p-0x%p", fault, end - 1);
+	slab_err_nopanic(s, page, "Padding overwritten. 0x%p-0x%p", fault, end - 1);
 	print_section("Padding ", end - remainder, remainder);
+
+	if (slub_debug)
+		panic("SLUB ERROR: slab_pad_check. Can it be restored?");
 
 	restore_bytes(s, "slab padding", POISON_INUSE, end - remainder, end);
 	return 0;
@@ -1480,6 +1498,7 @@ static void setup_object(struct kmem_cache *s, struct page *page,
 		s->ctor(object);
 }
 
+extern int boot_mode_security;
 static struct page *new_slab(struct kmem_cache *s, gfp_t flags, int node)
 {
 	struct page *page;
@@ -1516,8 +1535,15 @@ static struct page *new_slab(struct kmem_cache *s, gfp_t flags, int node)
 	}
 	setup_object(s, page, last);
 	set_freepointer(s, last, NULL);
-#ifdef CONFIG_TIMA_RKP_30
-	tima_send_cmd3(page_to_phys(page), compound_order(page), 1, 0x26);
+#ifdef CONFIG_RKP_DBLMAP_PROT
+	if (boot_mode_security){
+		tima_send_cmd5(page_to_phys(page), compound_order(page), 1, (unsigned long) __pa(rkp_double_bitmap), 0, 0x4a);
+	}
+#endif
+
+#ifdef TIMA_RKP_KDATA_PROT
+	if(rkp_cred_enable)
+		tima_send_cmd3(page_to_phys(page), compound_order(page), 1, 0x26);
 #endif
 	page->freelist = start;
 	page->inuse = page->objects;
@@ -1530,6 +1556,12 @@ static void __free_slab(struct kmem_cache *s, struct page *page)
 {
 	int order = compound_order(page);
 	int pages = 1 << order;
+
+#ifdef CONFIG_RKP_DBLMAP_PROT
+	if (boot_mode_security){
+		tima_send_cmd5(page_to_phys(page), compound_order(page), 0, (unsigned long) __pa(rkp_double_bitmap), 0, 0x4a);
+	}
+#endif
 
 	if (kmem_cache_debug(s)) {
 		void *p;
@@ -1581,8 +1613,9 @@ static void rcu_free_slab(struct rcu_head *h)
 
 static void free_slab(struct kmem_cache *s, struct page *page)
 {
-#ifdef CONFIG_TIMA_RKP_30
-	tima_send_cmd3(page_to_phys(page), compound_order(page), 0, 0x26);
+#ifdef TIMA_RKP_KDATA_PROT
+	if(rkp_cred_enable)
+		tima_send_cmd3(page_to_phys(page), compound_order(page), 0, 0x26);
 #endif
 	if (unlikely(s->flags & SLAB_DESTROY_BY_RCU)) {
 		struct rcu_head *head;
@@ -3251,7 +3284,7 @@ static void list_slab_objects(struct kmem_cache *s, struct page *page,
 				     sizeof(long), GFP_ATOMIC);
 	if (!map)
 		return;
-	slab_err(s, page, text, s->name);
+	slab_err_nopanic(s, page, text, s->name);
 	slab_lock(page);
 
 	get_map(s, page, map);
@@ -3263,6 +3296,9 @@ static void list_slab_objects(struct kmem_cache *s, struct page *page,
 			print_tracking(s, p);
 		}
 	}
+
+	if (slub_debug)
+		panic("SLUB ERROR: list_slab_objects.");
 	slab_unlock(page);
 	kfree(map);
 #endif

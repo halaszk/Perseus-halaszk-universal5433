@@ -5,6 +5,9 @@
 #include <linux/rcupdate.h>
 #include <linux/vmalloc.h>
 #include <linux/reboot.h>
+#ifdef CONFIG_SEC_DEBUG_AUX_SUSPEND
+#include <linux/sec_debug.h>
+#endif
 
 /*
  *	Notifier list for kernel code which wants to be called
@@ -77,6 +80,9 @@ static int __kprobes notifier_call_chain(struct notifier_block **nl,
 {
 	int ret = NOTIFY_DONE;
 	struct notifier_block *nb, *next_nb;
+#ifdef CONFIG_SEC_DEBUG_AUX_SUSPEND
+	int auxlog = (v == (void *)0xFFEDCBA9);
+#endif
 
 	nb = rcu_dereference_raw(*nl);
 
@@ -90,7 +96,17 @@ static int __kprobes notifier_call_chain(struct notifier_block **nl,
 			continue;
 		}
 #endif
+#ifdef CONFIG_SEC_DEBUG_AUX_SUSPEND
+		if (auxlog)
+			sec_debug_aux_log(SEC_DEBUG_AUXLOG_SUSPEND, "[%d]%p:%pf s", val, nb, nb->notifier_call);
+#endif
+
 		ret = nb->notifier_call(nb, val, v);
+
+#ifdef CONFIG_SEC_DEBUG_AUX_SUSPEND
+		if (auxlog)
+			sec_debug_aux_log(SEC_DEBUG_AUXLOG_SUSPEND, "[%d]%p:%pf e", val, nb, nb->notifier_call);
+#endif
 
 		if (nr_calls)
 			(*nr_calls)++;

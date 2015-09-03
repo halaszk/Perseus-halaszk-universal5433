@@ -1726,3 +1726,4 @@ module_exit(w1_ds28el35_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("TaiEup Kim <clark.kim@maximintegrated.com>");
 MODULE_DESCRIPTION("1-wire Driver for Maxim/Dallas DS23EL35 DeepCover Secure Authenticator IC");
+

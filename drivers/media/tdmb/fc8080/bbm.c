@@ -186,7 +186,7 @@ s32 bbm_com_tuner_write(HANDLE handle, u8 addr, u8 addr_len, u8 *buffer, u8 len)
 
 s32 bbm_com_tuner_set_freq(HANDLE handle, u32 freq)
 {
-	s32 res = BBM_OK;
+	s32 res;
 
 	res = tuner_set_freq(handle, freq);
 
@@ -195,7 +195,7 @@ s32 bbm_com_tuner_set_freq(HANDLE handle, u32 freq)
 
 s32 bbm_com_tuner_select(HANDLE handle, u32 product, u32 band)
 {
-	s32 res = BBM_OK;
+	s32 res;
 
 	res = tuner_select(handle, product, band);
 
@@ -204,7 +204,7 @@ s32 bbm_com_tuner_select(HANDLE handle, u32 product, u32 band)
 
 s32 bbm_com_tuner_get_rssi(HANDLE handle, s32 *rssi)
 {
-	s32 res = BBM_OK;
+	s32 res;
 
 	res = tuner_get_rssi(handle, rssi);
 
@@ -213,7 +213,7 @@ s32 bbm_com_tuner_get_rssi(HANDLE handle, s32 *rssi)
 
 s32 bbm_com_scan_status(HANDLE handle)
 {
-	s32 res = BBM_OK;
+	s32 res;
 
 	res = fc8080_scan_status(handle);
 
@@ -297,9 +297,9 @@ void bbm_com_isr(HANDLE handle)
 	fc8080_isr(handle);
 }
 
-s32 bbm_com_hostif_select(HANDLE handle, u8 hostif, u32 param)
+s32 bbm_com_hostif_select(HANDLE handle, u8 hostif, unsigned long param)
 {
-	s32 res = BBM_NOK;
+	s32 res;
 
 	res = bbm_hostif_select(handle, hostif, param);
 
@@ -308,7 +308,7 @@ s32 bbm_com_hostif_select(HANDLE handle, u8 hostif, u32 param)
 
 s32 bbm_com_hostif_deselect(HANDLE handle)
 {
-	s32 res = BBM_NOK;
+	s32 res;
 
 	res = bbm_hostif_deselect(handle);
 

@@ -44,6 +44,7 @@
 #define CALIBRATION_FILE_PATH           "/efs/accel_calibration_data"
 #define CALIBRATION_DATA_AMOUNT         20
 #define MAX_ACCEL_1G			1024
+#define MAX_ACCEL_1G_FOR4G		512
 
 #define BMA255_DEFAULT_DELAY            200000000LL
 #define BMA255_CHIP_ID                  0xFA
@@ -56,7 +57,8 @@
 #define SLOPE_Z_INT                     2
 
 #define SLOPE_DURATION_VALUE            2
-#define SLOPE_THRESHOLD_VALUE           0x0A
+#define SLOPE_THRESHOLD_VALUE			0x0A
+#define SLOPE_THRESHOLD_VALUE_4G		0x05
 
 #define BMA255_TOP_UPPER_RIGHT          0
 #define BMA255_TOP_LOWER_RIGHT          1
@@ -98,6 +100,7 @@ struct bma255_p {
 	ktime_t poll_delay;
 	atomic_t enable;
 
+	int range;
 	int chip_pos;
 	int recog_flag;
 	int irq1;
@@ -106,37 +109,10 @@ struct bma255_p {
 	int sda_gpio;
 	int scl_gpio;
 	int time_count;
+	u64 timestamp;
 };
 
 static int bma255_open_calibration(struct bma255_p *);
-
-/*static int sunggun_i2c_read(struct bma255_p *data, u16 reg_addr, u8 *buf)
-{
-	int ret;
-	struct i2c_msg msg[2];
-	unsigned char i2c_data[2];
-
-	msg[0].addr = 0x18;
-	msg[0].flags = I2C_M_WR;
-	msg[0].len = 2;
-	msg[0].buf = i2c_data;
-	i2c_data[0] = (reg_addr >> 8) & 0xff;
-	i2c_data[1] = (reg_addr) & 0xff;
-
-
-	msg[1].addr = 0x18;
-	msg[1].flags = I2C_M_RD;
-	msg[1].len = 2;
-	msg[1].buf = buf;
-
-	ret = i2c_transfer(data->client->adapter, msg, 2);
-	if (ret < 0) {
-		pr_err("[SENSOR]: %s - i2c read error %d\n", __func__, ret);
-		return ret;
-	}
-
-	return 0;
-}*/
 
 static int bma255_i2c_read(struct bma255_p *data,
 		unsigned char reg_addr, unsigned char *buf)
@@ -359,6 +335,13 @@ static void bma255_work_func(struct work_struct *work)
 	int ret;
 	struct bma255_v acc;
 	struct bma255_p *data = container_of(work, struct bma255_p, work);
+	struct timespec ts;
+	int time_hi, time_lo;
+
+	ts = ktime_to_timespec(ktime_get_boottime());
+	data->timestamp = ts.tv_sec * 1000000000ULL + ts.tv_nsec;
+	time_lo = (int)(data->timestamp & TIME_LO_MASK);
+	time_hi = (int)((data->timestamp & TIME_HI_MASK) >> TIME_HI_SHIFT);
 
 	ret = bma255_read_accel_xyz(data, &acc);
 	if (ret < 0)
@@ -371,6 +354,8 @@ static void bma255_work_func(struct work_struct *work)
 	input_report_rel(data->input, REL_X, data->accdata.x);
 	input_report_rel(data->input, REL_Y, data->accdata.y);
 	input_report_rel(data->input, REL_Z, data->accdata.z);
+	input_report_rel(data->input, REL_DIAL, time_hi);
+	input_report_rel(data->input, REL_MISC, time_lo);
 	input_sync(data->input);
 
 exit:
@@ -597,10 +582,18 @@ static int bma255_do_calibrate(struct bma255_p *data, int enable)
 		data->caldata.y = (sum[1] / CALIBRATION_DATA_AMOUNT);
 		data->caldata.z = (sum[2] / CALIBRATION_DATA_AMOUNT);
 
-		if (data->caldata.z > 0)
-			data->caldata.z -= MAX_ACCEL_1G;
-		else if (data->caldata.z < 0)
-			data->caldata.z += MAX_ACCEL_1G;
+		if (data->range == BMA255_RANGE_4G) {
+			if (data->caldata.z > 0)
+				data->caldata.z -= MAX_ACCEL_1G_FOR4G;
+			else if (data->caldata.z < 0)
+				data->caldata.z += MAX_ACCEL_1G_FOR4G;
+		} else {
+			if (data->caldata.z > 0)
+				data->caldata.z -= MAX_ACCEL_1G;
+			else if (data->caldata.z < 0)
+				data->caldata.z += MAX_ACCEL_1G;
+
+		}
 	} else {
 		data->caldata.x = 0;
 		data->caldata.y = 0;
@@ -721,6 +714,11 @@ static int bma255_parse_dt(struct bma255_p *data, struct device *dev)
 	if (of_property_read_u32(np, "accelerometer,chip_pos", &data->chip_pos) < 0)
 		data->chip_pos = BMA255_BOTTOM_UPPER_LEFT;
 
+	if (of_property_read_u32(np, "accelerometer,range", &data->range) < 0)
+		data->range = BMA255_RANGE_2G;
+	else
+		pr_info("[SENSOR]: %s - range set as %d\n", __func__, data->range);
+
 	pr_err("%s: acc_int1= %d, sda_gpio= %d, scl_gpio= %d, data->chip_pos=%d",
 				__func__, data->acc_int1, data->sda_gpio, data->scl_gpio,data->chip_pos );
 
@@ -780,7 +778,11 @@ static void bma255_slope_enable(struct bma255_p *data,
 					SLOPE_DURATION_VALUE);
 			bma255_i2c_write(data, BMA255_SLOPE_DUR__REG, reg);
 
-			reg = SLOPE_THRESHOLD_VALUE;
+			if (data->range == BMA255_RANGE_2G)
+				reg = SLOPE_THRESHOLD_VALUE;
+			else
+				reg = SLOPE_THRESHOLD_VALUE_4G;
+
 			bma255_i2c_write(data, BMA255_SLOPE_THRES__REG, reg);
 
 			bma255_set_int_enable(data, SLOPE_X_INT, ON);
@@ -949,6 +951,9 @@ static int bma255_input_init(struct bma255_p *data)
 	input_set_capability(dev, EV_REL, REL_X);
 	input_set_capability(dev, EV_REL, REL_Y);
 	input_set_capability(dev, EV_REL, REL_Z);
+	input_set_capability(dev, EV_REL, REL_DIAL); /* time_hi */
+	input_set_capability(dev, EV_REL, REL_MISC); /* time_lo */
+
 	input_set_drvdata(dev, data);
 
 	ret = input_register_device(dev);
@@ -980,7 +985,6 @@ static int bma255_probe(struct i2c_client *client,
 {
 	int ret = -ENODEV, i;
 	struct bma255_p *data = NULL;
-//	u8 valval;
 
 	pr_info("[SENSOR]: %s - Probe Start!\n", __func__);
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
@@ -1015,12 +1019,6 @@ static int bma255_probe(struct i2c_client *client,
 		       "reactive_wake_lock");
 printk(KERN_ERR "%s, data->client->addr=0x%x,client->addr=0x%x\n",__func__,data->client->addr,client->addr);
 	/* read chip id */
-
-	/*for (i = 0; i < CHIP_ID_RETRIES; i++) {
-		sunggun_i2c_read(data, BMA255_CHIP_ID_REG, &valval);
-		printk(KERN_ERR "sunggun 0x%x\n", valval);
-	}*/
-
 	for (i = 0; i < CHIP_ID_RETRIES; i++) {
 		ret = i2c_smbus_read_word_data(client, BMA255_CHIP_ID_REG);
 		if ((ret & 0x00ff) != BMA255_CHIP_ID) {
@@ -1081,7 +1079,7 @@ printk(KERN_ERR "%s, data->client->addr=0x%x,client->addr=0x%x\n",__func__,data-
 	data->recog_flag = OFF;
 
 	bma255_set_bandwidth(data, BMA255_BW_125HZ);
-	bma255_set_range(data, BMA255_RANGE_2G);
+	bma255_set_range(data, data->range);
 	bma255_set_mode(data, BMA255_MODE_SUSPEND);
 
 	pr_info("[SENSOR]: %s - Probe done!(chip pos : %d)\n",

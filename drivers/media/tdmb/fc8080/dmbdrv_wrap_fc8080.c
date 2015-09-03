@@ -44,6 +44,10 @@ static u32 dmb_initialize;
 unsigned char current_service_type = 0x18;
 unsigned char current_subchannel_id;
 
+#ifdef CONFIG_TDMB_XTAL_FREQ
+u32 main_xtal_freq = 24576;
+#endif
+
 int tdmb_interrupt_fic_callback(u32 userdata, u8 *data, int length)
 {
 	fic_decoder_put((struct fic *)data, length);
@@ -133,7 +137,11 @@ void dmb_drv_isr()
 }
 #endif
 
-unsigned char dmb_drv_init(unsigned long param)
+unsigned char dmb_drv_init(unsigned long param
+#ifdef CONFIG_TDMB_XTAL_FREQ
+	, u32 xtal_freq
+#endif
+)
 {
 #ifdef FEATURE_INTERFACE_TEST_MODE
 	int i;
@@ -160,11 +168,15 @@ unsigned char dmb_drv_init(unsigned long param)
 		return TDMB_FAIL;
 	}
 
+#ifdef CONFIG_TDMB_XTAL_FREQ
+	main_xtal_freq = xtal_freq;
+#endif
+
 #if defined(CONFIG_TDMB_TSIF_SLSI) || defined(CONFIG_TDMB_TSIF_QC)
 	fc8080_demux_fic_callback_register(
-		(u32)NULL, tdmb_interrupt_fic_callback);
+		0, tdmb_interrupt_fic_callback);
 	fc8080_demux_msc_callback_register(
-		(u32)NULL, tdmb_interrupt_msc_callback);
+		0, tdmb_interrupt_msc_callback);
 #else
 	bbm_com_fic_callback_register(0, tdmb_interrupt_fic_callback);
 	bbm_com_msc_callback_register(0, tdmb_interrupt_msc_callback);
@@ -757,6 +769,15 @@ unsigned long frequency
 		bbm_com_audio_select(NULL, subchannel, 1);
 	else
 		bbm_com_data_select(NULL, subchannel, 2);
+
+#if defined(CONFIG_TDMB_TSIF_SLSI) || defined(CONFIG_TDMB_TSIF_QC)
+	if (sevice_type == 0x18)
+		fc8080_demux_select_video(subchannel, 0);
+	else if (sevice_type == 0x00)
+		fc8080_demux_select_channel(subchannel, 1);
+	else
+		fc8080_demux_select_channel(subchannel, 2);
+#endif
 
 #ifdef FEATURE_FC8080_DEBUG
 	if (sevice_type == 0x18)

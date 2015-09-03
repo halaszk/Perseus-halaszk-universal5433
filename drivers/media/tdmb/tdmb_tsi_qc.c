@@ -18,7 +18,7 @@
 #include <linux/vmalloc.h>
 #include <linux/slab.h>
 #include <linux/types.h>
-#include <mach/msm_tspp.h>
+#include <linux/qcom_tspp.h>
 
 #include "tdmb.h"
 
@@ -152,29 +152,6 @@ static void tdmb_tsi_pull_data(struct work_struct *work)
 {
 	struct tsi_pkt *pkt;
 	unsigned long flags;
-
-	if (!tsi_priv->tsi_running) {
-		DPRINTK("%s : tsi_runing : %d\n",
-			__func__, tsi_priv->tsi_running);
-		return;
-	}
-
-	while ((pkt = tsi_get_pkt(tsi_priv, &tsi_priv->full_list)) != NULL) {
-#ifdef CONFIG_TSI_LIST_DEBUG
-		DPRINTK("full_list virt:0x%p length:%d\n",pkt->buf, pkt->len);
-#endif
-		if (tsi_data_callback)
-			tsi_data_callback(pkt->buf, pkt->len);
-		spin_lock_irqsave(&tsi_priv->tsi_lock, flags);
-		list_move(&pkt->list, &tsi_priv->free_list);
-		spin_unlock_irqrestore(&tsi_priv->tsi_lock, flags);
-	}
-}
-
-static void tdmb_tspp_callback(int channel_id, void *user)
-{
-	struct tsi_pkt *pkt;
-	unsigned long flags;
 	const struct tspp_data_descriptor *tspp_data_desc;
 
 	if (!tsi_priv->tsi_running) {
@@ -204,6 +181,25 @@ static void tdmb_tspp_callback(int channel_id, void *user)
 		tspp_release_buffer(0, CHANNEL_ID, tspp_data_desc->id);
 	}
 
+	while ((pkt = tsi_get_pkt(tsi_priv, &tsi_priv->full_list)) != NULL) {
+#ifdef CONFIG_TSI_LIST_DEBUG
+		DPRINTK("full_list virt:0x%p length:%d\n",pkt->buf, pkt->len);
+#endif
+		if (tsi_data_callback)
+			tsi_data_callback(pkt->buf, pkt->len);
+		spin_lock_irqsave(&tsi_priv->tsi_lock, flags);
+		list_move(&pkt->list, &tsi_priv->free_list);
+		spin_unlock_irqrestore(&tsi_priv->tsi_lock, flags);
+	}
+}
+
+static void tdmb_tspp_callback(int channel_id, void *user)
+{
+	if (!tsi_priv->tsi_running) {
+		DPRINTK("%s : tsi_runing : %d\n",
+			__func__, tsi_priv->tsi_running);
+		return;
+	}
 	if (tdmb_tsi_workqueue) {
 		int ret;
 		ret = queue_work(tdmb_tsi_workqueue, &tdmb_tsi_work);

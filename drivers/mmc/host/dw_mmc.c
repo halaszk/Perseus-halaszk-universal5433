@@ -2111,7 +2111,7 @@ static void dw_mci_command_complete(struct dw_mci *host, struct mmc_command *cmd
 	else if ((cmd->flags & MMC_RSP_CRC) && (status & SDMMC_INT_RCRC))
 		cmd->error = -EILSEQ;
 	else if (status & SDMMC_INT_RESP_ERR)
-		cmd->error = -EIO;
+		cmd->error = -EILSEQ;
 	else
 		cmd->error = 0;
 
@@ -2434,6 +2434,7 @@ static int dw_mci_tasklet_dat(struct dw_mci *host)
 						data->error = -ETIMEDOUT;
 						dev_err(host->dev,
 							"Write no CRC\n");
+						dw_mci_reg_dump(host);
 					} else {
 						data->error = -EIO;
 						dev_err(host->dev,

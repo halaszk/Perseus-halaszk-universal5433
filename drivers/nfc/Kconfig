@@ -137,4 +137,16 @@ config SEC_NFC_MARGINTIME
 	  Say Y here to compile support for SAMSUNG SEC NFC MARGINTIME feature into the
 	  kernel.
 
+config SEC_NFC_LDO_CONTROL
+	bool "SEC NFC LDO CONTROL"
+	depends on SEC_NFC
+	default n
+	help
+	  SAMSUNG SEC NFC LDO CONTROL feature.
+	  This feature provides support for SAMSUNG NFC products.
+	  You should select this feature if your NFC product uses ldo control of i2c.
+
+	  Say Y here to compile support for SEC NFC LDO CONTROL feature into the
+	  kernel.
+
 endmenu

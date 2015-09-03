@@ -2246,7 +2246,9 @@ static void fts_reinit_fac(struct fts_ts_info *info)
 
 	if (info->flip_enable)
 		fts_set_cover_type(info, true);
-	else if (info->fast_mshover_enabled)
+
+	/* enable glove touch when flip cover is closed */
+	if (info->fast_mshover_enabled)
 		fts_command(info, FTS_CMD_SET_FAST_GLOVE_MODE);
 	else if (info->mshover_enabled)
 		fts_command(info, FTS_CMD_MSHOVER_ON);
@@ -2284,9 +2286,10 @@ static void fts_reinit_fac(struct fts_ts_info *info)
 
 static void fts_reinit(struct fts_ts_info *info)
 {
-	fts_wait_for_ready(info);
-
-	fts_read_chip_id(info);
+	if (!info->lowpower_mode) {
+		fts_wait_for_ready(info);
+		fts_read_chip_id(info);
+	}
 
 	fts_systemreset(info);
 
@@ -2524,6 +2527,9 @@ static int fts_stop_device(struct fts_ts_info *info)
 		fts_release_all_finger(info);
 #ifdef FTS_SUPPORT_TOUCH_KEY
 		fts_release_all_key(info);
+#endif
+#ifdef FTS_SUPPORT_NOISE_PARAM
+		fts_get_noise_param(info);
 #endif
 	} else {
 		fts_interrupt_set(info, INT_DISABLE);

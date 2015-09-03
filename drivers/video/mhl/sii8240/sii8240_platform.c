@@ -19,7 +19,7 @@
 
 struct sii8240_platform_data *g_pdata;
 
-#if defined(CONFIG_SOC_EXYNOS5430) || defined(CONFIG_SOC_EXYNOS5433)
+#if defined(CONFIG_SOC_EXYNOS5430) || defined(CONFIG_MHL_EXTLDO)
 #define MHL_LDO1_8 "VCC_1.8V_MHL"
 #define MHL_LDO1_2 "VSIL_1.2V"
 #else
@@ -44,6 +44,12 @@ static void muic_mhl_cb(bool otg_enable, int plim)
 	struct power_supply *psy;
 	pdata->charging_type = POWER_SUPPLY_TYPE_MISC;
 
+	if (pdata->mhl_muic_type == MHL_SMART_DOCK) {
+		pr_info("sii8240 : SMART_DOCK connected, mhl_cb does nothing\n");
+		return;
+	}
+	pr_info("sii8240 : %s: otg_en:%d, plim:%d\n", __func__, otg_enable, plim);
+
 	if (plim == 0x00)
 		pdata->charging_type = POWER_SUPPLY_TYPE_MHL_500;
 	else if (plim == 0x01)
@@ -54,6 +60,17 @@ static void muic_mhl_cb(bool otg_enable, int plim)
 		pdata->charging_type = POWER_SUPPLY_TYPE_USB;
 	else
 		pdata->charging_type = POWER_SUPPLY_TYPE_BATTERY;
+
+	if (pdata->mhl_muic_type == MHL_MM_DOCK) {
+		if (otg_enable == true || plim == 0x00) {
+			pr_info("sii8240 : %s does nothing\n", __func__);
+			return;
+		} else if (pdata->charging_type != POWER_SUPPLY_TYPE_BATTERY) {
+			pdata->charging_type = (plim == 0x03) ? POWER_SUPPLY_TYPE_MDOCK_USB :
+				POWER_SUPPLY_TYPE_MDOCK_TA;
+			pr_info("sii8240 : %s MDOCK_TA with plim(0x%02x)\n", __func__, plim);
+		}
+	}
 
 	for (i = 0; i < 10; i++) {
 		psy = power_supply_get_by_name("battery");
@@ -94,7 +111,7 @@ static void muic_mhl_cb(bool otg_enable, int plim)
 	return;
 }
 
-#if defined(CONFIG_SOC_EXYNOS5430) || defined(CONFIG_SOC_EXYNOS5433) /* KQ-Helsinki MHL-Regulator */
+#if defined(CONFIG_SOC_EXYNOS5430) || defined(CONFIG_MHL_EXTLDO)
 static void of_sii8240_hw_onoff(bool on)
 {
 	struct sii8240_platform_data *pdata = g_pdata;

@@ -121,11 +121,13 @@ inline void rkp_print_debug(void)
 	printk(KERN_ERR"\nRKP2 uid = %d gid = %d euid = %d  egid = %d \n",current->cred->uid,current->cred->gid,current->cred->euid,current->cred->egid);
 
 }
+
 /* Main function to verify cred security context of a process */
 int security_integrity_current(void)
 {
-	if (!tima_ro_page((unsigned long)current->cred)||
-		cmp_sec_integrity()) {
+	if (rkp_cred_enable && 
+		(!tima_ro_page((unsigned long)current->cred)||
+		cmp_sec_integrity())) {
 		rkp_print_debug();
 		panic("RKP CRED PROTECTION VIOLATION\n");
 	}
@@ -1525,12 +1527,29 @@ static int task_has_perm(const struct task_struct *tsk1,
 			 const struct task_struct *tsk2,
 			 u32 perms)
 {
+#ifdef CONFIG_TIMA_RKP_RO_CRED
+	volatile struct task_security_struct *tsec1, *tsec2;
+#endif /*CONFIG_TIMA_RKP_RO_CRED*/
 	const struct task_security_struct *__tsec1, *__tsec2;
 	u32 sid1, sid2;
 
 	rcu_read_lock();
+
+#ifdef CONFIG_TIMA_RKP_RO_CRED
+	if(rkp_cred_enable){
+		while((u64)(tsec1 = __task_cred(tsk1)->security) == (u64)0x07);
+		while((u64)(tsec2 = __task_cred(tsk2)->security) == (u64)0x07);
+		sid1 = tsec1->sid;
+		sid2 = tsec2->sid;
+	}else {
+		__tsec1 = __task_cred(tsk1)->security;	sid1 = __tsec1->sid;
+		__tsec2 = __task_cred(tsk2)->security;	sid2 = __tsec2->sid;
+	}
+#else
 	__tsec1 = __task_cred(tsk1)->security;	sid1 = __tsec1->sid;
 	__tsec2 = __task_cred(tsk2)->security;	sid2 = __tsec2->sid;
+#endif /*CONFIG_TIMA_RKP_RO_CRED*/
+
 	rcu_read_unlock();
 	return avc_has_perm(sid1, sid2, SECCLASS_PROCESS, perms, NULL);
 }
@@ -3688,6 +3707,12 @@ static int selinux_cred_alloc_blank(struct cred *cred, gfp_t gfp)
 static void selinux_cred_free(struct cred *cred)
 {
 	struct task_security_struct *tsec = cred->security;
+
+	if((unsigned long) cred->security == 0x7) {
+		printk(KERN_ERR"CRED SECURITY is already freed  %s -> %p sec %p SHOULD BE 7\n",
+					__func__, cred, cred->security);
+		return;
+	}
 
 	/*
 	 * cred->security == NULL if security_cred_alloc_blank() or

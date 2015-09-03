@@ -44,9 +44,6 @@
 #include <asm/mmu_context.h>
 
 #include "internal.h"
-#ifdef CONFIG_SDCARD_FS
-#include "../fs/sdcardfs/sdcardfs.h"
-#endif
 
 #ifndef arch_mmap_check
 #define arch_mmap_check(addr, len, flags)	(0)
@@ -55,6 +52,8 @@
 #ifndef arch_rebalance_pgtables
 #define arch_rebalance_pgtables(addr, len)		(addr)
 #endif
+
+extern int boot_mode_security;
 
 static void unmap_region(struct mm_struct *mm,
 		struct vm_area_struct *vma, struct vm_area_struct *prev,
@@ -1232,10 +1231,8 @@ unsigned long do_mmap_pgoff(struct file *file, unsigned long addr,
 
 	*populate = 0;
 
-#ifdef CONFIG_SDCARD_FS
-	if (file && (file->f_path.mnt->mnt_sb->s_magic == SDCARDFS_SUPER_MAGIC))
-		file = sdcardfs_lower_file(file);
-#endif
+	while (file && (file->f_mode & FMODE_NONMAPPABLE))
+			file = file->f_op->get_lower_file(file);
 
 	/*
 	 * Does the application expect PROT_READ to imply PROT_EXEC?
@@ -1633,7 +1630,7 @@ munmap_back:
 
 #ifdef CONFIG_TIMA_RKP
 #ifdef CONFIG_TIMA_DALVIKHEAP_OPT
-        if(file && (strcmp(current->comm, "zygote") == 0)){
+        if(boot_mode_security && file && (strcmp(current->comm, "zygote") == 0)){
                 char *tmp;
                 char *pathname;
                 struct path path;

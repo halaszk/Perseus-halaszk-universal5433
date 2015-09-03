@@ -19,9 +19,9 @@
 #include <linux/platform_device.h>
 #include <linux/sched.h>
 #include <linux/spinlock.h>
-#include <linux/sdp_mm.h>
 #include <linux/types.h>
 #include <linux/uaccess.h>
+#include <sdp/sdp_mm.h>
 
 #define SDP_MM_DEV	"sdp_mm"
 

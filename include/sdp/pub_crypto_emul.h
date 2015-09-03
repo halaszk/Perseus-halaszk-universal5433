@@ -11,22 +11,17 @@
 #define OP_RSA_DEC 11
 #define OP_DH_DEC 12
 #define OP_DH_ENC 13
+#define OP_ECDH_DEC 14
+#define OP_ECDH_ENC 15
 
 #define PUB_CRYPTO_ERROR 99
 
-struct rsa_send_msg {
+typedef struct __cipher_param {
     u32 request_id;
     u8 opcode;
 	dek_t in;
 	kek_t key;
-};
-
-struct dh_send_msg {
-    u32 request_id;
-    u8 opcode;
-	dek_t in;
-	kek_t key;
-};
+}cipher_param_t;
 
 typedef struct result {
     u32 request_id;
@@ -63,10 +58,7 @@ typedef struct pub_crypto_request {
 
 	enum req_state state;
 
-	union {
-		struct dh_send_msg dh;
-		struct rsa_send_msg rsa;
-	}msg;
+	cipher_param_t cipher_param;
 
 	result_t result;
 
@@ -78,5 +70,6 @@ int rsa_encryptByPub(dek_t *dek, dek_t *edek, kek_t *key);
 int rsa_decryptByPair(dek_t *edek, dek_t *dek, kek_t *key);
 int dh_decryptEDEK(dek_t *edek, dek_t *dek, kek_t *key);
 int dh_encryptDEK(dek_t *dek, dek_t *edek, kek_t *key);
-
+int ecdh_decryptEDEK(dek_t *edek, dek_t *dek, kek_t *key);
+int ecdh_encryptDEK(dek_t *dek, dek_t *edek, kek_t *key);
 #endif

@@ -354,6 +354,10 @@ struct page *dma_alloc_from_contiguous(struct device *dev, int count,
 
 	mask = (1 << align) - 1;
 
+	/* HACK for MFC context buffer */
+	if (!strncmp(dev_name(dev), "ion_video", strlen("ion_video")) && (count > 8))
+		start = 16;
+
 	mutex_lock(&cma_mutex);
 
 	for (;;) {

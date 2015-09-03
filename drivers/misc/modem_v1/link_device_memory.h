@@ -352,15 +352,6 @@ struct mem_link_device {
 	cpumask_var_t imask;	/* irq affinity cpu mask */
 
 	/**
-	 * GPIO#, MBOX#, IRQ# for IPC
-	 */
-	unsigned int mbx_cp2ap_msg;	/* MBOX# for IPC RX */
-	unsigned int irq_cp2ap_msg;	/* IRQ# for IPC RX  */
-
-	unsigned int mbx_ap2cp_msg;	/* MBOX# for IPC TX */
-	unsigned int int_ap2cp_msg;	/* INTR# for IPC TX */
-
-	/**
 	 * Member variables for TX & RX
 	 */
 	struct mst_buff_head msb_rxq;
@@ -368,7 +359,6 @@ struct mem_link_device {
 
 	struct tasklet_struct rx_tsk;
 
-	struct hrtimer tx_timer;
 	struct hrtimer sbd_tx_timer;
 
 	/**
@@ -936,9 +926,6 @@ void mem_irq_handler(struct mem_link_device *mld, struct mst_buff *msb);
 void __iomem *mem_vmap(phys_addr_t pa, size_t size, struct page *pages[]);
 void mem_vunmap(void *va);
 
-int mem_register_boot_rgn(struct mem_link_device *mld, phys_addr_t start,
-			  size_t size);
-void mem_unregister_boot_rgn(struct mem_link_device *mld);
 int mem_setup_boot_map(struct mem_link_device *mld);
 
 int mem_register_ipc_rgn(struct mem_link_device *mld, phys_addr_t start,
@@ -954,21 +941,8 @@ struct mem_link_device *mem_create_link_device(enum mem_iface_type type,
 */
 #endif
 
-/*============================================================================*/
-
-#ifdef GROUP_MEM_LINK_COMMAND
-/**
-@addtogroup group_mem_link_command
-@{
-*/
-
 int mem_reset_ipc_link(struct mem_link_device *mld);
 void mem_cmd_handler(struct mem_link_device *mld, u16 cmd);
-
-/**
-@}
-*/
-#endif
 
 /*============================================================================*/
 
@@ -1029,10 +1003,6 @@ void print_res_ack(struct mem_link_device *mld, struct mem_snapshot *mst,
 void print_mem_snapshot(struct mem_link_device *mld, struct mem_snapshot *mst);
 void print_dev_snapshot(struct mem_link_device *mld, struct mem_snapshot *mst,
 			struct mem_ipc_device *dev);
-
-void save_mem_dump(struct mem_link_device *mld);
-void mem_dump_work(struct work_struct *ws);
-
 /**
 @}
 */
@@ -1061,41 +1031,21 @@ static inline struct sk_buff *mem_alloc_skb(unsigned int len)
 	return skb;
 }
 
-#ifdef GROUP_MEM_LINK_IOSM_MESSAGE
+/*============================================================================*/
 
-/* direction: CP -> AP */
-#define IOSM_C2A_MDM_READY	0x80
-#define IOSM_C2A_CONF_CH_RSP	0xA3	/* answer of flow control msg */
-#define IOSM_C2A_STOP_TX_CH	0xB0
-#define IOSM_C2A_START_TX_CH	0xB1
-#define IOSM_C2A_ACK		0xE0
-#define IOSM_C2A_NACK		0xE1
-
-/* direction: AP -> CP */
-#define IOSM_A2C_AP_READY	0x00
-#define IOSM_A2C_CONF_CH_REQ	0x22	/* flow control on/off */
-#define IOSM_A2C_OPEN_CH	0x24
-#define IOSM_A2C_CLOSE_CH	0x25
-#define IOSM_A2C_STOP_TX_CH	0x30
-#define IOSM_A2C_START_TX_CH	0x30
-#define IOSM_A2C_ACK		0x60
-#define IOSM_A2C_NACK		0x61
-
-#define IOSM_TRANS_ID_MAX	255
-#define IOSM_MSG_AREA_SIZE	(CTRL_RGN_SIZE / 2)
-#define IOSM_MSG_TX_OFFSET	CMD_RGN_OFFSET
-#define IOSM_MSG_RX_OFFSET	(CMD_RGN_OFFSET + IOSM_MSG_AREA_SIZE)
-#define IOSM_MSG_DESC_OFFSET	(CMD_RGN_OFFSET + CMD_RGN_SIZE)
-
-void tx_iosm_message(struct mem_link_device *, u8, u32 *);
-void iosm_event_work(struct work_struct *work);
-void iosm_event_bh(struct mem_link_device *mld, u16 cmd);
+void link_to_demux(struct mem_link_device *mld);
+void link_to_demux_work(struct work_struct *ws);
+void recv_ipc_frames(struct mem_link_device *mld, struct mem_snapshot *mst);
+int xmit_udl(struct mem_link_device *mld, struct io_device *iod,
+		    enum sipc_ch_id ch, struct sk_buff *skb);
+int mem_xmit_boot(struct link_device *ld, struct io_device *iod,
+		     unsigned long arg);
+int mem_start_download(struct link_device *ld, struct io_device *iod);
+int mem_update_firm_info(struct link_device *ld, struct io_device *iod,
+				unsigned long arg);
+int mem_start_upload(struct link_device *ld, struct io_device *iod);
+void reset_ipc_map(struct mem_link_device *mld);
+void remap_4mb_map_to_ipc_dev(struct mem_link_device *mld);
+void recv_sbd_ipc_frames(struct mem_link_device *mld);
 
 #endif
-
-#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
-extern int is_rndis_use(void);
-#endif
-
-#endif
-

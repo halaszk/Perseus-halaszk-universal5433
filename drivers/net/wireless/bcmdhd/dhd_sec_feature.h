@@ -82,7 +82,7 @@
 #define HW_OOB
 #endif /* CONFIG_MACH_SAMSUNG_ESPRESSO && CONFIG_MACH_SAMSUNG_ESPRESSO_10 */
 
-#if defined(CONFIG_MACH_UNIVERSAL5430)
+#if defined(CONFIG_MACH_UNIVERSAL5430) && !defined(CONFIG_BCM43455) && !defined(CONFIG_BCM4334)
 #undef CUSTOM_SET_CPUCORE
 #define PRIMARY_CPUCORE 0
 #define DPC_CPUCORE 4
@@ -111,6 +111,11 @@
 #define HW_OOB
 #define READ_MACADDR
 #endif /* CONFIG_ARCH_MSM7X30 */
+
+
+#ifdef CONFIG_MACH_A7LTE
+#undef HW_OOB
+#endif /*CONFIG_MACH_A7LTE*/
 
 #if defined(CONFIG_MACH_GC1) || defined(CONFIG_MACH_U1_NA_SPR) || \
 	defined(CONFIG_MACH_VIENNAEUR) || defined(CONFIG_V1A) || defined(CONFIG_MACH_LT03EUR) || \

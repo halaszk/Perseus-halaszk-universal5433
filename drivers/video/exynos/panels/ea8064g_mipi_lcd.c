@@ -35,6 +35,7 @@
 
 #if defined(CONFIG_DECON_MDNIE_LITE)
 #include "mdnie.h"
+#include "mdnie_lite_table_s.h"
 #endif
 
 #define POWER_IS_ON(pwr)		(pwr <= FB_BLANK_NORMAL)
@@ -120,14 +121,6 @@ struct lcd_info {
 	unsigned int			coordinate[2];
 	unsigned int			partial_range[2];
 	unsigned char			date[2];
-
-	unsigned int			width;
-	unsigned int			height;
-
-#ifdef CONFIG_LCD_ALPM
-	int				alpm;
-	int				current_alpm;
-#endif
 
 #if defined(CONFIG_ESD_FG)
 	unsigned int			esd_fg_irq;
@@ -629,17 +622,6 @@ static int ea8064g_set_hbm(struct lcd_info *lcd, u8 force)
 	return ret;
 }
 
-static int ea8064g_set_partial_display(struct lcd_info *lcd)
-{
-	if (lcd->partial_range[0] || lcd->partial_range[1]) {
-		ea8064g_write(lcd, SEQ_PARTIAL_AREA, ARRAY_SIZE(SEQ_PARTIAL_AREA));
-		ea8064g_write(lcd, SEQ_PARTIAL_MODE_ON, ARRAY_SIZE(SEQ_PARTIAL_MODE_ON));
-	} else
-		ea8064g_write(lcd, SEQ_NORMAL_MODE_ON, ARRAY_SIZE(SEQ_NORMAL_MODE_ON));
-
-	return 0;
-}
-
 static void init_dynamic_aid(struct lcd_info *lcd)
 {
 	lcd->daid.vreg = VREG_OUT_X1000;
@@ -1033,70 +1015,12 @@ static int ea8064g_ldi_disable(struct lcd_info *lcd)
 	return ret;
 }
 
-#ifdef CONFIG_LCD_ALPM
-static int ea8064g_ldi_alpm_init(struct lcd_info *lcd)
-{
-	int ret = 0;
-
-	ea8064g_write_set(lcd, SEQ_ALPM_ON_SET, ARRAY_SIZE(SEQ_ALPM_ON_SET));
-
-	/* ALPM MODE */
-	lcd->current_alpm = 1;
-
-	return ret;
-}
-
-static int ea8064g_ldi_alpm_exit(struct lcd_info *lcd)
-{
-	int ret = 0;
-
-	ea8064g_write_set(lcd, SEQ_ALPM_OFF_SET, ARRAY_SIZE(SEQ_ALPM_OFF_SET));
-
-	/* NORMAL MODE */
-	lcd->current_alpm = lcd->dsim->lcd_alpm = 0;
-
-	return ret;
-}
-#endif
-
 static int ea8064g_power_on(struct lcd_info *lcd)
 {
 	int ret = 0;
 
 	dev_info(&lcd->ld->dev, "+ %s\n", __func__);
 
-#ifdef CONFIG_LCD_ALPM
-	if (lcd->current_alpm && lcd->alpm) {
-		ea8064g_set_partial_display(lcd);
-		dev_info(&lcd->ld->dev, "%s : ALPM mode\n", __func__);
-	} else {
-		if (lcd->current_alpm) {
-			ret = ea8064g_ldi_alpm_exit(lcd);
-			if (ret) {
-				dev_err(&lcd->ld->dev, "failed to exit alpm.\n");
-				goto err;
-			}
-		}
-
-		ret = ea8064g_ldi_init(lcd);
-		if (ret) {
-			dev_err(&lcd->ld->dev, "failed to initialize ldi.\n");
-			goto err;
-		}
-
-		if (lcd->alpm) {
-			ret = ea8064g_ldi_alpm_init(lcd);
-			if (ret)
-				dev_err(&lcd->ld->dev, "failed to initialize alpm.\n");
-		} else {
-			ret = ea8064g_ldi_enable(lcd);
-			if (ret) {
-				dev_err(&lcd->ld->dev, "failed to enable ldi.\n");
-				goto err;
-			}
-		}
-	}
-#else
 	ret = ea8064g_ldi_init(lcd);
 	if (ret) {
 		dev_err(&lcd->ld->dev, "failed to initialize ldi.\n");
@@ -1108,7 +1032,6 @@ static int ea8064g_power_on(struct lcd_info *lcd)
 		dev_err(&lcd->ld->dev, "failed to enable ldi.\n");
 		goto err;
 	}
-#endif
 
 	mutex_lock(&lcd->bl_lock);
 	lcd->ldi_enable = 1;
@@ -1139,15 +1062,7 @@ static int ea8064g_power_off(struct lcd_info *lcd)
 	lcd->ldi_enable = 0;
 	mutex_unlock(&lcd->bl_lock);
 
-#ifdef CONFIG_LCD_ALPM
-	if (lcd->current_alpm && lcd->alpm) {
-		lcd->dsim->lcd_alpm = 1;
-		dev_info(&lcd->ld->dev, "%s : ALPM mode\n", __func__);
-	} else
-		ret = ea8064g_ldi_disable(lcd);
-#else
 	ret = ea8064g_ldi_disable(lcd);
-#endif
 
 	dev_info(&lcd->ld->dev, "- %s\n", __func__);
 
@@ -1444,140 +1359,6 @@ static ssize_t manufacture_date_show(struct device *dev,
 	return strlen(buf);
 }
 
-static ssize_t partial_disp_show(struct device *dev,
-	struct device_attribute *attr, char *buf)
-{
-	struct lcd_info *lcd = dev_get_drvdata(dev);
-
-	sprintf(buf, "%u, %u\n", lcd->partial_range[0], lcd->partial_range[1]);
-
-	dev_info(dev, "%s: %d, %d\n", __func__, lcd->partial_range[0], lcd->partial_range[1]);
-
-	return strlen(buf);
-}
-
-static ssize_t partial_disp_store(struct device *dev,
-	struct device_attribute *attr, const char *buf, size_t size)
-{
-	struct lcd_info *lcd = dev_get_drvdata(dev);
-	u32 st, ed;
-	u8 *seq_cmd = SEQ_PARTIAL_AREA;
-
-	sscanf(buf, "%9d %9d" , &st, &ed);
-
-	dev_info(dev, "%s: %d, %d\n", __func__, st, ed);
-
-	if ((st >= lcd->height || ed >= lcd->height) || (st > ed)) {
-		pr_err("%s:Invalid Input\n", __func__);
-		return size;
-	}
-
-	lcd->partial_range[0] = st;
-	lcd->partial_range[1] = ed;
-
-	seq_cmd[1] = (st >> 8) & 0xFF;/*select msb 1byte*/
-	seq_cmd[2] = st & 0xFF;
-	seq_cmd[3] = (ed >> 8) & 0xFF;/*select msb 1byte*/
-	seq_cmd[4] = ed & 0xFF;
-
-	if (lcd->ldi_enable)
-		ea8064g_set_partial_display(lcd);
-
-	return size;
-}
-
-static ssize_t aid_log_show(struct device *dev,
-	struct device_attribute *attr, char *buf)
-{
-	struct lcd_info *lcd = dev_get_drvdata(dev);
-	u8 temp[256];
-	int i, j, k;
-	int *mtp;
-
-	mtp = lcd->daid.mtp;
-	for (i = 0, j = 0; i < IV_MAX; i++, j += 3) {
-		if (i == 0)
-			dev_info(dev, "MTP Offset VT R:%d G:%d B:%d\n",
-					mtp[j], mtp[j + 1], mtp[j + 2]);
-		else
-			dev_info(dev, "MTP Offset V%3d R:%04d G:%04d B:%04d\n",
-					lcd->daid.iv_tbl[i], mtp[j], mtp[j + 1], mtp[j + 2]);
-	}
-
-	for (i = 0; i < IBRIGHTNESS_MAX; i++) {
-		memset(temp, 0, sizeof(temp));
-		for (j = 1; j < GAMMA_PARAM_SIZE; j++) {
-			if (j == 1 || j == 3 || j == 5)
-				k = lcd->gamma_table[i][j++] * 256;
-			else
-				k = 0;
-			snprintf(temp + strnlen(temp, 256), 256, " %d",
-				lcd->gamma_table[i][j] + k);
-		}
-
-		dev_info(dev, "nit : %3d  %s\n", lcd->daid.ibr_tbl[i], temp);
-	}
-
-	dev_info(dev, "%s\n", __func__);
-
-	return strlen(buf);
-}
-
-#ifdef CONFIG_LCD_ALPM
-static ssize_t alpm_show(struct device *dev,
-	struct device_attribute *attr, char *buf)
-{
-	struct lcd_info *lcd = dev_get_drvdata(dev);
-
-	sprintf(buf, "%d\n", lcd->alpm);
-
-	dev_info(dev, "%s: %d\n", __func__, lcd->alpm);
-
-	return strlen(buf);
-}
-
-static ssize_t alpm_store(struct device *dev,
-	struct device_attribute *attr, const char *buf, size_t size)
-{
-	struct lcd_info *lcd = dev_get_drvdata(dev);
-	int value;
-	u32 st, ed;
-	u8 *seq_cmd = SEQ_PARTIAL_AREA;
-
-	sscanf(buf, "%9d %9d %9d", &value, &st, &ed);
-
-	dev_info(dev, "%s: %d %d, %d\n", __func__, value, st, ed);
-
-	if ((st >= lcd->height || ed >= lcd->height) || (st > ed)) {
-		pr_err("%s:Invalid Input\n", __func__);
-		return size;
-	}
-
-	lcd->partial_range[0] = st;
-	lcd->partial_range[1] = ed;
-
-	seq_cmd[1] = (st >> 8) & 0xFF;/*select msb 1byte*/
-	seq_cmd[2] = st & 0xFF;
-	seq_cmd[3] = (ed >> 8) & 0xFF;/*select msb 1byte*/
-	seq_cmd[4] = ed & 0xFF;
-
-	if (value) {
-		if (lcd->ldi_enable && !lcd->current_alpm)
-			ea8064g_ldi_alpm_init(lcd);
-	} else {
-		if (lcd->ldi_enable && lcd->current_alpm)
-			ea8064g_ldi_alpm_exit(lcd);
-	}
-
-	lcd->alpm = value;
-
-	dev_info(dev, "%s: %d\n", __func__, lcd->alpm);
-
-	return size;
-}
-
-static DEVICE_ATTR(alpm, 0664, alpm_show, alpm_store);
-#endif
 
 static DEVICE_ATTR(power_reduce, 0664, power_reduce_show, power_reduce_store);
 static DEVICE_ATTR(lcd_type, 0444, lcd_type_show, NULL);
@@ -1589,8 +1370,6 @@ static DEVICE_ATTR(siop_enable, 0664, siop_enable_show, siop_enable_store);
 static DEVICE_ATTR(temperature, 0664, temperature_show, temperature_store);
 static DEVICE_ATTR(color_coordinate, 0444, color_coordinate_show, NULL);
 static DEVICE_ATTR(manufacture_date, 0444, manufacture_date_show, NULL);
-static DEVICE_ATTR(aid_log, 0444, aid_log_show, NULL);
-static DEVICE_ATTR(partial_disp, 0664, partial_disp_show, partial_disp_store);
 
 static int ea8064g_probe(struct mipi_dsim_device *dsim)
 {
@@ -1638,12 +1417,6 @@ static int ea8064g_probe(struct mipi_dsim_device *dsim)
 	lcd->connected = 1;
 	lcd->siop_enable = 0;
 	lcd->temperature = NORMAL_TEMPERATURE;
-	lcd->width = dsim->lcd_info->xres;
-	lcd->height = dsim->lcd_info->yres;
-#ifdef CONFIG_LCD_ALPM
-	lcd->alpm = 0;
-	lcd->current_alpm = 0;
-#endif
 
 	ret = device_create_file(&lcd->ld->dev, &dev_attr_power_reduce);
 	if (ret < 0)
@@ -1661,7 +1434,7 @@ static int ea8064g_probe(struct mipi_dsim_device *dsim)
 	if (ret < 0)
 		dev_err(&lcd->ld->dev, "failed to add sysfs entries, %d\n", __LINE__);
 
-	ret = device_create_file(&lcd->ld->dev, &dev_attr_brightness_table);
+	ret = device_create_file(&lcd->bd->dev, &dev_attr_brightness_table);
 	if (ret < 0)
 		dev_err(&lcd->ld->dev, "failed to add sysfs entries, %d\n", __LINE__);
 
@@ -1684,20 +1457,6 @@ static int ea8064g_probe(struct mipi_dsim_device *dsim)
 	ret = device_create_file(&lcd->ld->dev, &dev_attr_manufacture_date);
 	if (ret < 0)
 		dev_err(&lcd->ld->dev, "failed to add sysfs entries, %d\n", __LINE__);
-
-	ret = device_create_file(&lcd->ld->dev, &dev_attr_aid_log);
-	if (ret < 0)
-		dev_err(&lcd->ld->dev, "failed to add sysfs entries, %d\n", __LINE__);
-
-	ret = device_create_file(&lcd->ld->dev, &dev_attr_partial_disp);
-	if (ret < 0)
-		dev_err(&lcd->ld->dev, "failed to add sysfs entries, %d\n", __LINE__);
-
-#ifdef CONFIG_LCD_ALPM
-	ret = device_create_file(&lcd->ld->dev, &dev_attr_alpm);
-	if (ret < 0)
-		dev_err(&lcd->ld->dev, "failed to add sysfs entries, %d\n", __LINE__);
-#endif
 
 	mutex_init(&lcd->lock);
 	mutex_init(&lcd->bl_lock);
@@ -1726,7 +1485,7 @@ static int ea8064g_probe(struct mipi_dsim_device *dsim)
 	lcd->ldi_enable = 1;
 
 #if defined(CONFIG_DECON_MDNIE_LITE)
-	mdnie_register(&lcd->ld->dev, lcd, (mdnie_w)ea8064g_send_seq, (mdnie_r)ea8064g_read);
+	mdnie_register(&lcd->ld->dev, lcd, (mdnie_w)ea8064g_send_seq, (mdnie_r)ea8064g_read, &tune_info);
 #endif
 
 	update_brightness(lcd, 1);

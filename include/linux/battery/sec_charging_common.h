@@ -81,6 +81,7 @@ enum sec_battery_adc_channel {
 	SEC_BAT_ADC_CHANNEL_NUM,
 	SEC_BAT_ADC_CHANNEL_CHG_TEMP,
 	SEC_BAT_ADC_CHANNEL_INBAT_VOLTAGE,
+	SEC_BAT_ADC_CHANNEL_DISCHARGING_CHECK,
 };
 
 /* charging mode */
@@ -237,6 +238,8 @@ enum sec_battery_thermal_source {
 	SEC_BATTERY_THERMAL_SOURCE_CALLBACK,
 	/* by ADC */
 	SEC_BATTERY_THERMAL_SOURCE_ADC,
+	/* source none */
+	SEC_BATTERY_THERMAL_SOURCE_NONE,
 };
 #define sec_battery_thermal_source_t \
 	enum sec_battery_thermal_source
@@ -455,6 +458,31 @@ struct sec_battery_platform_data {
 	/* sustaining event after deactivated (second) */
 	unsigned int event_waiting_time;
 
+#if defined(CONFIG_BATTERY_SWELLING)
+	/* battery swelling */
+	int swelling_high_temp_block;
+	int swelling_high_temp_recov;
+	int swelling_low_temp_block;
+	int swelling_low_temp_recov;
+	int swelling_chg_current;
+	unsigned int swelling_normal_float_voltage;
+	unsigned int swelling_drop_float_voltage;
+	unsigned int swelling_high_rechg_voltage;
+	unsigned int swelling_low_rechg_voltage;
+	unsigned int swelling_block_time;
+#endif
+
+#if defined(CONFIG_BATTERY_SWELLING_SELF_DISCHARGING)
+	/* self discharging */
+	bool self_discharging_en;
+	unsigned int discharging_adc_max;
+	unsigned int discharging_adc_min;
+	unsigned int self_discharging_voltage_limit;
+	int force_discharging_limit;
+	int force_discharging_recov;
+	int factory_discharging;
+#endif
+
 	/* Monitor setting */
 	sec_battery_monitor_polling_t polling_type;
 	/* for initial check */
@@ -598,6 +626,8 @@ struct sec_battery_platform_data {
 	int chg_float_voltage;
 #endif
 	sec_charger_functions_t chg_functions_setting;
+
+	bool always_enable;
 
 	/* ADC setting */
 	unsigned int adc_check_count;

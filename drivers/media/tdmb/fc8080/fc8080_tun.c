@@ -79,7 +79,11 @@ static s32 fc8080_bb_read(HANDLE handle, u16 addr, u8 *data)
 static s32 fc8080_set_filter(HANDLE handle)
 {
 	u8 cal = 0;
+#ifdef CONFIG_TDMB_XTAL_FREQ
+	u32 tcxo = main_xtal_freq * 1000;
+#else
 	u32 tcxo = FC8080_FREQ_XTAL * 1000;
+#endif
 	u32 csfbw = 780000;
 
 	cal = (unsigned int) (tcxo * 78 * 2 / csfbw) / 100;
@@ -215,6 +219,27 @@ s32 fc8080_tuner_init(HANDLE handle, u32 band)
 
 	fc8080_write(handle, 0xd0, 0x00);
 
+#ifdef CONFIG_TDMB_XTAL_FREQ
+	if (main_xtal_freq == 16384) {
+		fc8080_write(handle, 0xd2, 0x18);
+		fc8080_write(handle, 0xd4, 0x2a);
+	} else if (main_xtal_freq == 19200) {
+		fc8080_write(handle, 0xd2, 0x1d);
+		fc8080_write(handle, 0xd4, 0x33);
+	} else if (main_xtal_freq == 24000) {
+		fc8080_write(handle, 0xd2, 0x28);
+		fc8080_write(handle, 0xd4, 0x44);
+	} else if (main_xtal_freq == 24576) {
+		fc8080_write(handle, 0xd2, 0x28);
+		fc8080_write(handle, 0xd4, 0x44);
+	} else if (main_xtal_freq == 27120) {
+		fc8080_write(handle, 0xd2, 0x2d);
+		fc8080_write(handle, 0xd4, 0x4c);
+	} else if (main_xtal_freq == 38400) {
+		fc8080_write(handle, 0xd2, 0x44);
+		fc8080_write(handle, 0xd4, 0x6f);
+	}
+#else
 #if (FC8080_FREQ_XTAL == 16384)
 	fc8080_write(handle, 0xd2, 0x18);
 	fc8080_write(handle, 0xd4, 0x2a);
@@ -234,7 +259,7 @@ s32 fc8080_tuner_init(HANDLE handle, u32 band)
 	fc8080_write(handle, 0xd2, 0x44);
 	fc8080_write(handle, 0xd4, 0x6f);
 #endif
-
+#endif
 	fc8080_write(handle, 0xae, 0x36);
 	fc8080_write(handle, 0xad, 0x8b);
 	fc8080_write(handle, 0x14, 0x63);
@@ -273,13 +298,21 @@ s32 fc8080_set_freq(HANDLE handle, u32 band, u32 freq)
 		lo_mode = 1;
 		f_vco = freq * div_ratio;
 	}
+#ifdef CONFIG_TDMB_XTAL_FREQ
+	if (f_vco < main_xtal_freq * 35)
+		r_val = 2;
+	else
+		r_val = 1;
 
+	f_comp = main_xtal_freq / r_val;
+#else
 	if (f_vco < FC8080_FREQ_XTAL * 35)
 		r_val = 2;
 	else
 		r_val = 1;
 
 	f_comp = FC8080_FREQ_XTAL / r_val;
+#endif
 
 	n_val = f_vco / f_comp;
 	f_diff = f_vco - f_comp * n_val;

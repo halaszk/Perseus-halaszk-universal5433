@@ -645,6 +645,7 @@ int gsc_set_scaler_info(struct gsc_ctx *ctx)
 	struct gsc_frame *s_frame = &ctx->s_frame;
 	struct gsc_frame *d_frame = &ctx->d_frame;
 	struct gsc_variant *variant = ctx->gsc_dev->variant;
+	unsigned long main_hratio, main_vratio;
 	int tx, ty;
 	int ret;
 
@@ -688,8 +689,16 @@ int gsc_set_scaler_info(struct gsc_ctx *ctx)
 	gsc_get_prescaler_shfactor(sc->pre_hratio, sc->pre_vratio,
 				   &sc->pre_shfactor);
 
-	sc->main_hratio = (s_frame->crop.width << 16) / tx;
-	sc->main_vratio = (s_frame->crop.height << 16) / ty;
+	main_hratio = (s_frame->crop.width << 16) / tx;
+	main_vratio = (s_frame->crop.height << 16) / ty;
+
+	sc->main_hratio_dirty =
+		(main_hratio != sc->main_hratio) ? true : false;
+	sc->main_vratio_dirty =
+		(main_vratio != sc->main_vratio) ? true : false;
+
+	sc->main_hratio = main_hratio;
+	sc->main_vratio = main_vratio;
 
 	gsc_dbg("scaler input/output size : sx = %d, sy = %d, tx = %d, ty = %d",
 		s_frame->crop.width, s_frame->crop.height, tx, ty);
@@ -1172,8 +1181,8 @@ static irqreturn_t gsc_irq_handler(int irq, void *priv)
 	int gsc_irq;
 
 	if (test_bit(ST_OUTPUT_OPEN, &gsc->state)) {
-		gsc->out.isr_time[gsc->real_isr_cnt % 50] = sched_clock();
-		gsc->real_isr_cnt++;
+		gsc->out.isr_time[gsc->out.real_isr_cnt % MAX_DEBUG_BUF_CNT] = sched_clock();
+		gsc->out.real_isr_cnt++;
 	}
 	spin_lock(&gsc->slock);
 
@@ -1230,6 +1239,10 @@ static irqreturn_t gsc_irq_handler(int irq, void *priv)
 			else
 				v4l2_m2m_job_finish(gsc->m2m.m2m_dev, ctx->m2m_ctx);
 		}
+#if defined(CONFIG_VIDEO_EXYNOS_GSCALER_DEBUG)
+		gsc->m2m.isr_time[gsc->m2m.isr_cnt % 50] = sched_clock();
+		gsc->m2m.isr_cnt++;
+#endif /* CONFIG_VIDEO_EXYNOS_GSCALER_DEBUG */
 		pm_runtime_put(&gsc->pdev->dev);
 	} else if (test_bit(ST_OUTPUT_STREAMON, &gsc->state) &&
 			gsc->out.vbq.streaming) {
@@ -1240,7 +1253,7 @@ static irqreturn_t gsc_irq_handler(int irq, void *priv)
 		} else {
 			gsc_info("active buf empty");
 		}
-		gsc->isr_cnt++;
+		gsc->out.isr_cnt++;
 	} else if (test_and_clear_bit(ST_CAPT_RUN, &gsc->state)) {
 		if (!list_empty(&gsc->cap.active_buf_q)) {
 			struct gsc_input_buf *done_buf;
@@ -1386,9 +1399,39 @@ int gsc_set_protected_content(struct gsc_dev *gsc, bool enable)
 
 void gsc_dump_registers(struct gsc_dev *gsc)
 {
+#if defined(CONFIG_VIDEO_EXYNOS_GSCALER_DEBUG)
+	u32 cfg;
+#endif /* CONFIG_VIDEO_EXYNOS_GSCALER_DEBUG */
 	pr_err("GSC dumping registers\n");
+#if !defined(CONFIG_VIDEO_EXYNOS_GSCALER_DEBUG)
 	print_hex_dump(KERN_ERR, "", DUMP_PREFIX_ADDRESS, 32, 4, gsc->regs,
 			0x0C20, false);
+#else /* CONFIG_VIDEO_EXYNOS_GSCALER_DEBUG */
+	print_hex_dump(KERN_ERR, "", DUMP_PREFIX_ADDRESS, 32, 4,
+			gsc->regs, 0x200, false);
+	print_hex_dump(KERN_ERR, "", DUMP_PREFIX_ADDRESS, 32, 4,
+			gsc->regs + 0xA74, 0x90, false);
+	print_hex_dump(KERN_ERR, "", DUMP_PREFIX_ADDRESS, 32, 4,
+			gsc->regs + 0xB00, 0x40, false);
+	print_hex_dump(KERN_ERR, "", DUMP_PREFIX_ADDRESS, 32, 4,
+			gsc->regs + 0xC10, 0x10, false);
+	pr_err("=== DEBUG SFR DUMP ===\n");
+	for (cfg = 0x10; cfg < 0x14; cfg++) {
+		writel(cfg, gsc->regs + 0xD00);
+		udelay(10);
+		pr_err("(%d) : 0x%x\n", cfg, readl(gsc->regs + 0xD04));
+	}
+	for (cfg = 0x20; cfg < 0x2e; cfg++) {
+		writel(cfg, gsc->regs + 0xD00);
+		udelay(10);
+		pr_err("(%d) : 0x%x\n", cfg, readl(gsc->regs + 0xD04));
+	}
+	for (cfg = 0x30; cfg < 0x3c; cfg++) {
+		writel(cfg, gsc->regs + 0xD00);
+		udelay(10);
+		pr_err("(%d) : 0x%x\n", cfg, readl(gsc->regs + 0xD04));
+	}
+#endif /* !CONFIG_VIDEO_EXYNOS_GSCALER_DEBUG */
 	pr_err("End of GSC_SFR DUMP\n");
 	if (gsc_cap_opened(gsc)) {
 		pr_err("SysRegister dump\n");
@@ -1419,7 +1462,9 @@ static int gsc_runtime_resume(struct device *dev)
 	struct platform_device *pdev = to_platform_device(dev);
 	struct gsc_dev *gsc = (struct gsc_dev *)platform_get_drvdata(pdev);
 
+#if !defined(CONFIG_VIDEO_EXYNOS_GSCALER_DEBUG)
 	gsc_hw_set_dynamic_clock_gating(gsc);
+#endif /* !CONFIG_VIDEO_EXYNOS_GSCALER_DEBUG */
 
 	if (clk_set_parent(gsc->clock[CLK_CHILD],
 			gsc->clock[CLK_PARENT])) {
@@ -1470,8 +1515,12 @@ static void gsc_parse_dt(struct device_node *np, struct gsc_dev *gsc)
 	of_property_read_u32(np, "mif_min", &pdata->mif_min);
 	of_property_read_u32(np, "int_min", &pdata->int_min);
 
-	if (gsc->id == 0)
-		of_property_read_u32(np, "int_min_otf",	&pdata->int_min_otf);
+	if (gsc->id == 0) {
+		of_property_read_u32(np, "int_min_otf",
+				&pdata->int_min_otf);
+		of_property_read_u32(np, "mif_min_otf_rot",
+				&pdata->mif_min_otf_rot);
+	}
 }
 #else
 static void gsc_parse_dt(struct device_node *np, struct gsc_dev *gsc)
@@ -1706,7 +1755,9 @@ static int gsc_probe(struct platform_device *pdev)
 	exynos_create_iovmm(&pdev->dev, 3, 3);
 	gsc->vb2->resume(gsc->alloc_ctx);
 
+#if !defined(CONFIG_VIDEO_EXYNOS_GSCALER_DEBUG)
 	gsc_hw_set_dynamic_clock_gating(gsc);
+#endif /* !CONFIG_VIDEO_EXYNOS_GSCALER_DEBUG */
 
 #ifdef CONFIG_PM_RUNTIME
 	gsc_pm_runtime_enable(&pdev->dev);

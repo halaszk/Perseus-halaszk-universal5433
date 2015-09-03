@@ -455,6 +455,7 @@
 			cypress,irq-gpio = <&gpa3 2 1>;
 			cypress,ic-stabilizing-time = <150>;
 			cypress,boot-on-ldo = "true";
+			cypress,multi-touchkey-fw-version = <0x11>;
 		};
 	};
 
@@ -678,7 +679,7 @@
 		oled-pcd-gpio = <&gpa0 5 0xf>;
 		oled-errfg-gpio = <&gpb0 4 0xf>;
 		lcd_info = <&s6e3ha2>;
-		display,regulator-names = "VCC_1.8V_LCD_AP", "VCC_3.0V_LCD_AP";
+		decon_board = <&decon_board_list>;
 
 		pinctrl-names = "default", "turnon_tes", "turnoff_tes", "errfg_off";
 		pinctrl-0 = <&disp_id &disp_pcd &disp_errfg>;
@@ -769,9 +770,6 @@
 		};
 
 		mipi_dsi: mipi_dsi {
-			/* gpios = <&gpv7 2 0x1>; */
-			gpios = <&gpv7 2 0x1>, <&gpf1 5 0x1>;
-
 			/* Interface definition: 0 - DSIM_COMMAND,
 						 1 - DSIM_VIDEO */
 			e_interface = <0>;
@@ -836,6 +834,26 @@
 			timing,dsi-escape-clk = <16>;
 			timing,hsync-2h-cycle = <1>;
 			mic = <1>;
+		};
+
+		decon_board_list: decon_board_list {
+			enable_display_driver_power {
+				type = "regulator,enable", "gpio,high", "regulator,enable", "delay,usleep", "pinctrl,default", "pinctrl,turnon_tes";
+				gpios = <&gpf1 5 0x1>;
+				delay = <10000 11000>;
+				regulator = "VCC_1.8V_LCD_AP", "VCC_3.0V_LCD_AP";
+			};
+			disable_display_driver_power {
+				type = "gpio,low", "regulator,disable", "gpio,low", "delay,usleep", "regulator,disable", "pinctrl,turnoff_tes";
+				gpios = <&gpv7 2 0x1>, <&gpf1 5 0x1>;
+				delay = <3000 5000>;
+				regulator = "VCC_3.0V_LCD_AP", "VCC_1.8V_LCD_AP";
+			};
+			reset_display_driver_panel {
+				type = "gpio,high", "delay,usleep", "gpio,low", "delay,usleep", "gpio,high", "delay,usleep";
+				gpios = <&gpv7 2 0x1>, <&gpv7 2 0x1>, <&gpv7 2 0x1>;
+				delay = <5000 6000>, <5000 6000>, <10000 11000>;
+			};
 		};
 	};
 
@@ -1156,6 +1174,27 @@
 		use_module_check;
 		/delete-property/ pinctrl-names;
 		/delete-property/ pinctrl-0;
+
+		total_camera_num = <2>;
+		camera_info0 {				// 0 : rear
+			isp = <0>;				/* 0 : INT , 1 : EXT , 2 : SOC */
+			cal_memory = <1>;		/* 0 : N , 1 : FROM , 2 : EEPROM , 3 : OTP  */
+			read_version = <0>;		/* 0 : SYSFS , 1 : CAMON */
+			core_voltage = <1>;		/* 0 : N , 1 : Y  */
+			upgrade = <0>;			/* 0 : N , 1 : SYSFS , 2 : CAMON */
+			companion_chip = <1>;	/* 0 : N , 1 : Y  */
+			ois = <1>;				/* 0 : N , 1 : Y  */
+		};
+		camera_info1 {				// 1 : front
+			isp = <0>;				/* 0 : INT , 1 : EXT , 2 : SOC */
+			cal_memory = <0>;		/* 0 : N , 1 : FROM , 2 : EEPROM , 3 : OTP  */
+			read_version = <0>;		/* 0 : SYSFS , 1 : CAMON */
+			core_voltage = <0>;		/* 0 : N , 1 : Y  */
+			upgrade = <0>;			/* 0 : N , 1 : SYSFS , 2 : CAMON */
+			companion_chip = <0>;	/* 0 : N , 1 : Y  */
+			ois = <0>;				/* 0 : N , 1 : Y  */
+		};
+
 		fimc_is_dvfs {
 			default_int = <400000>; /* L0 */
 			default_cam = <777000>; /* L0 */

@@ -224,7 +224,11 @@ static void gsc_m2m_device_run(void *priv)
 		gsc_hw_set_write_slave_error_mask(gsc, false);
 		gsc_hw_set_gsc_irq_enable(gsc, true);
 		gsc_hw_set_one_frm_mode(gsc, true);
+#if !defined(CONFIG_VIDEO_EXYNOS_GSCALER_DEBUG)
 		gsc_hw_set_freerun_clock_mode(gsc, false);
+#else /* CONFIG_VIDEO_EXYNOS_GSCALER_DEBUG */
+		gsc_hw_set_freerun_clock_mode(gsc, true);
+#endif /* !CONFIG_VIDEO_EXYNOS_GSCALER_DEBUG */
 
 		if (gsc_set_scaler_info(ctx)) {
 			gsc_err("Scaler setup error");
@@ -265,12 +269,43 @@ static void gsc_m2m_device_run(void *priv)
 		 GSCALER_ON on -> GSCALER_OP_STATUS is operating ->
 		 GSCALER_ON off */
 		gsc_hw_enable_control(gsc, true);
+#if defined(CONFIG_VIDEO_EXYNOS_GSCALER_DEBUG)
+		gsc->m2m.run_time[gsc->m2m.run_cnt % 50] = sched_clock();
+		gsc->m2m.run_cnt++;
+#endif /* CONFIG_VIDEO_EXYNOS_GSCALER_DEBUG */
 #ifdef GSC_PERF
 		gsc->start_time = sched_clock();
 #endif
 		ret = gsc_wait_operating(gsc);
 		if (ret < 0) {
+#if defined(CONFIG_VIDEO_EXYNOS_GSCALER_DEBUG)
+			struct vb2_buffer *src_vb, *dst_vb;
+			void __iomem *iommu_addr;
+#endif /* CONFIG_VIDEO_EXYNOS_GSCALER_DEBUG */
 			gsc_err("gscaler wait operating timeout");
+#if defined(CONFIG_VIDEO_EXYNOS_GSCALER_DEBUG)
+			exynos5_bts_show_mo_status();
+			gsc_dump_registers(gsc);
+			clear_bit(ST_M2M_RUN, &gsc->state);
+			src_vb = v4l2_m2m_src_buf_remove(ctx->m2m_ctx);
+			dst_vb = v4l2_m2m_dst_buf_remove(ctx->m2m_ctx);
+			if (src_vb && dst_vb) {
+				v4l2_m2m_buf_done(src_vb,
+						VB2_BUF_STATE_ERROR);
+				v4l2_m2m_buf_done(dst_vb,
+						VB2_BUF_STATE_ERROR);
+			}
+			if (gsc->id == 0)
+				iommu_addr = ioremap(0x13C80000, 0x10);
+			else if (gsc->id == 1)
+				iommu_addr = ioremap(0x13C90000, 0x10);
+			else
+				iommu_addr = ioremap(0x13CA0000, 0x10);
+			pr_err("MMU_CTRL : 0x%x\n", __raw_readl(iommu_addr));
+			pr_err("MMU_CFG : 0x%x\n", __raw_readl(iommu_addr + 0x4));
+			pr_err("MMU_STATUS : 0x%x\n", __raw_readl(iommu_addr + 0x8));
+			BUG();
+#endif /* CONFIG_VIDEO_EXYNOS_GSCALER_DEBUG */
 			goto put_device;
 		}
 		gsc->op_timer.expires = (jiffies + 2 * HZ);
@@ -740,6 +775,11 @@ static int gsc_m2m_open(struct file *file)
 	if (gsc_out_opened(gsc) || gsc_cap_opened(gsc))
 		return -EBUSY;
 
+#if defined(CONFIG_VIDEO_EXYNOS_GSCALER_DEBUG)
+	if (gsc_m2m_opened(gsc))
+		gsc_info("Multi-instance");
+#endif /* CONFIG_VIDEO_EXYNOS_GSCALER_DEBUG */
+
 	ctx = kzalloc(sizeof *ctx, GFP_KERNEL);
 	if (!ctx)
 		return -ENOMEM;
@@ -780,6 +820,9 @@ static int gsc_m2m_open(struct file *file)
 		set_bit(ST_M2M_OPEN, &gsc->state);
 
 	gsc_dbg("gsc m2m driver is opened, ctx(0x%p)", ctx);
+#if defined(CONFIG_VIDEO_EXYNOS_GSCALER_DEBUG)
+	gsc->m2m.run_cnt = gsc->m2m.isr_cnt = 0;
+#endif /* CONFIG_VIDEO_EXYNOS_GSCALER_DEBUG */
 	return 0;
 
 error_fh:

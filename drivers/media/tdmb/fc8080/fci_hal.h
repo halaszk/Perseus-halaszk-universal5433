@@ -31,7 +31,7 @@
 extern "C" {
 #endif
 
-extern s32 bbm_hostif_select(HANDLE handle, u8 hostif, u32 param);
+extern s32 bbm_hostif_select(HANDLE handle, u8 hostif, unsigned long param);
 extern s32 bbm_hostif_deselect(HANDLE handle);
 extern s32 bbm_read(HANDLE handle, u16 addr, u8 *data);
 extern s32 bbm_byte_read(HANDLE handle, u16 addr, u8 *data);

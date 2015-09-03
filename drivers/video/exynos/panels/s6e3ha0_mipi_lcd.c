@@ -33,6 +33,7 @@
 
 #if defined(CONFIG_DECON_MDNIE_LITE)
 #include "mdnie.h"
+#include "mdnie_lite_table_kq.h"
 #endif
 
 #define POWER_IS_ON(pwr)		(pwr <= FB_BLANK_NORMAL)
@@ -1990,7 +1991,7 @@ static int s6e3ha0_probe(struct mipi_dsim_device *dsim)
 	lcd->ldi_enable = 1;
 
 #if defined(CONFIG_DECON_MDNIE_LITE)
-	mdnie_register(&lcd->ld->dev, lcd, (mdnie_w)s6e3ha0_write_set, (mdnie_r)s6e3ha0_read);
+	mdnie_register(&lcd->ld->dev, lcd, (mdnie_w)s6e3ha0_write_set, (mdnie_r)s6e3ha0_read, &tune_info);
 #endif
 
 	update_brightness(lcd, 1);

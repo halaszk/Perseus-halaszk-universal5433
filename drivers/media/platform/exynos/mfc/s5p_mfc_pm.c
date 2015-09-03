@@ -267,12 +267,14 @@ int s5p_mfc_clock_on(struct s5p_mfc_dev *dev)
 	int state, val;
 	unsigned long flags;
 
+	dev->pm.clock_on_steps = 1;
 #ifdef CONFIG_MFC_USE_BUS_DEVFREQ
 	MFC_TRACE_DEV("++ clock_on: Set clock rate(%d)\n", dev->curr_rate);
 	mutex_lock(&dev->curr_rate_lock);
 	s5p_mfc_clock_set_rate(dev, dev->curr_rate);
 	mutex_unlock(&dev->curr_rate_lock);
 #endif
+	dev->pm.clock_on_steps |= 0x1 << 1;
 	ret = clk_enable(dev->pm.clock);
 	if (ret < 0)
 		return ret;
@@ -280,27 +282,31 @@ int s5p_mfc_clock_on(struct s5p_mfc_dev *dev)
 	if (dev->pm.base_type != MFCBUF_INVALID)
 		s5p_mfc_init_memctrl(dev, dev->pm.base_type);
 
+	dev->pm.clock_on_steps |= 0x1 << 2;
 	if (dev->curr_ctx_drm && dev->is_support_smc) {
 		spin_lock_irqsave(&dev->pm.clklock, flags);
 		mfc_debug(3, "Begin: enable protection\n");
 		ret = exynos_smc(SMC_PROTECTION_SET, 0,
 					dev->id, SMC_PROTECTION_ENABLE);
+		dev->pm.clock_on_steps |= 0x1 << 3;
 		if (!ret) {
 			printk("Protection Enable failed! ret(%u)\n", ret);
 			spin_unlock_irqrestore(&dev->pm.clklock, flags);
 			clk_disable(dev->pm.clock);
-			return ret;
+			return -EACCES;
 		}
 		mfc_debug(3, "End: enable protection\n");
 		spin_unlock_irqrestore(&dev->pm.clklock, flags);
 	} else {
 		ret = s5p_mfc_mem_resume(dev->alloc_ctx[0]);
 		if (ret < 0) {
+			dev->pm.clock_on_steps |= 0x1 << 4;
 			clk_disable(dev->pm.clock);
 			return ret;
 		}
 	}
 
+	dev->pm.clock_on_steps |= 0x1 << 5;
 	if (IS_MFCV6(dev)) {
 		spin_lock_irqsave(&dev->pm.clklock, flags);
 		if ((atomic_inc_return(&dev->clk_ref) == 1) &&
@@ -314,6 +320,7 @@ int s5p_mfc_clock_on(struct s5p_mfc_dev *dev)
 		atomic_inc_return(&dev->clk_ref);
 	}
 
+	dev->pm.clock_on_steps |= 0x1 << 6;
 	state = atomic_read(&dev->clk_ref);
 	mfc_debug(2, "+ %d\n", state);
 	MFC_TRACE_DEV("-- clock_on : ref state(%d)\n", state);

@@ -139,6 +139,13 @@ config SEC_DEBUG_RT_THROTTLE_ACTIVE
 	help
 	  This option add additional log for rt throttling detection.
 
+config SEC_DEBUG_AUX_SUSPEND
+	bool "Samsung suspend notifier log to aux"
+	depends on SEC_DEBUG_AUXILIARY_LOG
+	default n
+	help
+	  This option add additional log for suspend notifiers debugging.
+
 config SEC_DEBUG_FUPLOAD_DUMP_MORE
 	bool "Dump more information at forced upload"
 	default n

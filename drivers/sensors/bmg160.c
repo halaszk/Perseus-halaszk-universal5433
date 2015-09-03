@@ -78,6 +78,7 @@ struct bmg160_p {
 	struct workqueue_struct *gyro_wq;
 	ktime_t poll_delay;
 	atomic_t enable;
+	u64 timestamp;
 
 	int chip_pos;
 	int gyro_dps;
@@ -446,6 +447,13 @@ static void bmg160_work_func(struct work_struct *work)
 	int ret;
 	struct bmg160_v gyro;
 	struct bmg160_p *data = container_of(work, struct bmg160_p, work);
+	struct timespec ts;
+	int time_hi, time_lo;
+
+	ts = ktime_to_timespec(ktime_get_boottime());
+	data->timestamp = ts.tv_sec * 1000000000ULL + ts.tv_nsec;
+	time_lo = (int)(data->timestamp & TIME_LO_MASK);
+	time_hi = (int)((data->timestamp & TIME_HI_MASK) >> TIME_HI_SHIFT);
 
 	ret = bmg160_read_gyro_xyz(data, &gyro);
 	if (ret < 0)
@@ -454,6 +462,8 @@ static void bmg160_work_func(struct work_struct *work)
 	input_report_rel(data->input, REL_RX, gyro.x - data->caldata.x);
 	input_report_rel(data->input, REL_RY, gyro.y - data->caldata.y);
 	input_report_rel(data->input, REL_RZ, gyro.z - data->caldata.z);
+	input_report_rel(data->input, REL_X, time_hi);
+	input_report_rel(data->input, REL_Y, time_lo);
 	input_sync(data->input);
 	data->gyrodata = gyro;
 }
@@ -846,6 +856,7 @@ static int bmg160_selftest_show(struct device *dev,
 	int datay_check = 0;
 	int dataz_check = 0;
 	int sum[3], cnt;
+	int gyro_dps;
 	struct bmg160_v avg;
 	struct bmg160_p *data = dev_get_drvdata(dev);
 
@@ -859,6 +870,7 @@ static int bmg160_selftest_show(struct device *dev,
 	if (bist == 0)
 		selftest |= 1;
 
+	gyro_dps = data->gyro_dps;
 	data->gyro_dps = BMG160_RANGE_2000DPS;
 	bmg160_set_range(data, data->gyro_dps);
 
@@ -884,7 +896,7 @@ static int bmg160_selftest_show(struct device *dev,
 		(datay_check / 1000), (datay_check % 1000),
 		(dataz_check / 1000), (dataz_check % 1000));
 
-	data->gyro_dps = BMG160_RANGE_500DPS;
+	data->gyro_dps = gyro_dps;
 	bmg160_set_range(data, data->gyro_dps);
 
 	if ((datax_check <= SELFTEST_LIMITATION_OF_ERROR)
@@ -980,6 +992,8 @@ static int bmg160_input_init(struct bmg160_p *data)
 	input_set_capability(dev, EV_REL, REL_RX);
 	input_set_capability(dev, EV_REL, REL_RY);
 	input_set_capability(dev, EV_REL, REL_RZ);
+	input_set_capability(dev, EV_REL, REL_X); /* time_hi */
+	input_set_capability(dev, EV_REL, REL_Y); /* time_lo */
 
 	input_set_drvdata(dev, data);
 
@@ -1035,6 +1049,13 @@ printk(KERN_ERR "%s 3\n",__func__);
 		pr_err("[SENSOR]: %s - gyro_drdy failed\n", __func__);
 		return;
 	}
+
+	data->gyro_dps = of_get_named_gpio_flags(dNode,
+		"gyro,dps", 0, &flags);
+	if (data->gyro_dps < 0)
+		data->gyro_dps = BMG160_RANGE_500DPS;
+	else
+		pr_info("[SENSOR]: %s - gyro_dps set as %d\n", __func__, data->gyro_dps);
 printk(KERN_ERR "%s 4\n",__func__);
 	bmg160_setup_pin(data);
 }
@@ -1097,7 +1118,6 @@ printk(KERN_ERR "%s, data->client->addr=0x%x,client->addr=0x%x\n",__func__,data-
 	INIT_WORK(&data->work, bmg160_work_func);
 	atomic_set(&data->enable, OFF);
 
-	data->gyro_dps = BMG160_RANGE_500DPS;
 	bmg160_set_range(data, data->gyro_dps);
 	bmg160_set_bw(data, BMG160_BW_32Hz);
 	bmg160_set_mode(data, BMG160_MODE_SUSPEND);

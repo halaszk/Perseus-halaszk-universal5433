@@ -59,6 +59,7 @@
 #define IOCTL_MODEM_DUMP_RESET		_IO('o', 0x36)
 
 #define IOCTL_MODEM_SET_TX_LINK		_IO('o', 0x37)
+#define IOCTL_MODEM_WATCHDOG_CRASH	_IO('o', 0x38)
 
 #define IOCTL_DPRAM_SEND_BOOT		_IO('o', 0x40)
 #define IOCTL_DPRAM_INIT_STATUS		_IO('o', 0x43)

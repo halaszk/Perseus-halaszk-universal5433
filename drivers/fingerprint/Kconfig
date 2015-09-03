@@ -41,4 +41,10 @@ config SENSORS_FPRINT_SECURE
 	help
 	  If you say yes here you get support for Validity's
 	  fingerprint sensor enable secure zone.
+config SENSORS_ET310
+	tristate "ET310 fingerprint sensor supprot"
+	default n
+	help
+	  If you say yes here you get support for Egistec's
+	  fingerprint sensor ET310.
 endif

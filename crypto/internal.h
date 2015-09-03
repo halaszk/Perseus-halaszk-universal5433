@@ -39,14 +39,15 @@
  * FIPS_FUNC_TEST 6 will make the SHA1 test fail
  * FIPS_FUNC_TEST 7 will make the TDES test fail
  * FIPS_FUNC_TEST 8 will make the RNG test fail
+ * FIPS_FUNC_TEST 91 will make the drbg_pr_ctr_aes128 test fail
+ * FIPS_FUNC_TEST 92 will make the drbg_pr_sha256 test fail
+ * FIPS_FUNC_TEST 93 will make the drbg_pr_hmac_sha256 test fail
+ * FIPS_FUNC_TEST 94 will make the continous PRNG test fail for DRBG
+ * FIPS_FUNC_TEST 100 will make the AES GCM self test fail
  */
 
+#define FIPS_FUNC_TEST 0
 
-#ifdef CONFIG_CRYPTO_FIPS
-#define FIPS_FUNC_TEST 0
-#else
-#define FIPS_FUNC_TEST 0
-#endif
 
 /* Crypto notification events. */
 enum {
@@ -113,7 +114,6 @@ void crypto_exit_compress_ops(struct crypto_tfm *tfm);
 struct crypto_larval *crypto_larval_alloc(const char *name, u32 type, u32 mask);
 void crypto_larval_kill(struct crypto_alg *alg);
 struct crypto_alg *crypto_larval_lookup(const char *name, u32 type, u32 mask);
-void crypto_larval_error(const char *name, u32 type, u32 mask);
 void crypto_alg_tested(const char *name, int err);
 
 void crypto_remove_spawns(struct crypto_alg *alg, struct list_head *list,

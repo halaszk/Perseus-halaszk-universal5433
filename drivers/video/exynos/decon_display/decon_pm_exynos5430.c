@@ -10,23 +10,15 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
-#include <linux/clk.h>
 #include <linux/of.h>
 #include <linux/fb.h>
 #include <linux/pm_runtime.h>
 #include <linux/of_gpio.h>
 #include <linux/delay.h>
-#include <linux/clk-private.h>
 #include <linux/sec_batt.h>
-
 #include <linux/platform_device.h>
-#include <mach/map.h>
 
-#if defined(CONFIG_SOC_EXYNOS5433)
-#include <mach/regs-clock-exynos5433.h>
-#else
-#include <mach/regs-clock-exynos5430.h>
-#endif
+#include <mach/map.h>
 
 #include <mach/regs-pmu.h>
 
@@ -35,287 +27,9 @@
 #include "decon_fb.h"
 #include "decon_mipi_dsi.h"
 #include "decon_dt.h"
+#include "decon_clock.h"
+#include "decon_board.h"
 
-#if defined(CONFIG_DISP_CLK_DEBUG)
-struct cmu_list_t {
-	unsigned int	pa;
-	void __iomem	*va;
-};
-
-#define EXYNOS543X_CMU_LIST(name)	\
-	{EXYNOS5430_PA_CMU_##name,	EXYNOS5430_VA_CMU_##name}
-
-struct cmu_list_t cmu_list[] = {
-	EXYNOS543X_CMU_LIST(TOP),
-	EXYNOS543X_CMU_LIST(EGL),
-	EXYNOS543X_CMU_LIST(KFC),
-	EXYNOS543X_CMU_LIST(AUD),
-	EXYNOS543X_CMU_LIST(BUS1),
-	EXYNOS543X_CMU_LIST(BUS2),
-	EXYNOS543X_CMU_LIST(CAM0),
-	EXYNOS543X_CMU_LIST(CAM0_LOCAL),
-	EXYNOS543X_CMU_LIST(CAM1),
-	EXYNOS543X_CMU_LIST(CAM1_LOCAL),
-	EXYNOS543X_CMU_LIST(CPIF),
-	EXYNOS543X_CMU_LIST(DISP),
-	EXYNOS543X_CMU_LIST(FSYS),
-	EXYNOS543X_CMU_LIST(G2D),
-	EXYNOS543X_CMU_LIST(G3D),
-	EXYNOS543X_CMU_LIST(GSCL),
-	EXYNOS543X_CMU_LIST(HEVC),
-	EXYNOS543X_CMU_LIST(IMEM),
-	EXYNOS543X_CMU_LIST(ISP),
-	EXYNOS543X_CMU_LIST(ISP_LOCAL),
-	EXYNOS543X_CMU_LIST(MFC0),
-	EXYNOS543X_CMU_LIST(MFC1),
-	EXYNOS543X_CMU_LIST(MIF),
-	EXYNOS543X_CMU_LIST(MSCL),
-	EXYNOS543X_CMU_LIST(PERIC),
-	EXYNOS543X_CMU_LIST(PERIS),
-};
-
-unsigned int get_pa(void __iomem *va)
-{
-	unsigned int i, reg;
-
-	reg = (unsigned int)va;
-
-	for (i = 0; i < ARRAY_SIZE(cmu_list); i++) {
-		if ((reg & 0xfffff000) == (unsigned int)cmu_list[i].va)
-			break;
-	}
-
-	i = (i >= ARRAY_SIZE(cmu_list)) ? 0 : cmu_list[i].pa;
-
-	i += (reg & 0xfff);
-
-	return i;
-}
-#endif
-
-struct clk_list_t {
-	struct clk *c;
-	struct clk *p;
-	const char *c_name;
-	const char *p_name;
-};
-
-/* this clk eum value is DIFFERENT with clk-exynos543x.c */
-enum disp_clks {
-	disp_pll,
-	mout_aclk_disp_333_a,
-	mout_aclk_disp_333_b,
-	dout_pclk_disp,
-	mout_aclk_disp_333_user,
-	dout_sclk_dsd,
-	mout_sclk_dsd_c,
-	mout_sclk_dsd_b,
-	mout_sclk_dsd_a,
-	mout_sclk_dsd_user,
-	dout_sclk_decon_eclk,
-	mout_sclk_decon_eclk_c,
-	mout_sclk_decon_eclk_b,
-	mout_sclk_decon_eclk_a,
-	dout_sclk_decon_eclk_disp,
-	mout_sclk_decon_eclk,
-	mout_sclk_decon_eclk_user,
-	dout_sclk_decon_vclk,
-	mout_sclk_decon_vclk_c,
-	mout_sclk_decon_vclk_b,
-	mout_sclk_decon_vclk_a,
-	dout_sclk_decon_vclk_disp,
-	mout_sclk_decon_vclk,
-	mout_disp_pll,
-	dout_sclk_dsim0,
-	mout_sclk_dsim0_c,
-	mout_sclk_dsim0_b,
-	mout_sclk_dsim0_a,
-	dout_sclk_dsim0_disp,
-	mout_sclk_dsim0,
-	mout_sclk_dsim0_user,
-	mout_phyclk_mipidphy_rxclkesc0_user,
-	mout_phyclk_mipidphy_bitclkdiv8_user,
-	disp_clks_max,
-};
-
-static struct clk_list_t clk_list[disp_clks_max] = {
-	{ .c_name = "disp_pll", },
-	{ .c_name = "mout_aclk_disp_333_a", },
-	{ .c_name = "mout_aclk_disp_333_b", },
-	{ .c_name = "dout_pclk_disp", },
-	{ .c_name = "mout_aclk_disp_333_user", },
-	{ .c_name = "dout_sclk_dsd", },
-	{ .c_name = "mout_sclk_dsd_c", },
-	{ .c_name = "mout_sclk_dsd_b", },
-	{ .c_name = "mout_sclk_dsd_a", },
-	{ .c_name = "mout_sclk_dsd_user", },
-	{ .c_name = "dout_sclk_decon_eclk", },
-	{ .c_name = "mout_sclk_decon_eclk_c", },
-	{ .c_name = "mout_sclk_decon_eclk_b", },
-	{ .c_name = "mout_sclk_decon_eclk_a", },
-	{ .c_name = "dout_sclk_decon_eclk_disp", },
-	{ .c_name = "mout_sclk_decon_eclk", },
-	{ .c_name = "mout_sclk_decon_eclk_user", },
-	{ .c_name = "dout_sclk_decon_vclk", },
-	{ .c_name = "mout_sclk_decon_vclk_c", },
-	{ .c_name = "mout_sclk_decon_vclk_b", },
-	{ .c_name = "mout_sclk_decon_vclk_a", },
-	{ .c_name = "dout_sclk_decon_vclk_disp", },
-	{ .c_name = "mout_sclk_decon_vclk", },
-	{ .c_name = "mout_disp_pll", },
-	{ .c_name = "dout_sclk_dsim0", },
-	{ .c_name = "mout_sclk_dsim0_c", },
-	{ .c_name = "mout_sclk_dsim0_b", },
-	{ .c_name = "mout_sclk_dsim0_a", },
-	{ .c_name = "dout_sclk_dsim0_disp", },
-	{ .c_name = "mout_sclk_dsim0", },
-	{ .c_name = "mout_sclk_dsim0_user", },
-	{ .c_name = "mout_phyclk_mipidphy_rxclkesc0_user", },
-	{ .c_name = "mout_phyclk_mipidphy_bitclkdiv8_user", },
-};
-
-static int exynos_display_clk_get(struct device *dev, enum disp_clks idx, const char *parent)
-{
-	struct clk *p;
-	struct clk *c;
-	int ret = 0;
-	const char *conid = clk_list[idx].c_name;
-
-	if (IS_ERR_OR_NULL(clk_list[idx].c)) {
-		c = clk_get(dev, conid);
-		if (IS_ERR_OR_NULL(c)) {
-			pr_err("%s: can't get clock: %s\n", __func__, conid);
-			return -EINVAL;
-		} else
-			clk_list[idx].c = c;
-	}
-
-	if (IS_ERR_OR_NULL(parent)) {
-		if (IS_ERR_OR_NULL(clk_list[idx].p)) {
-			p = clk_get_parent(clk_list[idx].c);
-			if (IS_ERR_OR_NULL(p)) {
-				pr_err("%s: can't get clock parent: %s\n", __func__, conid);
-				return -EINVAL;
-			} else
-				clk_list[idx].p = p;
-		}
-	} else {
-		if (IS_ERR_OR_NULL(clk_list[idx].p)) {
-			p = clk_get(dev, parent);
-			if (IS_ERR_OR_NULL(p)) {
-				pr_err("%s: can't get clock: %s\n", __func__, parent);
-				return -EINVAL;
-			} else
-				clk_list[idx].p = p;
-		}
-	}
-
-	return ret;
-}
-
-static int exynos_display_set_parent(struct device *dev, enum disp_clks idx, const char *parent)
-{
-	struct clk *p;
-	struct clk *c;
-	int ret = 0;
-	const char *conid = clk_list[idx].c_name;
-
-	if (unlikely(IS_ERR_OR_NULL(clk_list[idx].c))) {
-		ret = exynos_display_clk_get(dev, idx, parent);
-		if (ret < 0) {
-			pr_err("%s: can't get clock: %s\n", __func__, conid);
-			return ret;
-		}
-	}
-
-	p = clk_list[idx].p;
-	c = clk_list[idx].c;
-
-	ret = clk_set_parent(c, p);
-	if (ret < 0)
-		pr_info("failed %s: %s, %s, %d\n", __func__, conid, parent, ret);
-#if defined(CONFIG_DISP_CLK_DEBUG)
-	else {
-		struct clk_mux *mux = container_of(c->hw, struct clk_mux, hw);
-		unsigned int val = readl(mux->reg) >> mux->shift;
-		val &= mux->mask;
-		pr_info("%08X[%2d], %8d, 0x%08x, %30s, %30s\n",
-			get_pa(mux->reg), mux->shift, val, readl(mux->reg), conid, parent);
-	}
-#endif
-
-	return ret;
-}
-
-static int exynos_display_set_divide(struct device *dev, enum disp_clks idx, unsigned int divider)
-{
-	struct clk *p;
-	struct clk *c;
-	unsigned long rate;
-	int ret = 0;
-	const char *conid = clk_list[idx].c_name;
-
-	if (unlikely(IS_ERR_OR_NULL(clk_list[idx].c))) {
-		ret = exynos_display_clk_get(dev, idx, NULL);
-		if (ret < 0) {
-			pr_err("%s: can't get clock: %s\n", __func__, conid);
-			return ret;
-		}
-	}
-
-	p = clk_list[idx].p;
-	c = clk_list[idx].c;
-
-	rate = DIV_ROUND_UP(clk_get_rate(p), (divider + 1));
-
-	ret = clk_set_rate(c, rate);
-	if (ret < 0)
-		pr_info("failed to %s, %s, %d\n", __func__, conid, ret);
-#if defined(CONFIG_DISP_CLK_DEBUG)
-	else {
-		struct clk_divider *div = container_of(c->hw, struct clk_divider, hw);
-		unsigned int val = readl(div->reg) >> div->shift;
-		val &= (BIT(div->width) - 1);
-		WARN_ON(divider != val);
-		pr_info("%08X[%2d], %8d, 0x%08x, %30s, %30s\n",
-			get_pa(div->reg), div->shift, val, readl(div->reg), conid, __clk_get_name(p));
-	}
-#endif
-
-	return ret;
-}
-
-static int exynos_display_set_rate(struct device *dev, enum disp_clks idx, unsigned long rate)
-{
-	struct clk *p;
-	struct clk *c;
-	int ret = 0;
-	const char *conid = clk_list[idx].c_name;
-
-	if (unlikely(IS_ERR_OR_NULL(clk_list[idx].c))) {
-		ret = exynos_display_clk_get(dev, idx, NULL);
-		if (ret < 0) {
-			pr_err("%s: can't get clock: %s\n", __func__, conid);
-			return ret;
-		}
-	}
-
-	p = clk_list[idx].p;
-	c = clk_list[idx].c;
-
-	ret = clk_set_rate(c, rate);
-	if (ret < 0)
-		pr_info("failed to %s, %s, %d\n", __func__, conid, ret);
-#if defined(CONFIG_DISP_CLK_DEBUG)
-	else {
-		struct clk_divider *div = container_of(c->hw, struct clk_divider, hw);
-		pr_info("%08X[%2s], %8s, 0x%08x, %30s, %30s\n",
-			get_pa(div->reg), "", "", readl(div->reg), conid, __clk_get_name(p));
-	}
-#endif
-
-	return ret;
-}
 
 int init_display_decon_clocks(struct device *dev)
 {
@@ -326,15 +40,15 @@ int init_display_decon_clocks(struct device *dev)
 #endif
 
 	if (lcd->xres * lcd->yres == 720 * 1280)
-		exynos_display_set_rate(dev, disp_pll, 67 * MHZ);
+		exynos_display_set_rate(dev, disp_pll, 67 * 1000000);
 	else if (lcd->xres * lcd->yres == 1080 * 1920)
-		exynos_display_set_rate(dev, disp_pll, 142 * MHZ);
+		exynos_display_set_rate(dev, disp_pll, 142 * 1000000);
 	else if (lcd->xres * lcd->yres == 1536 * 2048)
-		exynos_display_set_rate(dev, disp_pll, 214 * MHZ);
+		exynos_display_set_rate(dev, disp_pll, 214 * 1000000);
 	else if (lcd->xres * lcd->yres == 1440 * 2560)
-		exynos_display_set_rate(dev, disp_pll, 250 * MHZ);
+		exynos_display_set_rate(dev, disp_pll, 250 * 1000000);
 	else if (lcd->xres * lcd->yres == 2560 * 1600)
-		exynos_display_set_rate(dev, disp_pll, 278 * MHZ);
+		exynos_display_set_rate(dev, disp_pll, 278 * 1000000);
 	else
 		dev_err(dev, "%s: resolution %d:%d is missing\n", __func__, lcd->xres, lcd->yres);
 
@@ -474,481 +188,114 @@ int disable_display_decon_clocks(struct device *dev)
 	return 0;
 }
 
-/* should be moved to dt file */
-static struct regulator_bulk_data *supplies;
-static int num_supplies;
-
-static void get_supplies(struct device *dev)
-{
-	int ret = 0;
-	unsigned int i;
-
-	num_supplies = of_property_count_strings(dev->of_node, "display,regulator-names");
-
-	if (num_supplies <= 0)
-		return;
-
-	supplies = kzalloc(num_supplies * sizeof(struct regulator_bulk_data), GFP_KERNEL);
-
-	for (i = 0; i < num_supplies; i++) {
-		of_property_read_string_index(dev->of_node, "display,regulator-names", i, &supplies[i].supply);
-		pr_info("%s: %s\n", __func__, supplies[i].supply);
-	}
-
-	if (num_supplies) {
-		ret = regulator_bulk_get(NULL, num_supplies, supplies);
-		if (ret < 0)
-			pr_err("%s: failed to get regulators: %d\n", __func__, ret);
-	}
-}
-
-static struct pinctrl		*pins;
-static struct pinctrl_state	*state_default;
-#if defined(CONFIG_FB_I80_COMMAND_MODE) && !defined(CONFIG_FB_I80_SW_TRIGGER)
-static struct pinctrl_state	*state_turnon_tes;
-static struct pinctrl_state	*state_turnoff_tes;
-#endif
-
-static void get_pintctrl(struct device *dev)
-{
-	if (!pins) {
-		pins = devm_pinctrl_get(dev);
-		if (!pins)
-			pr_err("%s: failed to get pinctrl\n", __func__);
-	}
-
-	if (!state_default) {
-		state_default = pinctrl_lookup_state(pins, "default");
-		if (!state_default)
-			pr_err("%s: failed to get default pinctrl\n", __func__);
-	}
-
-#if defined(CONFIG_FB_I80_COMMAND_MODE) && !defined(CONFIG_FB_I80_SW_TRIGGER)
-	if (!state_turnon_tes) {
-		state_turnon_tes = pinctrl_lookup_state(pins, "turnon_tes");
-		if (!state_turnon_tes)
-			pr_err("%s: failed to get default pinctrl\n", __func__);
-	}
-
-	if (!state_turnoff_tes) {
-		state_turnoff_tes = pinctrl_lookup_state(pins, "turnoff_tes");
-		if (!state_turnoff_tes)
-			pr_err("%s: failed to get default pinctrl\n", __func__);
-	}
-#endif
-}
-
-static int set_pinctrl(struct device *dev, int enable)
-{
-	int ret = 0;
-
-	if (enable) {
-		if (!pins)
-			get_pintctrl(dev);
-
-		if (!IS_ERR(pins) && !IS_ERR(state_default)) {
-			ret = pinctrl_select_state(pins, state_default);
-			if (ret) {
-				pr_err("%s: failed to select state for default", __func__);
-				return ret;
-			}
-		}
-
-#if defined(CONFIG_FB_I80_COMMAND_MODE) && !defined(CONFIG_FB_I80_SW_TRIGGER)
-		if (!IS_ERR(pins) && !IS_ERR(state_turnon_tes)) {
-			ret = pinctrl_select_state(pins, state_turnon_tes);
-			if (ret) {
-				pr_err("%s: failed to select state for turn on tes", __func__);
-				return ret;
-			}
-		}
-#endif
-	} else {
-#if defined(CONFIG_FB_I80_COMMAND_MODE) && !defined(CONFIG_FB_I80_SW_TRIGGER)
-		if (!IS_ERR(pins) && !IS_ERR(state_turnoff_tes)) {
-			ret = pinctrl_select_state(pins, state_turnoff_tes);
-			if (ret) {
-				pr_err("%s: failed to select state for turn off tes", __func__);
-				return ret;
-			}
-		}
-#endif
-	}
-
-	return ret;
-}
-
-#if defined(CONFIG_DECON_LCD_S6TNMR7)
 int enable_display_driver_power(struct device *dev)
 {
+#ifdef CONFIG_LCD_ALPM
 	struct display_driver *dispdrv = get_display_driver();
-	struct display_gpio *gpio = dispdrv->dt_ops.get_display_dsi_reset_gpio();
-	int ret = 0;
 
-	if (!num_supplies)
-		get_supplies(dev);
-
-	if (!num_supplies)
-		goto pin_config;
-
-	/* Turn on VDD_3.3V*/
-	ret = gpio_request_one(gpio->id[0], GPIOF_OUT_INIT_HIGH, "lcd_power");
-	if (ret < 0) {
-		pr_err("%s: gpio lcd_power request fail\n", __func__);
-		goto pin_config;
-	}
-	gpio_free(gpio->id[0]);
-
-	usleep_range(10000, 12000);
-
-	/* Turn on VDD_1.8V(TCON_1.8v) */
-	ret = regulator_enable(supplies[0].consumer);
-	if (ret < 0) {
-		pr_err("%s: regulator %s enable fail\n", __func__, supplies[0].supply);
-		goto pin_config;
-	}
-
-pin_config:
-	set_pinctrl(dev, 1);
+	if (dispdrv->dsi_driver.dsim->lcd_alpm)
+		return 0;
+#endif
+	run_list(dev, __func__);
 
 	return 0;
 }
 
 int disable_display_driver_power(struct device *dev)
 {
-	struct display_driver *dispdrv;
-	struct display_gpio *gpio;
-	int ret;
+#ifdef CONFIG_LCD_ALPM
+	struct display_driver *dispdrv = get_display_driver();
 
-	dispdrv = get_display_driver();
-	gpio = dispdrv->dt_ops.get_display_dsi_reset_gpio();
-
-	if (!num_supplies)
-		get_supplies(dev);
-
-	if (!num_supplies)
-		goto pin_config;
-
-	/* Turn on VDD_1.8V(TCON_1.8v) */
-	ret = regulator_disable(supplies[0].consumer);
-	if (ret < 0) {
-		pr_err("%s: regulator %s enable fail\n", __func__, supplies[0].supply);
-		goto pin_config;
-	}
-	usleep_range(5000, 10000);
-	/* Turn off VDD_3.3V*/
-	ret = gpio_request_one(gpio->id[0], GPIOF_OUT_INIT_LOW, "lcd_power");
-	if (ret < 0) {
-		pr_err("%s: gpio lcd_power request fail\n", __func__);
-		goto pin_config;
-	}
-	gpio_free(gpio->id[0]);
-
-pin_config:
-	set_pinctrl(dev, 0);
+	if (dispdrv->dsi_driver.dsim->lcd_alpm)
+		return 0;
+#endif
+	run_list(dev, __func__);
 
 	return 0;
 }
 
-int reset_display_driver_panel(struct device *dev)
+#if defined(CONFIG_DECON_LCD_S6TNMR7)
+static int wait_tcon_rdy(struct device *dev)
 {
 	int timeout = 10;
 	int gpio;
 
-	pr_debug(" Chagall %s\n", __func__);
-
-	gpio = of_get_named_gpio(dev->of_node, "oled-pcd-gpio", 0);
+	gpio = of_get_named_gpio(dev->of_node, "gpio-tcon-rdy", 0);
 	if (gpio < 0) {
 		dev_err(dev, "failed to get proper gpio number\n");
-		return -EINVAL;
+		return 0;
 	}
-	msleep_interruptible(150);
+
 	do {
 		if (gpio_get_value(gpio))
 			break;
 		msleep(30);
 	} while (timeout--);
 	if (timeout < 0)
-		pr_err(" %s timeout...\n", __func__);
+		pr_err("%s timeout...\n", __func__);
 	else
-		pr_info("%s duration: %d\n", __func__, 150+(10-timeout)*30);
+		pr_info("%s duration: %d\n", __func__, (10 - timeout) * 30);
 	return 0;
 }
-#elif defined(CONFIG_DECON_LCD_S6E3HA1)
-int enable_display_driver_power(struct device *dev)
+#elif defined(CONFIG_DECON_LCD_ANA38401)
+static int wait_tcon_rdy(struct device *dev)
+{
+	int timeout = 30;
+	int gpio, ret = 0;
+	static int retry_count = 1;
+	extern unsigned int lcdtype;
+
+	gpio = of_get_named_gpio(dev->of_node, "gpio-tcon-rdy", 0);
+	if (gpio < 0) {
+		dev_err(dev, "failed to get proper gpio number\n");
+		return ret;
+	}
+
+	while (timeout) {
+		if (gpio_get_value(gpio))
+			break;
+		usleep_range(10000, 11000);
+		timeout--;
+	}
+
+	pr_info("%s time is %d: %d\n", __func__, (30 - timeout) * 10, retry_count);
+
+	if (timeout <= 22 && timeout >= 0) {
+		ret = retry_count ? -ETIMEDOUT : 0;
+		retry_count = !retry_count;
+		if (!timeout && (lcdtype & 0x4000)) {
+			ret = 0;
+			retry_count = 1;
+		}
+	} else {
+		ret = 0;
+		retry_count = 1;
+	}
+
+	return ret;
+}
+#endif
+
+int reset_display_driver_panel(struct device *dev)
 {
 	int ret = 0;
-
-	if (!num_supplies)
-		get_supplies(dev);
-
-	if (!num_supplies)
-		goto pin_config;
-
-	/* Turn on VDDI(VDD3): 1.8 */
-	ret = regulator_enable(supplies[0].consumer);
-	if (ret < 0) {
-		pr_err("%s: regulator %s enable fail\n", __func__, supplies[0].supply);
-		goto pin_config;
-	}
-
-	/* Wait 5ms */
-	usleep_range(5000, 6000);
-
-	/* Turn on VCI: 3.0 */
-	ret = regulator_enable(supplies[1].consumer);
-	if (ret < 0) {
-		pr_err("%s: regulator %s enable fail\n", __func__, supplies[1].supply);
-		goto pin_config;
-	}
-
-	/* Turn on VDDR(VDDI_REG): 1.5 or 1.6 */
-	ret = regulator_enable(supplies[2].consumer);
-	if (ret < 0) {
-		pr_err("%s: regulator %s enable fail\n", __func__, supplies[2].supply);
-		goto pin_config;
-	}
-
-	/* Wait 10ms */
-	usleep_range(10000, 11000);
-
-pin_config:
-	set_pinctrl(dev, 1);
-
-	return 0;
-}
-
-int disable_display_driver_power(struct device *dev)
-{
-	struct display_driver *dispdrv;
-	struct display_gpio *gpio;
-	int ret;
-
-	dispdrv = get_display_driver();
-	gpio = dispdrv->dt_ops.get_display_dsi_reset_gpio();
-
-	ret = gpio_request_one(gpio->id[0], GPIOF_OUT_INIT_LOW, "lcd_reset");
-	if (ret < 0) {
-		pr_err("Failed to get gpio number for the lcd_reset\n");
-		return -EINVAL;
-	}
-	gpio_free(gpio->id[0]);
-
-	if (!num_supplies)
-		get_supplies(dev);
-
-	if (!num_supplies)
-		goto pin_config;
-
-	/* Turn off VDDR(VDDI_REG): 1.5 or 1.6 */
-	ret = regulator_disable(supplies[2].consumer);
-	if (ret < 0) {
-		pr_err("%s: regulator %s enable fail\n", __func__, supplies[2].supply);
-		goto pin_config;
-	}
-
-	/* Wait 5ms */
-	usleep_range(5000, 6000);
-
-	/* Turn off VCI: 3.0 */
-	ret = regulator_disable(supplies[1].consumer);
-	if (ret < 0) {
-		pr_err("%s: regulator %s enable fail\n", __func__, supplies[1].supply);
-		goto pin_config;
-	}
-
-	/* Turn off VDDI(VDD3): 1.8 */
-	ret = regulator_disable(supplies[0].consumer);
-	if (ret < 0) {
-		pr_err("%s: regulator %s enable fail\n", __func__, supplies[0].supply);
-		goto pin_config;
-	}
-
-pin_config:
-	set_pinctrl(dev, 0);
-
-	return 0;
-}
-
-int reset_display_driver_panel(struct device *dev)
-{
-	struct display_driver *dispdrv;
-	struct display_gpio *gpio;
-
-	dispdrv = get_display_driver();
-
-	gpio = dispdrv->dt_ops.get_display_dsi_reset_gpio();
-	gpio_request_one(gpio->id[0], GPIOF_OUT_INIT_HIGH, "lcd_reset");
-	usleep_range(5000, 6000);
-	gpio_set_value(gpio->id[0], 0);
-	usleep_range(5000, 6000);
-	gpio_set_value(gpio->id[0], 1);
-	gpio_free(gpio->id[0]);
-
-	/* Wait 10ms */
-	usleep_range(10000, 11000);
-
-	return 0;
-}
-#else
-int enable_display_driver_power(struct device *dev)
-{
-#if !defined(CONFIG_MACH_XYREF5430) && !defined(CONFIG_MACH_ESPRESSO5433)
+#ifdef CONFIG_LCD_ALPM
 	struct display_driver *dispdrv = get_display_driver();
-	struct display_gpio *gpio = dispdrv->dt_ops.get_display_dsi_reset_gpio();
-	int ret = 0, i;
 
-#ifdef CONFIG_LCD_ALPM
 	if (dispdrv->dsi_driver.dsim->lcd_alpm)
 		return 0;
+
 #endif
 
-	if (!num_supplies)
-		get_supplies(dev);
+	run_list(dev, __func__);
 
-	if (!num_supplies)
-		goto pin_config;
-
-	/* Turn on VDDI(VDD3): 1.8 */
-	ret = regulator_enable(supplies[0].consumer);
-	if (ret < 0) {
-		pr_err("%s: regulator %s enable fail\n", __func__, supplies[0].supply);
-		goto pin_config;
-	}
-
-	if (gpio->num > 2) {
-		/* 1. Turn on VDDR(VDDI_REG): 1.5 or 1.6 */
-		/* 2. Turn on VCI: 3.0 */
-		for (i = 1; i < gpio->num; i++) {
-			ret = gpio_request_one(gpio->id[i], GPIOF_OUT_INIT_HIGH, "lcd_power");
-			if (ret < 0) {
-				pr_err("Failed to get gpio number for the lcd power(%d)\n", i);
-				return ret;
-			}
-			gpio_free(gpio->id[i]);
-		}
-	} else {
-		/* Turn on VDDR(VDDI_REG): 1.5 or 1.6 */
-		ret = gpio_request_one(gpio->id[1], GPIOF_OUT_INIT_HIGH, "lcd_power");
-		if (ret < 0) {
-			pr_err("%s: gpio lcd_power request fail\n", __func__);
-			goto pin_config;
-		}
-		gpio_free(gpio->id[1]);
-
-		/* Turn on VCI: 3.0 */
-		ret = regulator_enable(supplies[1].consumer);
-		if (ret < 0) {
-			pr_err("%s: regulator %s enable fail\n", __func__, supplies[0].supply);
-			goto pin_config;
-		}
-	}
-	/* Wait 10ms */
-	usleep_range(10000, 11000);
+#if defined(CONFIG_DECON_LCD_S6TNMR7) || defined(CONFIG_DECON_LCD_ANA38401)
+	if (of_find_property(dev->of_node, "gpio-tcon-rdy", NULL))
+		ret = wait_tcon_rdy(dev);
 #endif
 
-pin_config:
-	set_pinctrl(dev, 1);
-
-	return 0;
+	return ret;
 }
-
-int disable_display_driver_power(struct device *dev)
-{
-	struct display_driver *dispdrv;
-	struct display_gpio *gpio;
-	int ret, i;
-
-	dispdrv = get_display_driver();
-	gpio = dispdrv->dt_ops.get_display_dsi_reset_gpio();
-
-#ifdef CONFIG_LCD_ALPM
-	if (dispdrv->dsi_driver.dsim->lcd_alpm)
-		return 0;
-#endif
-
-	ret = gpio_request_one(gpio->id[0], GPIOF_OUT_INIT_LOW, "lcd_reset");
-	if (ret < 0) {
-		pr_err("Failed to get gpio number for the lcd_reset\n");
-		return -EINVAL;
-	}
-	gpio_free(gpio->id[0]);
-
-	if (!num_supplies)
-		get_supplies(dev);
-
-	if (!num_supplies)
-		goto pin_config;
-
-	if (gpio->num > 2) {
-		/* 1. Turn off VCI: 3.0 */
-		/* 2. Turn on VDDR(VDDI_REG): 1.5 or 1.6 */
-		for (i = gpio->num - 1; i > 0; i--) {
-			ret = gpio_request_one(gpio->id[i], GPIOF_OUT_INIT_LOW, "lcd_power");
-			if (ret < 0) {
-				pr_err("Failed to get gpio number for the lcd power(%d)\n", i);
-				return -EINVAL;
-			}
-			gpio_free(gpio->id[i]);
-		}
-	} else {
-		/* Turn off VCI: 3.0 */
-		ret = regulator_disable(supplies[1].consumer);
-		if (ret < 0) {
-			pr_err("%s: regulator %s enable fail\n", __func__, supplies[0].supply);
-			goto pin_config;
-		}
-
-#if !defined(CONFIG_MACH_XYREF5430) && !defined(CONFIG_MACH_ESPRESSO5433)
-		/* Turn on VDDR(VDDI_REG): 1.5 or 1.6 */
-		ret = gpio_request_one(gpio->id[1], GPIOF_OUT_INIT_LOW, "lcd_power");
-		if (ret < 0) {
-			pr_err("%s: gpio lcd_power request fail\n", __func__);
-			goto pin_config;
-		}
-		gpio_free(gpio->id[1]);
-		usleep_range(3000, 5000);
-#endif
-	}
-	/* Turn off VDDI(VDD3): 1.8 */
-	ret = regulator_disable(supplies[0].consumer);
-	if (ret < 0) {
-		pr_err("%s: regulator %s enable fail\n", __func__, supplies[0].supply);
-		goto pin_config;
-	}
-
-pin_config:
-	set_pinctrl(dev, 0);
-
-	return 0;
-}
-
-int reset_display_driver_panel(struct device *dev)
-{
-	struct display_driver *dispdrv;
-	struct display_gpio *gpio;
-
-	dispdrv = get_display_driver();
-
-#ifdef CONFIG_LCD_ALPM
-	if (dispdrv->dsi_driver.dsim->lcd_alpm)
-		return 0;
-#endif
-
-	gpio = dispdrv->dt_ops.get_display_dsi_reset_gpio();
-	gpio_request_one(gpio->id[0], GPIOF_OUT_INIT_HIGH, "lcd_reset");
-	usleep_range(5000, 6000);
-	gpio_set_value(gpio->id[0], 0);
-	usleep_range(5000, 6000);
-	gpio_set_value(gpio->id[0], 1);
-	gpio_free(gpio->id[0]);
-
-	/* Wait 10ms */
-	usleep_range(10000, 11000);
-
-	return 0;
-}
-#endif
 
 int enable_display_decon_runtimepm(struct device *dev)
 {
@@ -972,7 +319,7 @@ int enable_display_dsd_clocks(struct device *dev, bool enable)
 			return -EBUSY;
 		}
 	}
-#if defined(CONFIG_SOC_EXYNOS5433) && !defined(CONFIG_DECON_LCD_S6TNMR7)
+#if defined(CONFIG_SOC_EXYNOS5433) && defined(CONFIG_FB_HIBERNATION_DISPLAY_CLOCK_GATING)
 	if (!dispdrv->decon_driver.gate_dsd_clk) {
 		dispdrv->decon_driver.gate_dsd_clk = clk_get(dev, "gate_dsd_clk");
 		if (IS_ERR(dispdrv->decon_driver.gate_dsd_clk)) {
@@ -995,7 +342,7 @@ int disable_display_dsd_clocks(struct device *dev, bool enable)
 		return -EBUSY;
 
 	clk_disable_unprepare(dispdrv->decon_driver.dsd_clk);
-#if defined(CONFIG_SOC_EXYNOS5433) && !defined(CONFIG_DECON_LCD_S6TNMR7)
+#if defined(CONFIG_SOC_EXYNOS5433) && defined(CONFIG_FB_HIBERNATION_DISPLAY_CLOCK_GATING)
 	if (dispdrv->decon_driver.gate_dsd_clk)
 		clk_disable_unprepare(dispdrv->decon_driver.gate_dsd_clk);
 #endif

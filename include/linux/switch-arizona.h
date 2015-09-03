@@ -56,10 +56,23 @@ int arizona_jds_set_state(struct arizona_extcon_info *info,
 extern void arizona_set_headphone_imp(struct arizona_extcon_info *info,
 				      int imp);
 
+extern const struct arizona_jd_state arizona_hpdet_moisture;
+extern const struct arizona_jd_state arizona_hpdet_moisture_r;
 extern const struct arizona_jd_state arizona_hpdet_left;
 extern const struct arizona_jd_state arizona_hpdet_right;
 extern const struct arizona_jd_state arizona_micd_button;
 extern const struct arizona_jd_state arizona_micd_microphone;
+extern const struct arizona_jd_state arizona_micd_adc_mic;
+extern const struct arizona_jd_state arizona_hpdet_acc_id;
+extern const struct arizona_jd_state arizona_antenna_moisture;
+extern const struct arizona_jd_state arizona_antenna_moisture_r;
+extern const struct arizona_jd_state arizona_antenna_mic_det;
+extern const struct arizona_jd_state arizona_antenna_oc_det;
+extern const struct arizona_jd_state arizona_antenna_hp_det;
+extern const struct arizona_jd_state arizona_antenna_hpr_det;
+extern const struct arizona_jd_state arizona_antenna_button_det;
+extern const struct arizona_jd_state arizona_antenna_button_check;
+extern const struct arizona_jd_state arizona_antenna_remove_det;
 
 extern int arizona_hpdet_start(struct arizona_extcon_info *info);
 extern void arizona_hpdet_restart(struct arizona_extcon_info *info);
@@ -78,5 +91,7 @@ extern int arizona_micd_mic_timeout_ms(struct arizona_extcon_info *info);
 extern void arizona_micd_mic_timeout(struct arizona_extcon_info *info);
 
 extern void arizona_extcon_report(struct arizona_extcon_info *info, int state);
+
+extern int arizona_extcon_take_manual_mic_reading(struct arizona_extcon_info *info);
 
 #endif

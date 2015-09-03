@@ -13,6 +13,10 @@ Required properties:
         "wlf,wm8997"
         "wlf,WM8998"
         "wlf,wm1814"
+        "wlf,wm8285"
+        "wlf,wm1840"
+        "wlf,wm1831"
+        "cirrus,cs47l24"
 
   - reg : I2C slave address when connected using I2C, chip select number when
     using SPI.
@@ -32,9 +36,10 @@ Required properties:
     second cell is used to specify optional parameters (currently unused).
 
   - AVDD-supply, DBVDD1-supply, DBVDD2-supply, DBVDD3-supply (wm5102, wm5110),
-    CPVDD-supply, SPKVDDL-supply (wm5102, wm5110), SPKVDDR-supply (wm5102,
-    wm5110), SPKVDD-supply (wm8997) : Power supplies for the device, as covered
-    in Documentation/devicetree/bindings/regulator/regulator.txt
+    DBVDD4-supply (wm8285), CPVDD-supply, SPKVDDL-supply (wm5102, wm5110),
+    SPKVDDR-supply (wm5102, wm5110), SPKVDD-supply (wm8997, cs47l24) : Power
+    supplies for the device, as covered in
+    Documentation/devicetree/bindings/regulator/regulator.txt
 
 Optional properties:
 
@@ -74,6 +79,7 @@ Optional properties:
     value indicates this should be on
   - wlf,init-mic-delay : Adds a delay in milliseconds between jack detection
     and beginning ramp of MICBIAS.
+  - wlf,micd-clamp-mode: Specifies the logic of the micdetect clamp block
 
   - wlf,micbias1 : Configuration for the micbias regulator, should include 5
     cells.
@@ -87,17 +93,18 @@ Optional properties:
     and simply output MICVDD
   - wlf,micbias2 : See wlf,micbias1
   - wlf,micbias3 : See wlf,micbias1
+  - wlf,micbias4 : See wlf,micbias1
 
-  - wlf,gpio-defaults : A list of GPIO configuration register values. If
-    absent, no configuration of these registers is performed. If any
-    entry has a value that is out of range for a 16 bit register then
-    the chip default will be used.  If present exactly five values must
-    be specified.
+  - wlf,gpio-defaults : A list of GPIO configuration register values. Defines
+    for the appropriate values can found in <dt-bindings/mfd/arizona.txt>. If
+    absent, no configuration of these registers is performed. If any entry has
+    a value that is out of range for a 16 bit register then the chip default
+    will be used.
 
   - wlf,max-channels-clocked : The maximum number of channels to be clocked on
     each AIF, useful for I2S systems with multiple data lines being mastered.
-    If specified three cells must supplied one for each AIF, specify zero for
-    AIFs that should be handled normally.
+    Specify one cell for each AIF, specify zero for AIFs that should be handled
+    normally.
 
   - wlf,dmic-ref : DMIC reference for each input, must contain four cells if
     specified. 0 indicates MICVDD and is the default, 1,2,3 indicate the
@@ -106,6 +113,9 @@ Optional properties:
   - wlf,inmode : Input mode for each input, must contain four cells if
     specified. 0 indicates Differential, 1 indicates Single Ended and 2
     indicates a digital microphone.
+
+  - wlf,out-mono : Mono bit for each output, must contain six cells if
+    specified. A non-zero value indicates the corresponding output is mono.
 
   - wlf,use-jd-gpio : Use GPIO input for jack detection.
   - wlf,usr-jd-gpio-nopull : Internal pull on GPIO is disabled when used for
@@ -167,6 +177,7 @@ codec: wm5102@1a {
 
 	wlf,micbias2 = <2600 0 1 1 0>;
 	wlf,init-mic-delay = <10>;
+	wlf,micd-clamp-mode = <0xb>;
 
 	wlf,dmic-ref = <0 0 1 0>;
 	wlf,inmode = <0 0 2 0>;
@@ -174,11 +185,11 @@ codec: wm5102@1a {
 	wlf,gpsw = <0x3>;
 
 	wlf,gpio-defaults = <
-		0x00000000 /* AIF1TXLRCLK */
-		0xffffffff
-		0xffffffff
-		0xffffffff
-		0xffffffff
+		ARIZONA_GP_FN_TXLRCLK
+		ARIZONA_GP_DEFAULT
+		ARIZONA_GP_DEFAULT
+		ARIZONA_GP_DEFAULT
+		ARIZONA_GP_DEFAULT
 	>;
 
 	wlf,max-channels-clocked = <2 0 0>;

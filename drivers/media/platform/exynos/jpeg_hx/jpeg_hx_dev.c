@@ -515,9 +515,10 @@ static void jpeg_hx_re_compress(struct jpeg_ctx *ctx)
 	struct jpeg_enc_param enc_param;
 	struct vb2_buffer *vb = NULL;
 
-	if (ctx->param.enc_param.quality >= QUALITY_LEVEL_1 ||
-		ctx->param.enc_param.quality < QUALITY_LEVEL_6)
-		ctx->param.enc_param.quality++;
+	if (ctx->param.enc_param.quality > 4)
+		ctx->param.enc_param.quality -= 4;
+	else
+		ctx->param.enc_param.quality = 1;
 
 	enc_param = ctx->param.enc_param;
 
@@ -529,7 +530,7 @@ static void jpeg_hx_re_compress(struct jpeg_ctx *ctx)
 	jpeg_hx_set_interrupt(jpeg->reg_base);
 	jpeg_hx_coef(jpeg->reg_base, ENCODING, jpeg);
 	jpeg_hx_set_enc_tbl(jpeg->reg_base, enc_param.quality);
-	jpeg_hx_set_encode_tbl_select(jpeg->reg_base, enc_param.quality);
+	jpeg_hx_set_encode_tbl_select(jpeg->reg_base);
 	jpeg_hx_set_stream_size(jpeg->reg_base,
 		enc_param.in_width, enc_param.in_height);
 
@@ -594,7 +595,7 @@ static void jpeg_hx_device_enc_run(void *priv)
 	jpeg_hx_set_interrupt(jpeg->reg_base);
 	jpeg_hx_coef(jpeg->reg_base, ENCODING, jpeg);
 	jpeg_hx_set_enc_tbl(jpeg->reg_base, enc_param.quality);
-	jpeg_hx_set_encode_tbl_select(jpeg->reg_base, enc_param.quality);
+	jpeg_hx_set_encode_tbl_select(jpeg->reg_base);
 	jpeg_hx_set_stream_size(jpeg->reg_base,
 		enc_param.in_width, enc_param.in_height);
 

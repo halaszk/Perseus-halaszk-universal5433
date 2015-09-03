@@ -68,6 +68,7 @@ enum ion_heap_type {
 					   with zero value and userspace is not
 					   able to access the buffer
 					 */
+#define ION_FLAG_SYNC_FORCE 32		/* cache sync forcely at allocation */
 
 #ifdef __KERNEL__
 struct ion_device;

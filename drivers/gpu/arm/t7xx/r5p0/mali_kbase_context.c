@@ -149,6 +149,7 @@ kbase_create_context(struct kbase_device *kbdev, bool is_compat)
 
 #if SLSI_INTEGRATION
 	kctx->ctx_status = CTX_INITIALIZED;
+	kctx->destroying_context = MALI_FALSE;
 #endif
 
 
@@ -213,6 +214,10 @@ void kbase_destroy_context(struct kbase_context *kctx)
 	KBASE_DEBUG_ASSERT(NULL != kbdev);
 
 	KBASE_TRACE_ADD(kbdev, CORE_CTX_DESTROY, kctx, NULL, 0u, 0u);
+
+#if SLSI_INTEGRATION       
+	kctx->destroying_context = MALI_TRUE;
+#endif
 
 	kbasep_jd_debugfs_ctx_remove(kctx);
 

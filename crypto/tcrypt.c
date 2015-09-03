@@ -67,6 +67,28 @@ static char *check[] = {
 	"lzo", "cts", "zlib", NULL
 };
 
+#ifdef CONFIG_CRYPTO_DRBG
+static char *drbg_cores[] = {
+#ifdef CONFIG_CRYPTO_DRBG_CTR
+	"ctr_aes128",
+	"ctr_aes192",
+	"ctr_aes256",
+#endif /* CONFIG_CRYPTO_DRBG_CTR */
+#ifdef CONFIG_CRYPTO_DRBG_HASH
+	"sha1",
+	"sha384",
+	"sha512",
+	"sha256",
+#endif /* CONFIG_CRYPTO_DRBG_HASH */
+#ifdef CONFIG_CRYPTO_DRBG_HMAC
+	"hmac_sha1",
+	"hmac_sha384",
+	"hmac_sha512",
+	"hmac_sha256",
+#endif /* CONFIG_CRYPTO_DRBG_HMAC */
+};
+#endif /* CONFIG_CRYPTO_DRBG */
+
 static int test_cipher_jiffies(struct blkcipher_desc *desc, int enc,
 			       struct scatterlist *sg, int blen, int sec)
 {
@@ -926,6 +948,27 @@ out:
 	crypto_free_ablkcipher(tfm);
 }
 
+#ifdef CONFIG_CRYPTO_DRBG
+static inline int test_drbg(const char *drbg_core, int pr)
+{
+	int pos = 0;
+	char cra_driver_name[CRYPTO_MAX_ALG_NAME] = "";
+
+	if(!drbg_core)
+		return -EINVAL;
+
+	if (pr) { /* with prediction resistance */
+		memcpy(cra_driver_name, "drbg_pr_", 8);
+		pos = 8;
+	} else {
+		memcpy(cra_driver_name, "drbg_nopr_", 10);
+		pos = 10;
+	}
+	memcpy(cra_driver_name + pos, drbg_core, strlen(drbg_core));
+	return alg_test(cra_driver_name, "stdrng", 0, 0);
+}
+#endif /* CONFIG_CRYPTO_DRBG */
+
 static void test_available(void)
 {
 	char **name = check;
@@ -1171,9 +1214,7 @@ static int do_test(int m)
 		break;
 
 	case 44:
-#ifdef CONFIG_CRYPTO_ZLIB
 		ret += tcrypt_test("zlib");
-#endif
 		break;
 
 	case 45:
@@ -1183,9 +1224,7 @@ static int do_test(int m)
 		break;
 
 	case 46:
-#ifdef CONFIG_CRYPTO_GHASH
 		ret += tcrypt_test("ghash");
-#endif
 		break;
 
 	case 100:
@@ -1802,6 +1841,7 @@ static int do_test(int m)
 	case 1000:
 		test_available();
 		break;
+
 #ifdef CONFIG_CRYPTO_FIPS
 	case 1402 : //For FIPS 140-2
 		printk(KERN_ERR "FIPS : Tcrypt Tests Start\n");
@@ -1809,10 +1849,24 @@ static int do_test(int m)
 		/* AES */
 		ret += alg_test("ecb(aes-generic)", "ecb(aes)", 0, 0);
 		ret += alg_test("cbc(aes-generic)", "cbc(aes)", 0, 0);
-		
+#ifdef CONFIG_CRYPTO_GCM
+		ret += alg_test("gcm(aes-generic)", "gcm(aes)", 0, 0);
+#endif
+
 #ifdef CONFIG_CRYPTO_AES_ARM
 		ret += alg_test("ecb(aes-asm)", "ecb(aes)", 0, 0);
 		ret += alg_test("cbc(aes-asm)", "cbc(aes)", 0, 0);
+	#ifdef CONFIG_CRYPTO_GCM
+		ret += alg_test("gcm(aes-asm)", "gcm(aes)", 0, 0);
+	#endif
+#endif
+
+#ifdef CONFIG_CRYPTO_AES_ARM64_CE
+		ret += alg_test("ecb(aes-ce)", "ecb(aes)", 0, 0);
+		ret += alg_test("cbc(aes-ce)", "cbc(aes)", 0, 0);
+	#ifdef CONFIG_CRYPTO_GCM
+		ret += alg_test("gcm(aes-ce)", "gcm(aes)", 0, 0);
+	#endif
 #endif
 
 		/* 3DES */
@@ -1841,10 +1895,19 @@ static int do_test(int m)
 		/* RNG */
 		ret += alg_test("fips_ansi_cprng", "ansi_cprng", 0, 0);
 
+#ifdef CONFIG_CRYPTO_DRBG
+		/* DRBG */
+		for (i = 0; ARRAY_SIZE(drbg_cores) > i; i++)
+			ret += test_drbg(drbg_cores[i], 0);	/* no prediction resistance */
+		for (i = 0; ARRAY_SIZE(drbg_cores) > i; i++)
+			ret += test_drbg(drbg_cores[i], 1);	/* with prediction resistance */
+#endif
+
 		printk(KERN_ERR "FIPS : Tcrypt Tests End\n");
 
 		break;
-#endif //CONFIG_CRYPTO_FIPS		
+#endif //CONFIG_CRYPTO_FIPS
+
 	}
 
 	return ret;
@@ -1878,24 +1941,31 @@ static int __init tcrypt_mod_init(void)
 		err = do_test(mode);
 
 #if FIPS_FUNC_TEST == 1
-    printk(KERN_ERR "FIPS FUNC TEST: Do test again\n");
-    do_test(mode);
-#else
+	printk(KERN_ERR "FIPS FUNC TEST: Do test again\n");
+	do_test(mode);
+#else /* FIPS_FUNC_TEST != 1 */
 	if (err) {
 		printk(KERN_ERR "tcrypt: one or more tests failed!\n");
+	    #ifdef CONFIG_CRYPTO_FIPS
+		set_in_fips_err();
+	    #endif
 		goto err_free_tv;
-#ifndef CONFIG_CRYPTO_FIPS
+    #ifndef CONFIG_CRYPTO_FIPS
 	}
-#else
+    #else
 	} else {
-		do_integrity_check();
+		if (do_integrity_check() != 0)
+		{
+		    printk(KERN_ERR "tcrypt: CRYPTO API FIPS Integrity Check failed!!!\n");
+		    set_in_fips_err();
+		}
 		if(in_fips_err()) {
 			printk(KERN_ERR "tcrypt: CRYPTO API in FIPS Error!!!\n");
 		} else {
 			printk(KERN_ERR "tcrypt: CRYPTO API started in FIPS mode!!!\n");
 		}
 	}
-#endif
+    #endif
 #endif /* FIPS_FUNC_TEST */
 	/* We intentionaly return -EAGAIN to prevent keeping the module,
 	 * unless we're running in fips mode. It does all its work from
@@ -1920,7 +1990,13 @@ err_free_tv:
  */
 static void __exit tcrypt_mod_fini(void) { }
 
-module_init(tcrypt_mod_init);
+#if defined(CONFIG_DEFERRED_INITCALLS)
+deferred_module_init(tcrypt_mod_init);
+#elif defined(USE_LATE_INITCALL_SYNC)
+late_initcall_sync(tcrypt_mod_init);
+#else
+late_initcall(tcrypt_mod_init);
+#endif
 module_exit(tcrypt_mod_fini);
 
 module_param(alg, charp, 0);

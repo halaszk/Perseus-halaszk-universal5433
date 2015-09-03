@@ -328,19 +328,27 @@ static irqreturn_t mipi_lli_sig_irq(int irq, void *_dev)
 
 void mipi_lli_disable_irq(void)
 {
+	spin_lock(&g_lli->lock);
+
 	if (g_lli->sig_irq_active) {
 		disable_irq_nosync(g_lli->irq_sig);
 		g_lli->sig_irq_active = false;
 	}
+
+	spin_unlock(&g_lli->lock);
 }
 EXPORT_SYMBOL(mipi_lli_disable_irq);
 
 void mipi_lli_enable_irq(void)
 {
+	spin_lock(&g_lli->lock);
+
 	if (!g_lli->sig_irq_active) {
 		enable_irq(g_lli->irq_sig);
 		g_lli->sig_irq_active = true;
 	}
+
+	spin_unlock(&g_lli->lock);
 }
 EXPORT_SYMBOL(mipi_lli_enable_irq);
 
@@ -355,6 +363,18 @@ void mipi_lli_intr_enable(void)
 	g_lli->driver->intr_enable(g_lli);
 }
 EXPORT_SYMBOL(mipi_lli_intr_enable);
+
+/**
+ * mipi_lli_intr_disable
+ */
+void mipi_lli_intr_disable(void)
+{
+	if (!g_lli || !g_lli->driver || !g_lli->driver->intr_disable)
+		return;
+
+	g_lli->driver->intr_disable(g_lli);
+}
+EXPORT_SYMBOL(mipi_lli_intr_disable);
 
 static void mipi_lli_lock_link(void *owner)
 {
@@ -378,6 +398,18 @@ struct link_pm_svc *mipi_lli_get_pm_svc(void)
 	return &mipi_lli_pm_svc;
 }
 EXPORT_SYMBOL(mipi_lli_get_pm_svc);
+
+/**
+ * mipi_lli_mask_sb_intr
+ */
+void mipi_lli_mask_sb_intr(bool flag)
+{
+	if (!g_lli || !g_lli->driver || !g_lli->driver->mask_sb_intr)
+		return;
+
+	g_lli->driver->mask_sb_intr(g_lli, flag);
+}
+EXPORT_SYMBOL(mipi_lli_mask_sb_intr);
 
 /**
  * mipi_lli_suspend must call by modem_if.

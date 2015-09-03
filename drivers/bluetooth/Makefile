@@ -35,3 +35,4 @@ obj-$(CONFIG_BT_BCM43457)		+= bcm43457.o
 obj-$(CONFIG_BT_BCM4339)		+= bcm4339.o
 obj-$(CONFIG_BT_BCM4354)		+= bcm4354.o
 obj-$(CONFIG_BT_BCM4358)		+= bcm4358.o
+obj-$(CONFIG_BT_BCM43455)		+= bcm43455.o

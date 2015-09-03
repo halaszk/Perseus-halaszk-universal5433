@@ -501,10 +501,16 @@ config LEDS_TCA6507
 	  Driver support brightness control and hardware-assisted blinking.
 
 config LEDS_MAX77804
-        bool "LED support for the MAX77804"
-        depends on LEDS_CLASS
-        help
-          This option enables support for the LEDs on the MAX77804.
+	bool "LED support for the MAX77804"
+	depends on LEDS_CLASS
+	help
+	  This option enables support for the LEDs on the MAX77804.
+
+config LEDS_MAX77888
+	bool "LED support for the MAX77888"
+	depends on LEDS_CLASS
+	help
+	  This option enables support for the LEDs on the MAX77888.
 
 config LEDS_MAX8997
 	tristate "LED support for MAX8997 PMIC"
@@ -581,6 +587,59 @@ config LEDS_BLUE_BRIGHTNESS_OFFSET
 	help
 	  This option enables support for blue brightness offset
 
+config FLASHLIGHT
+	bool "Flashlight Support"
+	help
+	  This option enables the led sysfs class in /sys/class/flashlight.
+
+config SM_FLASH_LED
+	tristate "Siliconmitus flash LED driver support"
+	depends on FLASHLIGHT
+	help
+	  Say Y here to enable Siliconmitus's flash LED driver HAL architecture
+
+config FLED_SM5703
+	tristate "Siliconmitus SM5703 flash LED driver"
+	depends on SM_FLASH_LED
+	help
+	  A driver for Siliconmitus SM5703 flash LED
+
+config FLED_SM5703_EXT_GPIO
+	bool "External(or ISP) GPIO"
+	  help
+	  Use GPIO pins to enable/disable torch and flash light.
+	  If unsure, say N.
+
+config RT_FLASH_LED
+	tristate "Richtek flash LED driver support"
+	depends on FLASHLIGHT
+	help
+	  Say Y here to enable Richtek's flash LED driver HAL architecture
+
+config FLED_RT5033
+	tristate "Richtek RT5033 flash LED driver"
+	depends on RT_FLASH_LED && MFD_RT5033
+	help
+	  A driver for Richtek RT5033 flash LED
+choice
+	prompt "Control method"
+	depends on FLED_RT5033
+	default FLED_RT5033_I2C
+	help
+	  Choose which control signal to use for enabling/disabling torch and flash light.
+
+config FLED_RT5033_I2C
+	bool "I2C"
+	help
+	  Use I2C to enable/disable torch and flash light.
+	  If unsure, say N.
+
+config FLED_RT5033_EXT_GPIO
+	bool "External(or ISP) GPIO"
+	help
+	  Use GPIO pins to enable/disable torch and flash light.
+	  If unsure, say N.
+endchoice
 comment "LED Triggers"
 source "drivers/leds/trigger/Kconfig"
 

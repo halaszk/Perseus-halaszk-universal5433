@@ -33,6 +33,7 @@
 #include "fc8080_tun.h"
 #include "fc8080_regs.h"
 
+#ifndef CONFIG_TDMB_XTAL_FREQ
 #if (FC8080_FREQ_XTAL == 16000)
 #define CLOCK_RATIO 34359738 /* 33554432 * ((float) 1.024) */
 #elif (FC8080_FREQ_XTAL == 16384)
@@ -53,6 +54,7 @@
 #define CLOCK_RATIO 22347251 /* 33554432 * ((float) 0.666) */
 #elif (FC8080_FREQ_XTAL == 38400)
 #define CLOCK_RATIO 28631996 /* 33554432 * ((float) 0.8533) */
+#endif
 #endif
 
 struct tuner_i2c_driver {
@@ -145,7 +147,32 @@ s32 tuner_set_freq(HANDLE handle, u32 freq)
 		return BBM_NOK;
 	}
 
+#ifdef CONFIG_TDMB_XTAL_FREQ
+	if (main_xtal_freq == 16000)
+		tmp = (u8) (34359738 / freq); /* 33554432 * ((float) 1.024) */
+	else if (main_xtal_freq == 16384)
+		tmp = (u8) (33554432 / freq); /* 33554432 * ((float) 1.) */
+	else if (main_xtal_freq == 19200)
+		tmp = (u8) (28631996 / freq); /* 33554432 * ((float) 0.8533) */
+	else if (main_xtal_freq == 24000)
+		tmp = (u8) (22347251 / freq); /* 33554432 * ((float) 0.666) */
+	else if (main_xtal_freq == 24576)
+		tmp = (u8) (33554432 / freq); /* 33554432 * ((float) 1.) */
+	else if (main_xtal_freq == 26000)
+		tmp = (u8) (31715649 / freq); /* 33554432 * ((float) 0.9452) */
+	else if (main_xtal_freq == 27000)
+		tmp = (u8) (30541244 / freq); /* 33554432 * ((float) 0.9102) */
+	else if (main_xtal_freq == 27120)
+		tmp = (u8) (30403670 / freq); /* 33554432 * ((float) 0.9061) */
+	else if (main_xtal_freq == 32000)
+		tmp = (u8) (22347251 / freq); /* 33554432 * ((float) 0.666) */
+	else if (main_xtal_freq == 38400)
+		tmp = (u8) (28631996 / freq); /* 33554432 * ((float) 0.8533) */
+	else
+		tmp = (u8) (33554432 / freq);
+#else
 	tmp = (u8) (CLOCK_RATIO / freq);
+#endif
 	bbm_write(handle, BBM_INV_CARRIER_FREQ, tmp);
 
 	fc8080_reset(handle);

@@ -14,14 +14,15 @@
 #define __JPEG_REGS_H__
 
 #include "jpeg.h"
+#include "regs_jpeg_v4_x.h"
 
 void jpeg_sw_reset(void __iomem *base);
 void jpeg_set_enc_dec_mode(void __iomem *base, enum jpeg_mode mode);
 void jpeg_set_image_fmt(void __iomem *base, u32 cfg);
-void jpeg_set_enc_tbl(void __iomem *base,
-		enum jpeg_img_quality_level level);
-void jpeg_set_dec_tbl(void __iomem *base,
-		struct jpeg_tables *tables);
+void jpeg_set_enc_custom_tbl(void __iomem *base, const unsigned char qtbl[]);
+void jpeg_set_enc_tbl(void __iomem *base, unsigned int quality_factor);
+void jpeg_set_encode_huffman_table(void __iomem *base);
+void jpeg_set_dec_tbl(void __iomem *base, struct jpeg_tables *tables);
 void jpeg_set_interrupt(void __iomem *base);
 void jpeg_clean_interrupt(void __iomem *base);
 unsigned int jpeg_get_int_status(void __iomem *base);
@@ -32,8 +33,6 @@ void jpeg_set_image_addr(void __iomem *base, struct m2m1shot_buffer_dma *buf,
 void jpeg_set_stream_addr(void __iomem *base, unsigned int address);
 void jpeg_set_stream_size(void __iomem *base,
 		unsigned int x_value, unsigned int y_value);
-void jpeg_set_encode_tbl_select(void __iomem *base,
-		enum jpeg_img_quality_level level);
 void jpeg_set_decode_tbl_select(void __iomem *base,
 		struct jpeg_tables_info *tinfo);
 void jpeg_set_encode_hoff_cnt(void __iomem *base, unsigned int fourcc);
@@ -51,4 +50,17 @@ void jpeg_set_window_margin(void __iomem *base, unsigned int top,
 void jpeg_get_window_margin(void __iomem *base, unsigned int *top,
 		unsigned int *bottom, unsigned int *left, unsigned int *right);
 void jpeg_set_decode_huff_cnt(void __iomem *base, unsigned int cnt);
+void jpeg_show_sfr_status(void __iomem *base);
+
+static inline void jpeg_set_encode_tbl_select(void __iomem *base)
+{
+	u32 reg = S5P_JPEG_Q_TBL_COMP1_0 |
+			S5P_JPEG_Q_TBL_COMP2_1 |
+			S5P_JPEG_Q_TBL_COMP3_1 |
+			S5P_JPEG_HUFF_TBL_COMP1_AC_0_DC_0 |
+			S5P_JPEG_HUFF_TBL_COMP2_AC_1_DC_1 |
+			S5P_JPEG_HUFF_TBL_COMP3_AC_1_DC_1;
+	__raw_writel(reg, base + S5P_JPEG_TBL_SEL_REG);
+}
+
 #endif /* __JPEG_REGS_H__ */

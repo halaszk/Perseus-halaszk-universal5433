@@ -29,6 +29,7 @@
 #include <linux/mfd/max77888-private.h>
 
 static const u8 max77888_mask_reg[] = {
+	[LED_INT] = MAX77888_LED_REG_FLASH_INT_MASK,
 	[TOPSYS_INT] = MAX77888_PMIC_REG_TOPSYS_INT_MASK,
 	[CHG_INT] = MAX77888_CHG_REG_CHG_INT_MASK,
 	[MUIC_INT1] = MAX77888_MUIC_REG_INTMASK1,
@@ -56,6 +57,12 @@ struct max77888_irq_data {
 #define DECLARE_IRQ(idx, _group, _mask)		\
 	[(idx)] = { .group = (_group), .mask = (_mask) }
 static const struct max77888_irq_data max77888_irqs[] = {
+	DECLARE_IRQ(MAX77888_LED_IRQ_FLED2_OPEN,	LED_INT, 1 << 0),
+	DECLARE_IRQ(MAX77888_LED_IRQ_FLED2_SHORT,	LED_INT, 1 << 1),
+	DECLARE_IRQ(MAX77888_LED_IRQ_FLED1_OPEN,	LED_INT, 1 << 2),
+	DECLARE_IRQ(MAX77888_LED_IRQ_FLED1_SHORT,	LED_INT, 1 << 3),
+	DECLARE_IRQ(MAX77888_LED_IRQ_MAX_FLASH,	LED_INT, 1 << 4),
+
 	DECLARE_IRQ(MAX77888_TOPSYS_IRQ_T120C_INT,	TOPSYS_INT, 1 << 0),
 	DECLARE_IRQ(MAX77888_TOPSYS_IRQ_T140C_INT,	TOPSYS_INT, 1 << 1),
 	DECLARE_IRQ(MAX77888_TOPSYS_IRQLOWSYS_INT,	TOPSYS_INT, 1 << 3),
@@ -210,6 +217,14 @@ static irqreturn_t max77888_irq_thread(int irq, void *data)
 				&irq_reg[TOPSYS_INT]);
 		pr_info("%s: topsys interrupt(0x%02x)\n",
 				__func__, irq_reg[TOPSYS_INT]);
+	}
+
+	if (irq_src & MAX77888_IRQSRC_FLASH) {
+		/* LED_INT */
+		ret = max77888_read_reg(max77888->i2c,
+				MAX77888_LED_REG_FLASH_INT, &irq_reg[LED_INT]);
+		pr_info("%s: led interrupt(0x%02x)\n",
+				__func__, irq_reg[LED_INT]);
 	}
 
 	if (irq_src & MAX77888_IRQSRC_MUIC) {
@@ -377,7 +392,7 @@ int max77888_irq_init(struct max77888_dev *max77888)
 			return ret;
 		}
 	}
-	/* WA for MUIC RESET */  	
+	/* WA for MUIC RESET */
 
 	return 0;
 }

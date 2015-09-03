@@ -2689,7 +2689,7 @@ struct samsung_gate_clock exynos5433_gate_clks[] __initdata = {
 	CGTE(gate_dsd_clk, "gate_dsd_clk", NULL, EXYNOS5430_ENABLE_IP_MIF3, 8, CLK_IGNORE_UNUSED, 0),
 #else
 	CGTE(gate_decontv_eclk, "gate_decontv_eclk", NULL, EXYNOS5430_ENABLE_IP_MIF3, 7, 0, 0),
-#ifdef CONFIG_DECON_LCD_S6TNMR7
+#if !defined(CONFIG_FB_HIBERNATION_DISPLAY_CLOCK_GATING)
 	CGTE(gate_dsd_clk, "gate_dsd_clk", NULL, EXYNOS5430_ENABLE_IP_MIF3, 8, CLK_IGNORE_UNUSED, 0),
 #else
 	CGTE(gate_dsd_clk, "gate_dsd_clk", NULL, EXYNOS5430_ENABLE_IP_MIF3, 8, 0, 0),

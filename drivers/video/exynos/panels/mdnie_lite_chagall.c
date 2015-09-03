@@ -46,7 +46,7 @@ static struct class *mdnie_class;
 #ifdef ASCR_BIT_SHIFT
 static void inline store_ascr(struct mdnie_table *table, int pos, mdnie_t data)
 {
-	mdnie_t * wbuf = &(table->tune[ASCR_CMD].sequence[pos]);
+	mdnie_t * wbuf = &(table->seq[ASCR_CMD].cmd[pos]);
 	unsigned short * tmp = (unsigned short *)wbuf;
 	int bit_shift = ASCR_BIT_SHIFT;
 
@@ -56,7 +56,7 @@ static void inline store_ascr(struct mdnie_table *table, int pos, mdnie_t data)
 
 static mdnie_t inline read_ascr(struct mdnie_table *table, int pos)
 {
-	mdnie_t * wbuf = &(table->tune[ASCR_CMD].sequence[pos]);
+	mdnie_t * wbuf = &(table->seq[ASCR_CMD].cmd[pos]);
 	unsigned short * tmp = (unsigned short *)wbuf;
 	int bit_shift = ASCR_BIT_SHIFT;
 
@@ -65,14 +65,14 @@ static mdnie_t inline read_ascr(struct mdnie_table *table, int pos)
 #else
 static void inline store_ascr(struct mdnie_table *table, int pos, mdnie_t data)
 {
-	mdnie_t * wbuf = &(table->tune[ASCR_CMD].sequence[pos]);
+	mdnie_t * wbuf = &(table->seq[ASCR_CMD].cmd[pos]);
 
 	*wbuf = data;
 }
 
 static mdnie_t inline read_ascr(struct mdnie_table *table, int pos)
 {
-	mdnie_t * wbuf = &(table->tune[ASCR_CMD].sequence[pos]);
+	mdnie_t * wbuf = &(table->seq[ASCR_CMD].cmd[pos]);
 
 	return *wbuf;
 }
@@ -89,14 +89,14 @@ static int mdnie_write(struct mdnie_info *mdnie, struct mdnie_table *table)
 
 #ifdef MDNIE_USE_SET_ADDR
 	ret = md->ops->set_addr(md->dev.parent, MDNIE_SEQUENCE_OFFSET_1);
-	ret = md->ops->write(md->dev.parent, table->tune[MDNIE_CMD1].sequence,
-							table->tune[MDNIE_CMD1].size);
+	ret = md->ops->write(md->dev.parent, table->seq[MDNIE_CMD1].cmd,
+							table->seq[MDNIE_CMD1].len);
 	ret = md->ops->set_addr(md->dev.parent, MDNIE_SEQUENCE_OFFSET_2);
-	ret = md->ops->write(md->dev.parent, table->tune[MDNIE_CMD2].sequence,
-							table->tune[MDNIE_CMD2].size);
+	ret = md->ops->write(md->dev.parent, table->seq[MDNIE_CMD2].cmd,
+							table->seq[MDNIE_CMD2].len);
 #else
-	for (i = 0; i < ARRAY_SIZE(table->tune); i++) {
-			ret = md->ops->write(md->dev.parent, table->tune[i].sequence, table->tune[i].size);
+	for (i = 0; i < ARRAY_SIZE(table->seq); i++) {
+			ret = md->ops->write(md->dev.parent, table->seq[i].cmd, table->seq[i].len);
 	}
 #endif
 
@@ -109,8 +109,8 @@ static int mdnie_write_table(struct mdnie_info *mdnie, struct mdnie_table *table
 	struct mdnie_table *buf = NULL;
 
 	for (i = 0; i < MDNIE_CMD_MAX; i++) {
-		if (IS_ERR_OR_NULL(table->tune[i].sequence)) {
-			dev_err(mdnie->dev, "mdnie sequence %s is null, %x\n", table->name, (u32)table->tune[i].sequence);
+		if (IS_ERR_OR_NULL(table->seq[i].cmd)) {
+			dev_err(mdnie->dev, "mdnie sequence %s is null, %x\n", table->name, (u32)table->seq[i].cmd);
 			return -EPERM;
 		}
 	}
@@ -149,7 +149,7 @@ static struct mdnie_table *mdnie_find_table(struct mdnie_info *mdnie)
 		goto exit;
 #endif
 	} else if (IS_SCENARIO(mdnie->scenario)) {
-		table = &tuning_table[mdnie->scenario][mdnie->mode];
+		table = &main_table[mdnie->scenario][mdnie->mode];
 		goto exit;
 	}
 
@@ -208,10 +208,10 @@ static void update_color_position(struct mdnie_info *mdnie, unsigned int idx)
 
 	for (mode = 0; mode < MODE_MAX; mode++) {
 		for (scenario = 0; scenario <= EMAIL_MODE; scenario++) {
-			wbuf = tuning_table[scenario][mode].tune[ASCR_CMD].sequence;
+			wbuf = main_table[scenario][mode].seq[ASCR_CMD].cmd;
 			if (IS_ERR_OR_NULL(wbuf))
 				continue;
-			table = &tuning_table[scenario][mode];
+			table = &main_table[scenario][mode];
 			if ((read_ascr(table, MDNIE_WHITE_R) == 0xff)
 				&& (read_ascr(table, MDNIE_WHITE_G) == 0xff)
 				&& (read_ascr(table, MDNIE_WHITE_B) == 0xff)) {
@@ -360,12 +360,12 @@ static ssize_t tuning_show(struct device *dev,
 	table = mdnie_find_table(mdnie);
 	if (!IS_ERR_OR_NULL(table) && !IS_ERR_OR_NULL(table->name)) {
 		table = mdnie_request_table(mdnie->path, table);
-		for (i = 0; i < table->tune[MDNIE_CMD1].size; i++)
-			pos += sprintf(pos, "0x%02x ", table->tune[MDNIE_CMD1].sequence[i]);
+		for (i = 0; i < table->seq[MDNIE_CMD1].len; i++)
+			pos += sprintf(pos, "0x%02x ", table->seq[MDNIE_CMD1].cmd[i]);
 		pos += sprintf(pos, "\n");
 		if (MDNIE_CMD1 != MDNIE_CMD2) {
-			for (i = 0; i < table->tune[MDNIE_CMD2].size; i++)
-				pos += sprintf(pos, "0x%02x ", table->tune[MDNIE_CMD2].sequence[i]);
+			for (i = 0; i < table->seq[MDNIE_CMD2].len; i++)
+				pos += sprintf(pos, "0x%02x ", table->seq[MDNIE_CMD2].cmd[i]);
 		}
 	}
 
@@ -582,18 +582,18 @@ static ssize_t mdnie_show(struct device *dev,
 	table = mdnie_find_table(mdnie);
 
 	for (i = 0; i < MDNIE_CMD_MAX; i++) {
-		if (IS_ERR_OR_NULL(table->tune[i].sequence)) {
-			dev_err(mdnie->dev, "mdnie sequence %s is null, %x\n", table->name, (u32)table->tune[i].sequence);
+		if (IS_ERR_OR_NULL(table->seq[i].cmd)) {
+			dev_err(mdnie->dev, "mdnie sequence %s is null, %x\n", table->name, (u32)table->seq[i].cmd);
 			goto exit;
 		}
 	}
 
-	md->ops->write(md->dev.parent, table->tune[LEVEL1_KEY_UNLOCK].sequence, table->tune[LEVEL1_KEY_UNLOCK].size);
+	md->ops->write(md->dev.parent, table->seq[LEVEL_KEY_UNLOCK].cmd, table->seq[LEVEL_KEY_UNLOCK].len);
 
 	pos += sprintf(pos, "+ %s\n", table->name);
 
 	for (j = MDNIE_CMD1; j <= MDNIE_CMD2; j++) {
-		buffer = kzalloc(table->tune[j].size, GFP_KERNEL);
+		buffer = kzalloc(table->seq[j].len, GFP_KERNEL);
 
 #ifdef MDNIE_USE_SET_ADDR
 		if (j == MDNIE_CMD1)
@@ -602,11 +602,11 @@ static ssize_t mdnie_show(struct device *dev,
 			md->ops->set_addr(md->dev.parent, MDNIE_SEQUENCE_OFFSET_2);
 #endif
 
-		md->ops->read(md->dev.parent, table->tune[j].sequence[0], buffer, table->tune[j].size - 1);
+		md->ops->read(md->dev.parent, table->seq[j].cmd[0], buffer, table->seq[j].len - 1);
 
-		for (i = 0; i < table->tune[j].size - 1; i++) {
-			pos += sprintf(pos, "%3d:\t0x%02x\t0x%02x", i + 1, table->tune[j].sequence[i+1], buffer[i]);
-			if (table->tune[j].sequence[i+1] != buffer[i])
+		for (i = 0; i < table->seq[j].len - 1; i++) {
+			pos += sprintf(pos, "%3d:\t0x%02x\t0x%02x", i + 1, table->seq[j].cmd[i+1], buffer[i]);
+			if (table->seq[j].cmd[i+1] != buffer[i])
 				pos += sprintf(pos, "\t(X)");
 			pos += sprintf(pos, "\n");
 		}
@@ -616,7 +616,7 @@ static ssize_t mdnie_show(struct device *dev,
 
 	pos += sprintf(pos, "- %s\n", table->name);
 
-	md->ops->write(md->dev.parent, table->tune[LEVEL1_KEY_LOCK].sequence, table->tune[LEVEL1_KEY_LOCK].size);
+	md->ops->write(md->dev.parent, table->seq[LEVEL_KEY_LOCK].cmd, table->seq[LEVEL_KEY_LOCK].len);
 
 exit:
 	return pos - buf;
@@ -655,9 +655,9 @@ static ssize_t sensorRGB_store(struct device *dev,
 		memcpy(&(mdnie->table_buffer),
 			table, sizeof(struct mdnie_table));
 		memcpy(mdnie->sequence_buffer,
-			table->tune[ASCR_CMD].sequence,
-			table->tune[ASCR_CMD].size);
-		mdnie->table_buffer.tune[ASCR_CMD].sequence
+			table->seq[ASCR_CMD].cmd,
+			table->seq[ASCR_CMD].len);
+		mdnie->table_buffer.seq[ASCR_CMD].cmd
 			= mdnie->sequence_buffer;
 
 		store_ascr(&mdnie->table_buffer, MDNIE_WHITE_R,

@@ -33,7 +33,7 @@ extern int exynos_smc(u32 cmd, u32 arg1, u32 arg2, u32 arg3);
 unsigned int kap_on_reboot = 0;  // 1: turn on kap after reboot; 0: no pending ON action
 unsigned int kap_off_reboot = 0; // 1: turn off kap after reboot; 0: no pending OFF action
 
-#ifdef CONFIG_SOC_EXYNOS5433
+#if defined(CONFIG_SOC_EXYNOS5433) || defined(CONFIG_SOC_EXYNOS5430)
 #if defined(__GNUC__) && \
 	defined(__GNUC_MINOR__) && \
 	defined(__GNUC_PATCHLEVEL__) && \

@@ -68,6 +68,7 @@
 #define KEYCODE_REG			0x03
 #define BASE_REG			0x00
 #define TK_STATUS_FLAG		0x07
+#define CYPRESS_DETECTION_FLAG		0x08
 #define TK_DIFF_DATA		0x16
 #define TK_RAW_DATA			0x1E
 #define TK_IDAC				0x0D
@@ -90,6 +91,7 @@
 
 #define TK_BIT_WRITE_CONFIRM	0xAA
 #define TK_BIT_EXIT_CONFIRM	0xBB
+#define TK_BIT_DETECTION_CONFIRM	0xEE
 
 /* Status flag after sending command*/
 #define TK_BIT_LEDCONTROL   0x40    // Owner for LED on/off control (0:host / 1:TouchIC)
@@ -100,6 +102,7 @@
 #define TK_BIT_REGULAR		0x02    // regular mode = normal mode
 #define TK_BIT_LED_STATUS	0x01    // LED status
 
+#define TK_CMD_DUAL_DETECTION	0x01
 #define TK_CMD_LED_ON		0x10
 #define TK_CMD_LED_OFF		0x20
 
@@ -253,6 +256,7 @@ struct touchkey_i2c {
 	struct mode_change_data mc_data;
 	int ic_mode;
 	int tsk_enable_glove_mode;
+	int support_multi_touch;
 };
 
 extern struct class *sec_class;

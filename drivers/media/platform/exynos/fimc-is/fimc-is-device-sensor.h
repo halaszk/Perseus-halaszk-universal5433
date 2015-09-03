@@ -107,6 +107,10 @@ struct fimc_is_module_enum {
 	u32				pixel_height;
 	u32				active_width;
 	u32				active_height;
+	u32				margin_left;
+	u32				margin_right;
+	u32				margin_top;
+	u32				margin_bottom;
 	u32				max_framerate;
 	u32				position;
 	u32				mode;

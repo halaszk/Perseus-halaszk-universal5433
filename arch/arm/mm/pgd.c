@@ -27,6 +27,8 @@
 #define __pgd_free(pgd)	free_pages((unsigned long)pgd, 2)
 #endif
 
+extern int boot_mode_security;
+
 /*
  * need to get a 16k page for level 1
  */
@@ -173,18 +175,20 @@ no_pgd:
 	}
 #endif
 #ifdef  CONFIG_TIMA_RKP_L1_TABLES
-	__asm__ __volatile__ (
-		"stmfd  sp!,{r0-r2}\n"
-		"mov   	r2, r0\n"  /*mcr_val in r2 in fastcall */
-		"mov    r0, %0\n"
-		"mov    r1, %1\n"
-		rkp_call
-		"mov    r0, #0\n"
-		"mcr    p15, 0, r0, c8, c3, 0\n"
-		"dsb\n"
-		"isb\n"
-		"pop    {r0-r2}\n"
-		::"r"(cmd_id),"r"(pgd):"r0","r1","r2","cc");
+	if(boot_mode_security) {
+		__asm__ __volatile__ (
+			"stmfd  sp!,{r0-r2}\n"
+			"mov   	r2, r0\n"  /*mcr_val in r2 in fastcall */
+			"mov    r0, %0\n"
+			"mov    r1, %1\n"
+			rkp_call
+			"mov    r0, #0\n"
+			"mcr    p15, 0, r0, c8, c3, 0\n"
+			"dsb\n"
+			"isb\n"
+			"pop    {r0-r2}\n"
+			::"r"(cmd_id),"r"(pgd):"r0","r1","r2","cc");
+	}
 #endif
 	__pgd_free(pgd_base);
 }

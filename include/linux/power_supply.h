@@ -193,6 +193,7 @@ enum power_supply_type {
 	POWER_SUPPLY_TYPE_MHL_2000,
 	POWER_SUPPLY_TYPE_HV_UNKNOWN,
 	POWER_SUPPLY_TYPE_MDOCK_TA,        /* Mdock charger */
+	POWER_SUPPLY_TYPE_MDOCK_USB,       /* Mdock USB */
 	POWER_SUPPLY_TYPE_WIRELESS_REMOVE, /* Always last value (23)*/
 };
 /* EXTENDED_ONLINE_TYPE */

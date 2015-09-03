@@ -1322,6 +1322,11 @@ static long misc_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		}
 
 		return 0;
+	case IOCTL_MODEM_WATCHDOG_CRASH:
+		mif_info("%s: IOCTL_MODEM_CP_WATCHDOG_CRASH\n", iod->name);
+		iod->mc->phone_state = STATE_CRASH_WATCHDOG;
+		return 0;
+
 	default:
 		 /* If you need to handle the ioctl for specific link device,
 		  * then assign the link ioctl handler to ld->ioctl

@@ -287,9 +287,9 @@ static int max77843_get_charging_health(struct max77843_charger_data *charger)
 					state = POWER_SUPPLY_HEALTH_GOOD;
 			}
 		} else if (((vbus_state == 0x0) || (vbus_state == 0x01)) || \
-			   ((chg_dtls & 0x08) &&			\
-			    (chg_cnfg_00 & MAX77843_MODE_BUCK) &&	\
-			    (chg_cnfg_00 & MAX77843_MODE_CHGR) &&	\
+			   ((chg_dtls & 0x08) &&		      \
+				(chg_cnfg_00 & MAX77843_MODE_BUCK) && \
+				(chg_cnfg_00 & MAX77843_MODE_CHGR) && \
 			    (charger->cable_type != POWER_SUPPLY_TYPE_WIRELESS))) {
 			pr_info("%s: vbus is under\n", __func__);
 			state = POWER_SUPPLY_HEALTH_UNDERVOLTAGE;
@@ -398,6 +398,21 @@ static void max77843_set_buck(struct max77843_charger_data *charger,
 			   MAX77843_CHG_REG_CHG_CNFG_00, reg_data);
 }
 
+static void max77843_change_charge_path(struct max77843_charger_data *charger,
+		int path)
+{
+	u8 cnfg12;
+
+	if (path == POWER_SUPPLY_TYPE_WIRELESS) {
+		cnfg12 = (0 << CHG_CNFG_12_CHGINSEL_SHIFT);
+	} else {
+		cnfg12 = (1 << CHG_CNFG_12_CHGINSEL_SHIFT);
+	}
+
+	max77843_update_reg(charger->i2c, MAX77843_CHG_REG_CHG_CNFG_12,
+			cnfg12,	CHG_CNFG_12_CHGINSEL_MASK);
+}
+
 static void max77843_set_input_current(struct max77843_charger_data *charger,
 				       int input_current)
 {
@@ -418,8 +433,10 @@ static void max77843_set_input_current(struct max77843_charger_data *charger,
 
 	if (input_current <= 0)
 		max77843_set_buck(charger, DISABLE);
-	else
+	else {
+		max77843_change_charge_path(charger, charger->cable_type);
 		max77843_set_buck(charger, ENABLE);
+	}
 
 	if (!input_current) {
 		max77843_write_reg(charger->i2c,

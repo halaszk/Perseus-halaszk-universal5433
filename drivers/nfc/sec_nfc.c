@@ -50,7 +50,9 @@
 #include <linux/wakelock.h>
 #include <linux/of_gpio.h>
 #include <linux/clk.h>
-
+#ifdef CONFIG_SEC_NFC_LDO_CONTROL
+#include <linux/regulator/consumer.h>
+#endif
 #ifdef CONFIG_SOC_EXYNOS5433
 #include <mach/regs-clock-exynos5433.h>
 #endif
@@ -130,7 +132,12 @@ static irqreturn_t sec_nfc_irq_thread_fn(int irq, void *dev_id)
 	mutex_unlock(&info->i2c_info.read_mutex);
 
 	wake_up_interruptible(&info->i2c_info.read_wait);
-	wake_lock_timeout(&info->nfc_wake_lock, 2*HZ);
+
+	if(!wake_lock_active(&info->nfc_wake_lock))
+	{
+		dev_dbg(info->dev, "%s: Set wake_lock_timeout for 2 sec. !!!\n", __func__);
+		wake_lock_timeout(&info->nfc_wake_lock, 2*HZ);
+	}
 
 	return IRQ_HANDLED;
 }
@@ -300,7 +307,39 @@ out:
 
 	return ret;
 }
+#ifdef CONFIG_SEC_NFC_LDO_CONTROL
+static int sec_nfc_regulator_onoff(struct sec_nfc_platform_data *data, int onoff)
+{
+	int rc = 0;
+	struct regulator *regulator_i2c_1p8;
 
+	regulator_i2c_1p8 = regulator_get(NULL, data->i2c_1p8);
+	if (IS_ERR(regulator_i2c_1p8) || regulator_i2c_1p8 == NULL) {
+		pr_err("%s - i2c_1p8 regulator_get fail\n", __func__);
+		return -ENODEV;
+	}
+
+	pr_info("%s - onoff = %d\n", __func__, onoff);
+
+	if (onoff == NFC_I2C_LDO_ON) {
+		rc = regulator_enable(regulator_i2c_1p8);
+		if (rc) {
+			pr_err("%s - enable i2c_1p8 failed, rc=%d\n",
+				__func__, rc);
+		}
+	} else {
+		rc = regulator_disable(regulator_i2c_1p8);
+		if (rc) {
+			pr_err("%s - disable i2c_1p8 failed, rc=%d\n",
+				__func__, rc);
+		}
+	}
+
+	regulator_put(regulator_i2c_1p8);
+
+	return rc;
+}
+#endif
 void sec_nfc_i2c_irq_clear(struct sec_nfc_info *info)
 {
 	/* clear interrupt. Interrupt will be occured at power off */
@@ -337,6 +376,18 @@ int sec_nfc_i2c_probe(struct i2c_client *client)
                 goto err_irq_req;
 	}
 	gpio_direction_input(pdata->irq);
+
+#ifdef CONFIG_SEC_NFC_LDO_CONTROL
+	if (pdata->i2c_1p8 != NULL) {
+		if(!lpcharge) {
+			ret = sec_nfc_regulator_onoff(pdata, NFC_I2C_LDO_ON);
+			if (ret < 0)
+				pr_err("%s max86900_regulator_on fail err = %d\n",
+					__func__, ret);
+			usleep_range(1000, 1100);
+		}
+	}
+#endif
 
 	ret = request_threaded_irq(client->irq, NULL, sec_nfc_irq_thread_fn,
 			IRQF_TRIGGER_RISING | IRQF_ONESHOT, SEC_NFC_DRIVER_NAME,
@@ -640,7 +691,13 @@ static int sec_nfc_parse_dt(struct device *dev,
 #ifdef CONFIG_SEC_NFC_CLK_REQ
 	pdata->clk_req = of_get_named_gpio(np, "sec-nfc,clk_req-gpio", 0);
 #endif
-
+#ifdef CONFIG_SEC_NFC_LDO_CONTROL
+	if (of_property_read_string(np, "sec-nfc,i2c_1p8",
+		&pdata->i2c_1p8) < 0) {
+		pr_err("%s - get i2c_1p8 error\n", __func__);
+		pdata->i2c_1p8 = NULL;
+	}
+#endif
 	pr_info("%s: irq : %d, ven : %d, firm : %d\n",
 			__func__, pdata->irq, pdata->ven, pdata->firm);
 	return 0;

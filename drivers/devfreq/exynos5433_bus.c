@@ -2142,6 +2142,7 @@ int exynos5433_devfreq_isp_deinit(struct devfreq_data_isp *data)
 /* ========== 3. MIF related function */
 #define TRAFFIC_BYTES_HD_32BIT_60FPS		(1280*720*4*60)
 #define TRAFFIC_BYTES_FHD_32BIT_60FPS		(1920*1080*4*60)
+#define TRAFFIC_BYTES_QXGA_32BIT_60FPS		(1536*2048*4*60)
 #define TRAFFIC_BYTES_WQHD_32BIT_60FPS		(2560*1440*4*60)
 #define TRAFFIC_BYTES_WQXGA_32BIT_60FPS		(2560*1600*4*60)
 
@@ -2833,6 +2834,7 @@ unsigned int timeout_wqhd_ud_encode[][2] = {
 
 enum devfreq_mif_thermal_autorate {
 	RATE_ONE = 0x000B005D,
+	RATE_3_4 = 0x00080045,
 	RATE_HALF = 0x0005002E,
 	RATE_QUARTER = 0x00030017,
 };
@@ -2846,11 +2848,19 @@ static struct workqueue_struct *devfreq_mif_thermal_wq_ch0;
 static struct workqueue_struct *devfreq_mif_thermal_wq_ch1;
 struct devfreq_thermal_work devfreq_mif_ch0_work = {
 	.channel = THERMAL_CHANNEL0,
+#if defined(CONFIG_ARM_EXYNOS5433_BUS_DEVFREQ_THERMAL_POLICY_3_4)
+	.polling_period = 300,
+#else
 	.polling_period = 1000,
+#endif /* CONFIG_ARM_EXYNOS5433_BUS_DEVFREQ_THERMAL_POLICY_3_4 */
 };
 struct devfreq_thermal_work devfreq_mif_ch1_work = {
 	.channel = THERMAL_CHANNEL1,
+#if defined(CONFIG_ARM_EXYNOS5433_BUS_DEVFREQ_THERMAL_POLICY_3_4)
+	.polling_period = 300,
+#else
 	.polling_period = 1000,
+#endif /* CONFIG_ARM_EXYNOS5433_BUS_DEVFREQ_THERMAL_POLICY_3_4 */
 };
 struct devfreq_data_mif *data_mif;
 
@@ -3340,6 +3350,9 @@ void exynos5_update_media_layers(enum devfreq_media_type media_type, unsigned in
 				break;
 			case TRAFFIC_BYTES_FHD_32BIT_60FPS:
 				media_resolution = RESOLUTION_FULLHD;
+				break;
+			case TRAFFIC_BYTES_QXGA_32BIT_60FPS:
+				media_resolution = RESOLUTION_WQHD;
 				break;
 			case TRAFFIC_BYTES_WQHD_32BIT_60FPS:
 				media_resolution = RESOLUTION_WQHD;
@@ -3903,7 +3916,11 @@ static void exynos5_devfreq_thermal_monitor(struct work_struct *work)
 	struct devfreq_thermal_work *thermal_work =
 			container_of(d_work, struct devfreq_thermal_work, devfreq_mif_thermal_work);
 	unsigned int mrstatus, tmp_thermal_level, max_thermal_level = 0, tmp;
+#if defined(CONFIG_ARM_EXYNOS5433_BUS_DEVFREQ_THERMAL_POLICY_3_4)
+	unsigned int timingaref_value = RATE_3_4;
+#else
 	unsigned int timingaref_value = RATE_ONE;
+#endif /* CONFIG_ARM_EXYNOS5433_BUS_DEVFREQ_THERMAL_POLICY_3_4 */
 	unsigned long max_freq = data_mif->cal_qos_max;
 	bool throttling = false;
 	void __iomem *base_drex = NULL;
@@ -3940,8 +3957,13 @@ static void exynos5_devfreq_thermal_monitor(struct work_struct *work)
 	case 1:
 	case 2:
 	case 3:
+#if defined(CONFIG_ARM_EXYNOS5433_BUS_DEVFREQ_THERMAL_POLICY_3_4)
+		timingaref_value = RATE_3_4;
+		thermal_work->polling_period = 300;
+#else
 		timingaref_value = RATE_ONE;
 		thermal_work->polling_period = 1000;
+#endif /* CONFIG_ARM_EXYNOS5433_BUS_DEVFREQ_THERMAL_POLICY_3_4 */
 		break;
 	case 4:
 		timingaref_value = RATE_HALF;

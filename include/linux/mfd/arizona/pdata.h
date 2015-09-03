@@ -13,31 +13,26 @@
 #ifndef _ARIZONA_PDATA_H
 #define _ARIZONA_PDATA_H
 
-#define ARIZONA_GPN_DIR                          0x8000  /* GPN_DIR */
+#include <dt-bindings/mfd/arizona.h>
+
 #define ARIZONA_GPN_DIR_MASK                     0x8000  /* GPN_DIR */
 #define ARIZONA_GPN_DIR_SHIFT                        15  /* GPN_DIR */
 #define ARIZONA_GPN_DIR_WIDTH                         1  /* GPN_DIR */
-#define ARIZONA_GPN_PU                           0x4000  /* GPN_PU */
 #define ARIZONA_GPN_PU_MASK                      0x4000  /* GPN_PU */
 #define ARIZONA_GPN_PU_SHIFT                         14  /* GPN_PU */
 #define ARIZONA_GPN_PU_WIDTH                          1  /* GPN_PU */
-#define ARIZONA_GPN_PD                           0x2000  /* GPN_PD */
 #define ARIZONA_GPN_PD_MASK                      0x2000  /* GPN_PD */
 #define ARIZONA_GPN_PD_SHIFT                         13  /* GPN_PD */
 #define ARIZONA_GPN_PD_WIDTH                          1  /* GPN_PD */
-#define ARIZONA_GPN_LVL                          0x0800  /* GPN_LVL */
 #define ARIZONA_GPN_LVL_MASK                     0x0800  /* GPN_LVL */
 #define ARIZONA_GPN_LVL_SHIFT                        11  /* GPN_LVL */
 #define ARIZONA_GPN_LVL_WIDTH                         1  /* GPN_LVL */
-#define ARIZONA_GPN_POL                          0x0400  /* GPN_POL */
 #define ARIZONA_GPN_POL_MASK                     0x0400  /* GPN_POL */
 #define ARIZONA_GPN_POL_SHIFT                        10  /* GPN_POL */
 #define ARIZONA_GPN_POL_WIDTH                         1  /* GPN_POL */
-#define ARIZONA_GPN_OP_CFG                       0x0200  /* GPN_OP_CFG */
 #define ARIZONA_GPN_OP_CFG_MASK                  0x0200  /* GPN_OP_CFG */
 #define ARIZONA_GPN_OP_CFG_SHIFT                      9  /* GPN_OP_CFG */
 #define ARIZONA_GPN_OP_CFG_WIDTH                      1  /* GPN_OP_CFG */
-#define ARIZONA_GPN_DB                           0x0100  /* GPN_DB */
 #define ARIZONA_GPN_DB_MASK                      0x0100  /* GPN_DB */
 #define ARIZONA_GPN_DB_SHIFT                          8  /* GPN_DB */
 #define ARIZONA_GPN_DB_WIDTH                          1  /* GPN_DB */
@@ -45,28 +40,21 @@
 #define ARIZONA_GPN_FN_SHIFT                          0  /* GPN_FN - [6:0] */
 #define ARIZONA_GPN_FN_WIDTH                          7  /* GPN_FN - [6:0] */
 
-#define ARIZONA_MAX_GPIO 5
+#define CLEARWATER_GPN_LVL                           0x8000  /* GPN_LVL */
+#define CLEARWATER_GPN_LVL_MASK                      0x8000  /* GPN_LVL */
+#define CLEARWATER_GPN_LVL_SHIFT                         15  /* GPN_LVL */
+#define CLEARWATER_GPN_LVL_WIDTH                          1  /* GPN_LVL */
 
-#define ARIZONA_32KZ_MCLK1 1
-#define ARIZONA_32KZ_MCLK2 2
-#define ARIZONA_32KZ_NONE  3
+#define ARIZONA_MAX_GPIO_REGS 5
+#define CLEARWATER_MAX_GPIO_REGS 80
 
-#define ARIZONA_MAX_INPUT 4
+#define ARIZONA_MAX_INPUT 12
 
-#define ARIZONA_DMIC_MICVDD   0
-#define ARIZONA_DMIC_MICBIAS1 1
-#define ARIZONA_DMIC_MICBIAS2 2
-#define ARIZONA_DMIC_MICBIAS3 3
-
-#define ARIZONA_MAX_MICBIAS 3
-
-#define ARIZONA_INMODE_DIFF 0
-#define ARIZONA_INMODE_SE   1
-#define ARIZONA_INMODE_DMIC 2
+#define ARIZONA_MAX_MICBIAS 4
 
 #define ARIZONA_MAX_OUTPUT 6
 
-#define ARIZONA_MAX_AIF 3
+#define ARIZONA_MAX_AIF 4
 
 #define ARIZONA_HAP_ACT_ERM 0
 #define ARIZONA_HAP_ACT_LRA 2
@@ -76,7 +64,7 @@
 /* Treat INT_MAX impedance as open circuit */
 #define ARIZONA_HP_Z_OPEN INT_MAX
 
-#define ARIZONA_MAX_DSP	4
+#define ARIZONA_MAX_DSP	7
 
 struct regulator_init_data;
 
@@ -120,8 +108,14 @@ struct arizona_pdata {
 	/* Base GPIO */
 	int gpio_base;
 
-	/** Pin state for GPIO pins */
-	int gpio_defaults[ARIZONA_MAX_GPIO];
+	/** Pin state for GPIO pins
+	 * Defines default pin function and state for each GPIO
+	 *
+	 * 0 = leave at chip default
+	 * values 0x1..0xffff = set to this value
+	 * >0xffff = set to 0
+	 */
+	unsigned int gpio_defaults[CLEARWATER_MAX_GPIO_REGS];
 
 	/**
 	 * Maximum number of channels clocks will be generated for,
@@ -141,6 +135,13 @@ struct arizona_pdata {
 
 	/** set to true if jackdet contact opens on insert */
 	bool jd_invert;
+
+	/**
+	* Set to true to support antenna cable. antenna cable is a 4 pole
+	* cable with open circuit impedance and the usual 3 pole (headphone)
+	* or 4 pole (headset) cables can be plugged into the antenna cable
+	*/
+	bool antenna_supported;
 
 	/** If non-zero don't run headphone detection, report this value */
 	int fixed_hpdet_imp;
@@ -165,11 +166,20 @@ struct arizona_pdata {
 	 */
 	int hpdet_short_circuit_imp;
 
-	/** Use HPDETL to check for moisture, this value specifies the
-	 * threshold impedance in ohms above which it will be considered
-	 * a false detection
+	/**
+	 * Channel to use for moisture detection, valid values are 0 for
+	 * left and 1 for right
 	 */
+	unsigned int moisture_det_channel;
+
+	/**
+	* This value specifies the  threshold impedance in ohms above
+	* which it will be considered a false detection
+	*/
 	int hpdet_moisture_imp;
+
+	/** Software debounces for moisture detect */
+	int hpdet_moisture_debounce;
 
 	/**
 	 * Channel to use for headphone detection, valid values are 0 for
@@ -182,6 +192,19 @@ struct arizona_pdata {
 
 	/** Extra debounce timeout used during initial mic detection (ms) */
 	int micd_detect_debounce;
+
+	/** Extra software debounces during button detection */
+	int micd_manual_debounce;
+
+	/** Software debounces during 3/4 pole plugin into antenna cable */
+	int antenna_manual_debounce;
+
+	/** Software debounces during 3/4 pole plugout from antenna cable */
+	int antenna_manual_db_plugout;
+
+	/** range around hp impedance to be rejected to prevent false button events */
+	int antenna_hp_imp_range_lo;
+	int antenna_hp_imp_range_hi;
 
 	/** GPIO for mic detection polarity */
 	int micd_pol_gpio;
@@ -213,6 +236,9 @@ struct arizona_pdata {
 	/** Mic detect level parameters */
 	const struct arizona_micd_range *micd_ranges;
 	int num_micd_ranges;
+
+	/** Mic detect clamp function */
+	unsigned int micd_clamp_mode;
 
 	/** Headset polarity configurations */
 	struct arizona_micd_config *micd_configs;
@@ -246,7 +272,7 @@ struct arizona_pdata {
 	int irq_gpio;
 
 	/** General purpose switch control */
-	int gpsw;
+	unsigned int gpsw;
 
 	/** Callback which is called when the trigger phrase is detected */
 	void (*ez2ctrl_trigger)(void);
@@ -262,6 +288,9 @@ struct arizona_pdata {
 
 	/** Some platforms add a series resistor for hpdet to suppress pops */
 	int hpdet_ext_res;
+
+	/** Load firmwares for specific chip revisions */
+	bool rev_specific_fw;
 };
 
 #endif

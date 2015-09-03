@@ -1,11 +1,3 @@
-/**
-@file		link_device_lli.c
-@brief		functions for a pseudo shared-memory based on a chip-to-chip
-		(C2C) interface
-@date		2014/02/05
-@author		Hankook Jang (hankook.jang@samsung.com)
-*/
-
 /*
  * Copyright (C) 2010 Samsung Electronics.
  *
@@ -66,9 +58,7 @@ static inline void send_ap2cp_irq(struct mem_link_device *mld, u16 mask)
 
 	gpio_set_value(mld->gpio_ipc_int2cp, val);
 
-#ifdef DEBUG_MODEM_IF
 	trace_send_sig(mask, val);
-#endif
 
 	spin_unlock_irqrestore(&mld->sig_lock, flags);
 #else
@@ -156,7 +146,7 @@ static bool check_link_status(struct mem_link_device *mld)
 
 static void pm_fail_cb(struct modem_link_pm *pm)
 {
-	modemctl_notify_event(MDM_EVENT_CP_FORCE_CRASH);
+	modemctl_notify_event(MDM_CRASH_PM_FAIL);
 }
 
 static void pm_cp_fail_cb(struct modem_link_pm *pm)
@@ -176,7 +166,7 @@ static void pm_cp_fail_cb(struct modem_link_pm *pm)
 		if (mld->stop_pm)
 			mld->stop_pm(mld);
 
-		modemctl_notify_event(MDM_EVENT_CP_FORCE_CRASH);
+		modemctl_notify_event(MDM_CRASH_PM_CP_FAIL);
 		return;
 	}
 
@@ -559,15 +549,10 @@ static int init_pm(struct mem_link_device *mld)
 #endif
 #endif
 
-static void lli_link_ready(struct link_device *ld)
-{
-	mif_err("%s: PM %s <%pf>\n", ld->name, FUNC, CALLER);
-	stop_pm(ld_to_mem_link_device(ld));
-}
-
 static void lli_link_reset(struct link_device *ld)
 {
 	mif_err("%s: PM %s <%pf>\n", ld->name, FUNC, CALLER);
+	mipi_lli_intr_enable();
 	mipi_lli_reset();
 }
 
@@ -580,8 +565,8 @@ static void lli_link_reload(struct link_device *ld)
 static void lli_link_off(struct link_device *ld)
 {
 	mif_err("%s: PM %s <%pf>\n", ld->name, FUNC, CALLER);
+	mipi_lli_intr_disable();
 	stop_pm(ld_to_mem_link_device(ld));
-	mipi_lli_reload();
 }
 
 static bool lli_link_unmounted(struct link_device *ld)
@@ -651,6 +636,7 @@ static struct mem_link_device *g_mld;
  * some hard-coded values are used to limit the size of line and row.
  * need to invent more neater and cleaner way.
  */
+#if 0
 static ssize_t dump_rb_frame(char *buf, size_t size, struct sbd_ring_buffer *rb)
 {
 	int idx;
@@ -732,7 +718,7 @@ static const struct file_operations dbgfs_frame_fops = {
 	.read = dbgfs_frame,
 	.owner = THIS_MODULE
 };
-
+#endif
 static inline void dev_debugfs_add(struct mem_link_device *mld)
 {
 	mld->dbgfs_dir = debugfs_create_dir("svnet", NULL);
@@ -743,8 +729,9 @@ static inline void dev_debugfs_add(struct mem_link_device *mld)
 	debugfs_create_blob("mem_dump", S_IRUGO, mld->dbgfs_dir,
 					&mld->mem_dump_blob);
 
-	mld->dbgfs_frame = debugfs_create_file("frame", S_IRUGO,
+/*	mld->dbgfs_frame = debugfs_create_file("frame", S_IRUGO,
 			mld->dbgfs_dir, mld, &dbgfs_frame_fops);
+*/
 }
 #else
 static inline void dev_debugfs_add(struct mem_link_device *mld) {}
@@ -793,7 +780,6 @@ struct link_device *lli_create_link_device(struct platform_device *pdev)
 
 	ld = &mld->link_dev;
 
-	ld->ready = lli_link_ready;
 	ld->reset = lli_link_reset;
 	ld->reload = lli_link_reload;
 	ld->off = lli_link_off;

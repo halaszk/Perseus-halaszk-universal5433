@@ -1548,9 +1548,11 @@ struct samsung_pin_ctrl exynos5433_pin_ctrl[] = {
 		.geint_mask	= EXYNOS_GPIO_EMASK_OFFSET,
 		.geint_pend	= EXYNOS_GPIO_EPEND_OFFSET,
 		.svc		= EXYNOS_SVC_OFFSET,
+#ifndef ENABLE_SENSORS_FPRINT_SECURE
 		.eint_gpio_init = exynos_eint_gpio_init,
 		.suspend	= exynos5430_pinctrl_suspend,
 		.resume		= exynos5430_pinctrl_resume,
+#endif
 		.label		= "exynos5433-gpio-ctrl4",
 	}, {
 		/* pin-controller instance 5 data */

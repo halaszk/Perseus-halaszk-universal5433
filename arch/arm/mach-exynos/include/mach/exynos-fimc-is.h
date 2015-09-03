@@ -136,6 +136,57 @@ enum FIMC_IS_CLK_GATE_USR_SCENARIO {
 	CLK_GATE_DIS_SN,
 };
 
+#ifdef CONFIG_CAMERA_SYSFS_V2
+enum fimc_is_cam_info_isp {
+	CAM_INFO_ISP_TYPE_INTERNAL = 0,
+	CAM_INFO_ISP_TYPE_EXTERNAL,
+	CAM_INFO_ISP_TYPE_SOC,
+};
+
+enum fimc_is_cam_info_cal_mem {
+	CAM_INFO_CAL_MEM_TYPE_NONE = 0,
+	CAM_INFO_CAL_MEM_TYPE_FROM,
+	CAM_INFO_CAL_MEM_TYPE_EEPROM,
+	CAM_INFO_CAL_MEM_TYPE_OTP,
+};
+
+enum fimc_is_cam_info_read_ver {
+	CAM_INFO_READ_VER_SYSFS = 0,
+	CAM_INFO_READ_VER_CAMON,
+};
+
+enum fimc_is_cam_info_core_voltage {
+	CAM_INFO_CORE_VOLT_NONE = 0,
+	CAM_INFO_CORE_VOLT_USE,
+};
+
+enum fimc_is_cam_info_upgrade {
+	CAM_INFO_FW_UPGRADE_NONE = 0,
+	CAM_INFO_FW_UPGRADE_SYSFS,
+	CAM_INFO_FW_UPGRADE_CAMON,
+};
+
+enum fimc_is_cam_info_companion {
+	CAM_INFO_COMPANION_NONE = 0,
+	CAM_INFO_COMPANION_USE,
+};
+
+enum fimc_is_cam_info_ois {
+	CAM_INFO_OIS_NONE = 0,
+	CAM_INFO_OIS_USE,
+};
+
+struct fimc_is_cam_info {
+	unsigned int isp;
+	unsigned int cal_memory;
+	unsigned int read_version;
+	unsigned int core_voltage;
+	unsigned int upgrade;
+	unsigned int companion;
+	unsigned int ois;
+};
+#endif
+
 /*
  * struct exynos_fimc_is_subip_info
  *   This info describes what and how many subip fimc-is has.
@@ -218,6 +269,8 @@ struct exynos_platform_fimc_is {
 	int	(*print_cfg)(struct platform_device *pdev, u32 channel);
 	int	(*print_pwr)(struct platform_device *pdev);
 
+	struct pinctrl *pinctrl;
+
 	/* These fields are to return qos value for dvfs scenario */
 	u32	*int_qos_table;
 	u32	*mif_qos_table;
@@ -239,6 +292,11 @@ struct exynos_platform_fimc_is {
 #endif /* CONFIG_OIS_USE */
 	bool use_ois_hsi2c;
 	bool use_module_check;
+	bool skip_cal_loading;
+#ifdef CONFIG_CAMERA_SYSFS_V2
+	int total_camera_num;
+	struct fimc_is_cam_info *cam_infos;
+#endif
 };
 
 extern struct device *fimc_is_dev;

@@ -24,6 +24,8 @@
  */
 #define LOG_MAGIC 0x4d474f4c	/* "LOGM" */
 
+extern int boot_mode_security;
+
 /* These variables are also protected by logbuf_lock */
 static unsigned *sec_log_ptr;
 static char *sec_log_buf;
@@ -511,10 +513,10 @@ void sec_debug_tsp_log(char *fmt, ...)
 	/* Overflow buffer size */
 	if (idx + size > sec_tsp_log_size - 1) {
 		len = scnprintf(&sec_tsp_log_buf[0],
-						size + 1, "%s", buf);
+						size + 1, "%s\n", buf);
 		*sec_tsp_log_ptr = len;
 	} else {
-		len = scnprintf(&sec_tsp_log_buf[idx], size + 1, "%s", buf);
+		len = scnprintf(&sec_tsp_log_buf[idx], size + 1, "%s\n", buf);
 		*sec_tsp_log_ptr += len;
 	}
 }
@@ -717,14 +719,14 @@ static int  tima_setup_rkp_mem(void){
 	}
 	pr_info("RKP :%s, base:%x, size:%x \n", __func__,TIMA_DEBUG_LOG_START, TIMA_DEBUG_LOG_SIZE);
 
-
+#if !defined(CONFIG_SOC_EXYNOS5433)
 	if(memblock_reserve(TIMA_SEC_TO_PGT, TIMA_SEC_TO_PGT_SIZE)){
 		pr_err("%s: RKP failed reserving size %d " \
 			   "at base 0x%x\n", __func__, TIMA_SEC_TO_PGT_SIZE, TIMA_SEC_TO_PGT);
 		goto out;
 	}
 	pr_info("RKP :%s, base:%x, size:%x \n", __func__,TIMA_SEC_TO_PGT, TIMA_SEC_TO_PGT_SIZE);
-
+#endif
 
 	if(memblock_reserve(TIMA_SEC_LOG, TIMA_SEC_LOG_SIZE)){
 		pr_err("%s: RKP failed reserving size %d " \
@@ -775,6 +777,8 @@ static int __init sec_tima_log_eary_setup(char *str)
 	}
 
 	pr_info("tima :%s, base:%lx, size:%x \n", __func__,base, size);
+
+	if (!boot_mode_security) goto out;
 
 	if (!tima_setup_rkp_mem()) {
 		goto out;

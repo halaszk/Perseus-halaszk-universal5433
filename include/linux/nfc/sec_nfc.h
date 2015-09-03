@@ -15,6 +15,10 @@
 #ifdef CONFIG_SEC_NFC_CLK_REQ
 #include <linux/clk.h>
 #endif
+#ifdef CONFIG_SEC_NFC_LDO_CONTROL
+#define NFC_I2C_LDO_ON	1
+#define NFC_I2C_LDO_OFF	0
+#endif
 
 #ifdef CONFIG_SEC_NFC_I2C /* support old driver configuration */
 
@@ -70,6 +74,9 @@ struct sec_nfc_platform_data {
 	unsigned int clk_req;
 	struct   clk *clk;
 #endif
+#ifdef CONFIG_SEC_NFC_LDO_CONTROL
+	const char *i2c_1p8;
+#endif
 #ifdef CONFIG_SOC_EXYNOS5433
 	struct clk *gate_top_cam1;
 #endif
@@ -112,3 +119,7 @@ enum sec_nfc_wake {
 	SEC_NFC_WAKE_SLEEP = 0,
 	SEC_NFC_WAKE_UP,
 };
+
+#if defined(CONFIG_SEC_NFC_LDO_CONTROL)
+extern unsigned int lpcharge;
+#endif

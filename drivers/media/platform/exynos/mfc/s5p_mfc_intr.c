@@ -94,8 +94,5 @@ void s5p_mfc_cleanup_timeout(struct s5p_mfc_ctx *ctx)
 	clear_bit(ctx->num, &dev->ctx_work_bits);
 	spin_unlock_irq(&dev->condlock);
 
-	if (clear_hw_bit(ctx) > 0)
-		s5p_mfc_clock_off(dev);
-
 	s5p_mfc_try_run(dev);
 }

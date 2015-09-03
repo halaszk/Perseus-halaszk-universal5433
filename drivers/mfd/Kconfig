@@ -357,6 +357,17 @@ config MFD_MAX77843
           This driver provides common support for accessing the device;
           additional drivers
 
+config MFD_MAX77849
+        bool "Maxim Semiconductor MAX77849 PMIC Support"
+        depends on I2C=y && GENERIC_HARDIRQS
+        select MFD_CORE
+        help
+          Say yes here to support for Maxim Semiconductor MAX77849.
+          This is a Power Management IC with LDO, RGB(SVC led), Haptic,
+          MUIC controls on chip.
+          This driver provides common support for accessing the device;
+          additional drivers
+
 config MFD_MAX77888
         bool "Maxim Semiconductor MAX77888 PMIC Support"
         depends on I2C=y && GENERIC_HARDIRQS
@@ -414,6 +425,17 @@ config MFD_MAX8998
 	  additional drivers must be enabled in order to use the functionality
 	  of the device.
 
+config MFD_SM5703
+	bool "Silicon Mitus SM5703 PMIC Support"
+	depends on I2C=y && GENERIC_HARDIRQS
+	select MFD_CORE
+	help
+	  Say yes here to support for Silicon Mitus SM5703.
+	  This is a Power Management IC with LDO, RGB(SVC led)
+	  controls on chip.
+	  This driver provides common support for accessing the device;
+	  additional drivers
+
 config EZX_PCAP
 	bool "Motorola EZXPCAP Support"
 	depends on GENERIC_HARDIRQS && SPI_MASTER
@@ -443,6 +465,16 @@ config MFD_RETU
 	help
 	  Retu and Tahvo are a multi-function devices found on Nokia
 	  Internet Tablets (770, N800 and N810).
+
+config MFD_RT5511
+	bool "Support Richtek RT5511"
+	select MFD_CORE
+	depends on I2C=y && GENERIC_HARDIRQS
+	help
+	  The RT5511 is a low cost hi-fi CODEC designed for
+	  smartphone applicatiosn. This driver is only a MFD core driver,
+	  just provided same architecture even RT5511 can only provide
+	  codec function.
 
 config MFD_PCF50633
 	tristate "NXP PCF50633"
@@ -1076,6 +1108,12 @@ config MFD_ARIZONA
 	select MFD_CORE
 	bool
 
+config MFD_ARIZONA_DEFERRED_RESUME
+	bool "Arizona Deferred Resume"
+	depends on MFD_ARIZONA
+	help
+	  Support for Arizona deferred resume
+
 config MFD_ARIZONA_I2C
 	tristate "Wolfson Microelectronics Arizona platform with I2C"
 	select MFD_ARIZONA
@@ -1109,11 +1147,11 @@ config MFD_FLORIDA
 	  Support for Wolfson Microelectronics Florida class low power audio SoC
 	  such as the WM8280
 
-config MFD_WM8998
-	bool "Support Wolfson Microelectronics WM8998"
+config MFD_VEGAS
+	bool "Support Wolfson Microelectronics Vegas"
 	depends on MFD_ARIZONA
 	help
-	  Support for Wolfson Microelectronics WM8998 low power audio SoC
+	  Support for Wolfson Microelectronics Vegas low power audio SoC
 
 config MFD_WM8997
 	bool "Wolfson Microelectronics WM8997"
@@ -1190,6 +1228,35 @@ config MFD_WM8994
 	  supported via the relevant subsystems.  This driver provides
 	  core support for the WM8994, in order to use the actual
 	  functionaltiy of the device other drivers must be enabled.
+
+config MFD_RT5033
+	tristate "Support for Richtek RT5033 I/F PMIC"
+	depends on I2C
+	select MFD_CORE
+	default n
+	help
+	  If you say yes to this option, support will be included for the
+	  RT5033 I/F PMIC chip.
+
+config MFD_RT5033_RESET_WA
+	bool "Enable RT5033 reset workaround"
+	depends on MFD_RT5033
+	default n
+	help
+	  If you enable this function, it will reset when RT5033 is invalid.
+
+config MFD_RT5033_SLDO_VBUSDET
+	bool "SLDO uses for VBUS detection"
+	depends on MFD_RT5033_RESET_WA
+	default n
+
+config MFD_RT5033_EN_MRSTB
+	bool "Enable MRSTB function"
+	depends on MFD_RT5033
+	default n
+	help
+	  If you enable this function, you need to connect MRSTB to AP's GPIO,
+	  and then assign GPIO number in DTSI or board file
 
 endmenu
 endif

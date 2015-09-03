@@ -190,6 +190,53 @@ out_i2c_write:
 	return ret;
 }
 
+static void cypress_touchkey_interrupt_set_dual(struct i2c_client *client)
+{
+	struct touchkey_i2c *tkey_i2c = dev_get_drvdata(&client->dev);
+	int ret = 0;
+	int retry = 5;
+	u8 data[3] = {0, };
+
+	if (tkey_i2c->fw_ver_ic <= tkey_i2c->pdata->multi_fw_ver) {
+		tk_debug_err(true, &client->dev, "%s: not support this version\n", __func__);
+		return;
+	}
+
+	while (retry--) {
+		data[0] = TK_CMD_DUAL_DETECTION;
+		data[1] = 0x00;
+		data[2] = TK_BIT_DETECTION_CONFIRM;
+
+		ret = i2c_smbus_write_i2c_block_data(client, BASE_REG, 3, &data[0]);
+		if (ret < 0) {
+			tk_debug_err(true, &client->dev, "%s: i2c write error. (%d)\n", __func__, ret);
+			msleep(30);
+			continue;
+		}
+		msleep(30);
+
+		data[0] = CYPRESS_DETECTION_FLAG;
+
+		ret = i2c_smbus_read_i2c_block_data(client, data[0], 1, &data[1]);
+		if (ret < 0) {
+			tk_debug_err(true, &client->dev, "%s: i2c read error. (%d)\n", __func__, ret);
+			msleep(30);
+			continue;
+		}
+
+		if (data[1] != 1) {
+			tk_debug_err(true, &client->dev,
+				"%s: interrupt set: 0x%X, failed.\n", __func__, data[1]);
+			continue;
+		}
+		tkey_i2c->support_multi_touch = data[1];
+
+		tk_debug_info(true, &client->dev, "%s: interrupt set: 0x%X\n", __func__, tkey_i2c->support_multi_touch);
+		break;
+	}
+
+}
+
 static int touchkey_i2c_check(struct touchkey_i2c *tkey_i2c)
 {
 	char data[4] = { 0, };
@@ -227,8 +274,13 @@ static int touchkey_i2c_check(struct touchkey_i2c *tkey_i2c)
 	tkey_i2c->crc = ((0xFF & data[1]) << 8) | data[0];
 #endif
 
-	tk_debug_dbg(true, &tkey_i2c->client->dev, "%s: ic_fw_ver = 0x%02x, module_ver = 0x%02x, CY device = 0x%02x\n",
-		__func__, tkey_i2c->fw_ver_ic, tkey_i2c->md_ver_ic, tkey_i2c->device_ver);
+	/* CYPRESS Firmware setting interrupt type : dual or single interrupt */
+	cypress_touchkey_interrupt_set_dual(tkey_i2c->client);
+
+	tk_debug_dbg(true, &tkey_i2c->client->dev,
+			"%s: ic_fw_ver = 0x%02x, module_ver = 0x%02x, CY device = 0x%02x multi = %d\n",
+		__func__, tkey_i2c->fw_ver_ic, tkey_i2c->md_ver_ic, tkey_i2c->device_ver,
+			tkey_i2c->support_multi_touch);
 
 	return ret;
 }
@@ -1038,7 +1090,6 @@ static int touchkey_i2c_update(struct touchkey_i2c *tkey_i2c)
 	return ret;
 }
 
-
 static irqreturn_t touchkey_interrupt(int irq, void *dev_id)
 {
 	struct touchkey_i2c *tkey_i2c = dev_id;
@@ -1056,28 +1107,53 @@ static irqreturn_t touchkey_interrupt(int irq, void *dev_id)
 	if (ret < 0)
 		return IRQ_HANDLED;
 
-	keycode_type = (data[0] & TK_BIT_KEYCODE);
-	pressed = !(data[0] & TK_BIT_PRESS_EV);
+	if (tkey_i2c->fw_ver_ic >= tkey_i2c->pdata->multi_fw_ver && tkey_i2c->support_multi_touch == 1) {
+		int i;
+		int keycode_data[touchkey_count];
 
-	if (keycode_type <= 0 || keycode_type >= touchkey_count) {
-		tk_debug_dbg(true, &tkey_i2c->client->dev, "keycode_type err\n");
-		return IRQ_HANDLED;
-	}
+		keycode_data[1] = data[0] & 0x3;
+		keycode_data[2] = (data[0] >> 2) & 0x3;
 
-	input_report_key(tkey_i2c->input_dev,
-			 touchkey_keycode[keycode_type], pressed);
-#if defined(CONFIG_INPUT_BOOSTER)
-				input_booster_send_event(BOOSTER_DEVICE_TOUCHKEY, keycode_type);
-#endif
-	input_sync(tkey_i2c->input_dev);
+		for (i = 1; i < touchkey_count; i++) {
+			if (keycode_data[i]) {
+				input_report_key(tkey_i2c->input_dev, touchkey_keycode[i], (keycode_data[i] % 2));
 #if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
-	tk_debug_info(true, &tkey_i2c->client->dev, "keycode:%d pressed:%d %#x, %#x %d\n",
-	touchkey_keycode[keycode_type], pressed, tkey_i2c->fw_ver_ic,
-	tkey_i2c->md_ver_ic, tkey_i2c->mc_data.cur_mode);
+				tk_debug_info(true, &tkey_i2c->client->dev, "keycode: %d %s, %#x %#x %d\n",
+						touchkey_keycode[i], (keycode_data[i] % 2) ? "PRESS" : "RELEASE",
+						tkey_i2c->fw_ver_ic, tkey_i2c->md_ver_ic, tkey_i2c->mc_data.cur_mode);
 #else
-	tk_debug_info(true, &tkey_i2c->client->dev, "pressed:%d %#x, %#x, %d\n",
-		pressed, tkey_i2c->fw_ver_ic, tkey_i2c->md_ver_ic, tkey_i2c->mc_data.cur_mode);
+				tk_debug_info(true, &tkey_i2c->client->dev, " %s, %#x %#x %d\n",
+						(keycode_data[i] % 2) ? "PRESS" : "RELEASE", tkey_i2c->fw_ver_ic,
+							tkey_i2c->md_ver_ic, tkey_i2c->mc_data.cur_mode);
 #endif
+			}
+		}
+		input_sync(tkey_i2c->input_dev);
+	} else {
+		keycode_type = (data[0] & TK_BIT_KEYCODE);
+		pressed = !(data[0] & TK_BIT_PRESS_EV);
+
+		if (keycode_type <= 0 || keycode_type >= touchkey_count) {
+			tk_debug_dbg(true, &tkey_i2c->client->dev, "keycode_type err\n");
+			return IRQ_HANDLED;
+		}
+
+		input_report_key(tkey_i2c->input_dev,
+				 touchkey_keycode[keycode_type], pressed);
+#if defined(CONFIG_INPUT_BOOSTER)
+        input_booster_send_event(BOOSTER_DEVICE_TOUCHKEY, keycode_type);
+#endif
+		input_sync(tkey_i2c->input_dev);
+
+#if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
+		tk_debug_info(true, &tkey_i2c->client->dev, "keycode:%d pressed:%d %#x, %#x %d\n",
+		touchkey_keycode[keycode_type], pressed, tkey_i2c->fw_ver_ic,
+		tkey_i2c->md_ver_ic, tkey_i2c->mc_data.cur_mode);
+#else
+		tk_debug_info(true, &tkey_i2c->client->dev, "pressed:%d %#x, %#x, %d\n",
+			pressed, tkey_i2c->fw_ver_ic, tkey_i2c->md_ver_ic, tkey_i2c->mc_data.cur_mode);
+#endif
+	}
 	return IRQ_HANDLED;
 }
 
@@ -1177,6 +1253,9 @@ static int touchkey_start(struct touchkey_i2c *tkey_i2c)
 	tkey_i2c->pdata->power_on(tkey_i2c, 1);
 	tkey_i2c->pdata->led_power_on(tkey_i2c, 1);
 	msleep(tkey_i2c->pdata->stabilizing_time);
+
+	/* CYPRESS Firmware setting interrupt type : dual or single interrupt */
+	cypress_touchkey_interrupt_set_dual(tkey_i2c->client);
 
 	tkey_i2c->enabled = true;
 
@@ -2288,13 +2367,17 @@ static struct touchkey_platform_data *cypress_parse_dt(struct i2c_client *client
 		printk(KERN_ERR"touchkey:failed to ic-stabilizing-time %d\n", ret);
 		pdata->stabilizing_time = 150;
 	}
-
+	ret = of_property_read_u32(np,"cypress,multi-touchkey-fw-version",&pdata->multi_fw_ver);
+	if (ret) {
+		printk(KERN_ERR"touchkey:failed to multi-touchkey-fw-version %d\n", ret);
+		pdata->multi_fw_ver = 0xff;
+	}
 	ret = of_property_read_string(np, "cypress,fw_path", (const char **)&pdata->fw_path);
 	if (ret) {
 		printk(KERN_ERR"touchkey:failed to read fw_path %d\n", ret);
 		pdata->fw_path = FW_PATH;
 	}
-	tk_debug_info(true, &client->dev, "touchkey:fw path %s\n", pdata->fw_path);
+	tk_debug_info(true, &client->dev, "touchkey:fw path %s %d\n", pdata->fw_path, pdata->multi_fw_ver);
 
 	if (of_find_property(np, "cypress,led_by_ldo", NULL))
 		pdata->led_by_ldo = true;

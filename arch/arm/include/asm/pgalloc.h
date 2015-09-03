@@ -126,6 +126,8 @@ static inline void pte_free(struct mm_struct *mm, pgtable_t pte)
 	__free_page(pte);
 }
 
+extern int boot_mode_security;
+
 static inline void __pmd_populate(pmd_t *pmdp, phys_addr_t pte,
 				  pmdval_t prot)
 {
@@ -145,6 +147,7 @@ static inline void __pmd_populate(pmd_t *pmdp, phys_addr_t pte,
 #endif	
 
 
+ if (boot_mode_security) {
 	clean_dcache_area(pmdp, 8);
 	__asm__ __volatile__ (
 		"stmfd  sp!,{r0-r4}\n"
@@ -168,6 +171,13 @@ static inline void __pmd_populate(pmd_t *pmdp, phys_addr_t pte,
 		"isb\n"
 		"ldmfd  sp!,  {r0-r4}\n"
 		:"=r"(tima_wr_out):"r"(cmd_id),"r"((unsigned long)pmdp),"r"(__pmd(pmdval)),"r"(__pmd(pmdval + 256 * sizeof(pte_t))):"r0","r1", "r2","r3","r4","cc");
+ } else {
+	pmdp[0] = __pmd(pmdval);
+#ifndef CONFIG_ARM_LPAE
+	pmdp[1] = __pmd(pmdval + 256 * sizeof(pte_t));
+#endif
+ }
+
 #else
 	pmdp[0] = __pmd(pmdval);
 #ifndef CONFIG_ARM_LPAE

@@ -417,8 +417,11 @@ static int pci_restore_standard_config(struct pci_dev *pci_dev)
 
 	if (pci_dev->current_state != PCI_D0) {
 		int error = pci_set_power_state(pci_dev, PCI_D0);
-		if (error)
+		if (error) {
+			printk("%s: [device %04x:%04x], Failed to set D0\n",
+                        __FUNCTION__, pci_dev->vendor, pci_dev->device); 
 			return error;
+	}
 	}
 
 	pci_restore_state(pci_dev);

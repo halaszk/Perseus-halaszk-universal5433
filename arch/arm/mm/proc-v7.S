@@ -414,6 +414,7 @@ __v7_setup:
 ENDPROC(__v7_setup)
 
 	.align	2
+.global __v7_setup_stack
 __v7_setup_stack:
 	.space	4 * 11				@ 11 registers
 

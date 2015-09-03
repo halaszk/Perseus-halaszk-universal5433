@@ -61,14 +61,6 @@ extern struct decon_lcd *decon_get_lcd_info(void);
 
 struct display_driver;
 
-#define MAX_GPIO	10
-
-/* display_gpio - GPIOs resource for the display subsystem */
-struct display_gpio {
-	unsigned id[MAX_GPIO];
-	int num;
-};
-
 #define MAX_SYSREG	2
 
 struct display_sysreg {
@@ -112,7 +104,6 @@ struct display_dt_ops {
 	struct s3c_fb_platdata *(*get_display_platdata)(void);
 	struct mipi_dsim_config *(*get_display_dsi_drvdata)(void);
 	struct mipi_dsim_lcd_config *(*get_display_lcd_drvdata)(void);
-	struct display_gpio *(*get_display_dsi_reset_gpio)(void);
 #ifdef CONFIG_DECON_MIC
 	struct mic_config *(*get_display_mic_config)(void);
 #endif
@@ -221,6 +212,7 @@ struct display_driver {
 #ifdef CONFIG_DEBUG_FS
 	struct decon_ops_timestamp ops_timestamp[OPS_CALL_MAX];
 #endif
+	unsigned int disp_dump_status;
 };
 
 #define GET_DISPDRV_OPS(p) (p)->dsi_driver.dsi_ops

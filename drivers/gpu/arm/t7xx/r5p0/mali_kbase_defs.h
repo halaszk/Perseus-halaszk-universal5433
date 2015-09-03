@@ -1010,6 +1010,8 @@ struct kbase_context {
 	atomic_t used_tmem_pages;
 
 	char name[CTX_NAME_SIZE];
+
+	mali_bool destroying_context;
 #endif
 };
 

@@ -751,7 +751,13 @@ void ext4_mb_generate_buddy(struct super_block *sb,
 
 	if (free != grp->bb_free) {
 		/* for more specific debugging, sangwoo2.lee */
-		print_block_data(sb, 0, bitmap, 0, EXT4_BLOCK_SIZE(sb));
+		struct ext4_group_desc *desc;
+		ext4_fsblk_t bitmap_blk;
+
+		desc = ext4_get_group_desc(sb, group, NULL);
+		bitmap_blk = ext4_block_bitmap(sb, desc);
+
+		print_block_data(sb, bitmap_blk, bitmap, 0, EXT4_BLOCK_SIZE(sb));
 		/* for more specific debugging */
 
 		ext4_grp_locked_error(sb, group, 0, 0,
@@ -1421,12 +1427,17 @@ static void mb_free_blocks(struct inode *inode, struct ext4_buddy *e4b,
 		right_is_free = !mb_test_bit(last + 1, e4b->bd_bitmap);
 
 	if (unlikely(block != -1)) {
-		ext4_fsblk_t blocknr;
+		/* for debugging, sangwoo2.lee */
+		struct ext4_group_desc *desc;
+		ext4_fsblk_t blocknr, bitmap_blk;
+
+		desc = ext4_get_group_desc(sb, e4b->bd_group, NULL);
+		bitmap_blk = ext4_block_bitmap(sb, desc);
 
 		blocknr = ext4_group_first_block_no(sb, e4b->bd_group);
 		blocknr += EXT4_C2B(EXT4_SB(sb), block);
-		/* for debugging, sangwoo2.lee */
-		print_block_data(sb, blocknr, e4b->bd_bitmap, 0
+
+		print_block_data(sb, bitmap_blk, e4b->bd_bitmap, 0
 			, EXT4_BLOCK_SIZE(sb));
 		/* for debugging */
 		ext4_grp_locked_error(sb, e4b->bd_group,

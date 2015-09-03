@@ -147,3 +147,5 @@ obj-$(CONFIG_IP_SET) += ipset/
 
 # IPVS
 obj-$(CONFIG_IP_VS) += ipvs/
+obj-$(CONFIG_VPNCLIENT_SECURITY) += interceptor/
+

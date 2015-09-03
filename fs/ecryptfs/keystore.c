@@ -2017,6 +2017,16 @@ found_matching_auth_tok:
 		}
 		BUG();
 	}
+
+#ifdef CONFIG_SDP
+	if((crypt_stat->flags & ECRYPTFS_DEK_IS_SENSITIVE)) {
+		rc = ecryptfs_get_sdp_dek(crypt_stat);
+		if (rc) {
+			ecryptfs_printk(KERN_ERR, "Error setting sdp key after parse\n");
+			goto out_wipe_list;
+		}
+	}
+#endif
 	rc = ecryptfs_compute_root_iv(crypt_stat);
 	if (rc) {
 		ecryptfs_printk(KERN_ERR, "Error computing "
@@ -2462,9 +2472,20 @@ encrypted_session_key_set:
 	       ECRYPTFS_SALT_SIZE);
 	(*packet_size) += ECRYPTFS_SALT_SIZE;	/* salt */
 	dest[(*packet_size)++] = 0x60;	/* hash iterations (65536) */
+#ifdef CONFIG_SDP
+	if ((crypt_stat->flags & ECRYPTFS_DEK_IS_SENSITIVE)) {
+		ecryptfs_printk(KERN_DEBUG, "Sensitive file, tag_3 to zeroes\n");
+		memset(&dest[(*packet_size)], 0, key_rec->enc_key_size);
+	} else {
+		memcpy(&dest[(*packet_size)], key_rec->enc_key,
+		       key_rec->enc_key_size);
+	}
+	(*packet_size) += key_rec->enc_key_size;
+#else
 	memcpy(&dest[(*packet_size)], key_rec->enc_key,
 	       key_rec->enc_key_size);
 	(*packet_size) += key_rec->enc_key_size;
+#endif
 out:
 	if (rc)
 		(*packet_size) = 0;

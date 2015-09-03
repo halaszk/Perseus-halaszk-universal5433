@@ -30,7 +30,7 @@ static int tdmb_i2c_probe(struct i2c_client *client, const struct i2c_device_id 
 	struct tdmb_i2c_dev *tdmb_dev;
 
 	i2c_dmb = client;
-	DPRINTK("tdmbi2c_probe() i2c_dmb : 0x%x\n", (unsigned int)i2c_dmb);
+	DPRINTK("tdmbi2c_probe() i2c_dmb : 0x%p\n", i2c_dmb);
 
 	tdmb_dev = (struct tdmb_i2c_dev *)kzalloc(sizeof(*tdmb_dev), GFP_KERNEL);
 	if (!tdmb_dev) {

@@ -50,6 +50,7 @@
 
 #define IOCTL_LINK_CONNECTED		_IO('o', 0x33)
 #define IOCTL_LINK_DEVICE_RESET		_IO('o', 0x44)
+#define IOCTL_DUMPER_CONNECTED		_IO('o', 0x55)
 
 /* /sys/module/link_pm_hsic_m74xx/parameters/...*/
 static int l2_delay = 200;
@@ -76,6 +77,7 @@ enum status {
 	MAIN_CONNECT = 1 << 4,
 	LOADER_CONNECT = 1 << 5,
 	CP_CRASH = 1 << 6,
+	DUMPER_CONNECT = 1 << 7,
 };
 
 #ifdef CONFIG_WAIT_CP_SUSPEND_READY
@@ -120,6 +122,8 @@ static int (*generic_usb_resume)(struct usb_device *, pm_message_t);
 					(atomic_read(&p->status) & 0x0F) | val))
 
 #define set_crash_status(p, val)	(atomic_set(&p->status, \
+					atomic_read(&p->status) | val))
+#define set_dumper_status(p, val)	(atomic_set(&p->status, \
 					atomic_read(&p->status) | val))
 
 #define get_pm_status(p)		(atomic_read(&p->status) & 0x03)
@@ -378,7 +382,7 @@ static int wait_hostwake_value(struct link_pm_data *pmdata, int val)
 	mif_info("\n");
 
 	while (cnt--) {
-		ret = wait_event_interruptible_timeout(pmdata->hostwake_waitq,
+		ret = wait_event_timeout(pmdata->hostwake_waitq,
 			get_hostwake_status(pmdata) == val,
 			HOSTWAKE_WAITQ_TIMEOUT);
 		if (!check_status(pmdata, MAIN_CONNECT) ||
@@ -387,7 +391,7 @@ static int wait_hostwake_value(struct link_pm_data *pmdata, int val)
 
 		usb_mark_last_busy(pmdata->hdev);
 
-		if (ret && ret != -ERESTARTSYS)
+		if (ret)
 			return 0;
 
 		mif_info("hostwake: %d\n",
@@ -411,8 +415,7 @@ static int wait_cp2ap_status_value(struct link_pm_data *pmdata,
 	struct modemlink_pm_data *pdata = pmdata->pdata;
 
 	while (cnt--) {
-		ret = wait_event_interruptible_timeout(
-				pmdata->cp_suspend_ready_waitq,
+		ret = wait_event_timeout(pmdata->cp_suspend_ready_waitq,
 				get_cp2ap_status(pmdata) == val,
 				CP_SUSPEND_WAITQ_TIMEOUT);
 		if (!check_status(pmdata, MAIN_CONNECT) ||
@@ -423,7 +426,7 @@ static int wait_cp2ap_status_value(struct link_pm_data *pmdata,
 		if (udev->state == USB_STATE_NOTATTACHED)
 			return 0;
 
-		if (ret && ret != -ERESTARTSYS)
+		if (ret)
 			return 0;
 
 		mif_info("cp2ap_status: %d\n",
@@ -905,6 +908,9 @@ static int link_pm_usb_notify(struct notifier_block *nfb,
 
 			set_connect_status(pmdata, LOADER_CONNECT);
 
+			if (!strcmp(udev->product,"M7450 Dumper"))
+				set_dumper_status(pmdata, DUMPER_CONNECT);
+
 			mif_info("link_pm boot dev connect\n");
 
 			break;
@@ -1134,8 +1140,12 @@ static long link_pm_ioctl(struct file *file, unsigned int cmd,
 	int ret;
 
 	struct link_pm_data *pmdata = file->private_data;
+	struct modemlink_pm_data *pdata = pmdata->pdata;
 
-	mif_info("%x\n", cmd);
+	mif_info("%x - %d/%d/%d\n", cmd,
+			gpio_get_value(pdata->gpio_link_slavewake),
+			gpio_get_value(pdata->gpio_link_hostwake),
+			gpio_get_value(pdata->gpio_link_active));
 
 	switch (cmd) {
 	case IOCTL_LINK_CONNECTED:
@@ -1153,6 +1163,8 @@ static long link_pm_ioctl(struct file *file, unsigned int cmd,
 			usb_unlock_device(pmdata->udev);
 		}
 		break;
+	case IOCTL_DUMPER_CONNECTED:
+		return check_status(pmdata, DUMPER_CONNECT);
 	default:
 		return -EINVAL;
 	}

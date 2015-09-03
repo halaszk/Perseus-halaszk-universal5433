@@ -1067,6 +1067,7 @@ static const struct reg_default wm5102_reg_default[] = {
 	{ 0x00000ECD, 0x0000 },   /* R3789  - HPLPF4_2 */ 
 	{ 0x00000EE0, 0x0000 },   /* R3808  - ASRC_ENABLE */ 
 	{ 0x00000EE2, 0x0000 },   /* R3810  - ASRC_RATE1 */ 
+	{ 0x00000EE3, 0x0400 },   /* R3811  - ASRC_RATE2 */
 	{ 0x00000EF0, 0x0000 },   /* R3824  - ISRC 1 CTRL 1 */ 
 	{ 0x00000EF1, 0x0000 },   /* R3825  - ISRC 1 CTRL 2 */ 
 	{ 0x00000EF2, 0x0000 },   /* R3826  - ISRC 1 CTRL 3 */ 
@@ -1088,6 +1089,7 @@ static bool wm5102_readable_register(struct device *dev, unsigned int reg)
 	case ARIZONA_WRITE_SEQUENCER_CTRL_0:
 	case ARIZONA_WRITE_SEQUENCER_CTRL_1:
 	case ARIZONA_WRITE_SEQUENCER_CTRL_2:
+	case ARIZONA_WRITE_SEQUENCER_CTRL_3:
 	case ARIZONA_WRITE_SEQUENCER_PROM:
 	case ARIZONA_TONE_GENERATOR_1:
 	case ARIZONA_TONE_GENERATOR_2:
@@ -1959,6 +1961,7 @@ static bool wm5102_volatile_register(struct device *dev, unsigned int reg)
 	case ARIZONA_WRITE_SEQUENCER_CTRL_0:
 	case ARIZONA_WRITE_SEQUENCER_CTRL_1:
 	case ARIZONA_WRITE_SEQUENCER_CTRL_2:
+	case ARIZONA_WRITE_SEQUENCER_CTRL_3:
 	case ARIZONA_OUTPUT_STATUS_1:
 	case ARIZONA_RAW_OUTPUT_STATUS_1:
 	case ARIZONA_SLIMBUS_RX_PORT_STATUS:
@@ -1998,6 +2001,7 @@ static bool wm5102_volatile_register(struct device *dev, unsigned int reg)
 	case ARIZONA_AOD_IRQ1:
 	case ARIZONA_AOD_IRQ2:
 	case ARIZONA_AOD_IRQ_RAW_STATUS:
+	case ARIZONA_DSP1_CLOCKING_1:
 	case ARIZONA_DSP1_STATUS_1:
 	case ARIZONA_DSP1_STATUS_2:
 	case ARIZONA_DSP1_STATUS_3:

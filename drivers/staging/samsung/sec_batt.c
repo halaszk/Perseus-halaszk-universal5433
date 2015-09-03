@@ -30,3 +30,14 @@ static int sec_bat_is_lpm_check(char *str)
 __setup("androidboot.mode=", sec_bat_is_lpm_check);
 
 #endif
+
+int fg_reset;
+EXPORT_SYMBOL(fg_reset);
+
+static int sec_bat_get_fg_reset(char *val)
+{
+	fg_reset = strncmp(val, "1", 1) ? 0 : 1;
+	pr_info("%s, fg_reset:%d\n", __func__, fg_reset);
+	return 1;
+}
+__setup("fg_reset=", sec_bat_get_fg_reset);

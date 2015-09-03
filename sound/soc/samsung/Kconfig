@@ -99,6 +99,18 @@ config SND_SOC_SAMSUNG_SMDK_WM8994
 	help
 		Say Y if you want to add support for SoC audio on the SMDKs.
 
+config SND_SOC_SAMSUNG_UNIVERSAL5430_RT5511
+	tristate "SoC I2S Audio support for RT5511 on SMDK"
+	depends on SND_SOC_SAMSUNG && (MACH_UNIVERSAL5430)
+	depends on I2C=y && GENERIC_HARDIRQS
+	select SND_SAMSUNG_I2S
+	select SND_SAMSUNG_IOMMU
+	select SND_SAMSUNG_AUDSS
+	select MFD_RT5511
+	select SND_SOC_RT5511
+	help
+	  Say Y if you want to add support for SoC audio on the UNIVERSALs.
+
 config SND_SOC_SAMSUNG_SMDK2443_WM9710
 	tristate "SoC AC97 Audio support for SMDK2443 - WM9710"
 	depends on SND_SOC_SAMSUNG && MACH_SMDK2443
@@ -304,6 +316,28 @@ config SND_SOC_SAMSUNG_PACIFIC_FLORIDA
 	help
 		Say Y if you want to add support for SoC audio on the Pacific.
 
+config SND_SOC_SAMSUNG_PACIFIC_WM1814
+	tristate "SoC I2S Audio support for wm1814 on Pacific"
+	depends on SND_SOC_SAMSUNG
+	select SND_SOC_VEGAS
+	select MFD_VEGAS
+	select SND_SOC_SAMSUNG_ARIZONA
+	help
+		Say Y if you want to add support for SoC audio on the Pacific.
+
+config SND_SOC_SAMSUNG_PACIFIC_RT5659
+	tristate "SoC I2S Audio support for rt5659 on Pacific"
+	depends on SND_SOC_SAMSUNG
+	select SND_SAMSUNG_I2S
+	select SND_SAMSUNG_AUDSS
+	select SND_SAMSUNG_IOMMU if SOC_EXYNOS5430 || SOC_EXYNOS5433
+    select SND_SOC_RT5659
+	select MFD_ARIZONA_I2C
+	select SND_SOC_DUMMY_CODEC
+	select SND_DYNAMIC_MINORS
+	help
+		Say Y if you want to add support for SoC audio on the Pacific.
+
 config SND_SOC_SAMSUNG_ARIZONA
 	tristate "Audio support for arizona platform on the Exynos54XX"
 	depends on SND_SOC_SAMSUNG
@@ -313,6 +347,7 @@ config SND_SOC_SAMSUNG_ARIZONA
 	select SND_SOC_DUMMY_CODEC
 	select MFD_ARIZONA
 	select MFD_ARIZONA_SPI
+	select MFD_ARIZONA_I2C
 	select REGULATOR_ARIZONA
 	select GPIO_ARIZONA
 	select SWITCH
@@ -377,6 +412,10 @@ config SND_USE_3MICS
 	bool "use 3-mics"
 	default n
 
+config SND_USE_SUBMIC_BIAS
+	bool "use sub mic bias"
+	default n
+
 config SND_SAMSUNG_COMPENSATE_EXT_RES
 	bool "use compensate table for external resistance"
 	default n
@@ -390,3 +429,17 @@ config SND_SAMSUNG_SEIREN_DEBUG
 	default n
 	help
 	  Say Y if you want to add debug message for SEIREN Audio.
+
+config SND_CODEC_CONTROL_MCLK
+	bool "Audience ES325 doesn't control MCLK"
+	default n
+	depends on 2MIC_AUDIENCE_ES325
+
+config DYNAMIC_MICBIAS_CONTROL_RT5659
+	bool "Earjack micbias dynamic control for reduce current consumption"
+	default n
+	depends on SND_SOC_SAMSUNG_PACIFIC_RT5659
+	help
+	 This is earjack micbias control for reduce current consumption.
+	 When mic does not used or button is released,
+	 micbias set to low voltage.

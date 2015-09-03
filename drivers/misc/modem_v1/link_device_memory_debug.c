@@ -44,7 +44,7 @@
 
 void print_pm_status(struct mem_link_device *mld)
 {
-#if defined(DEBUG_MODEM_IF) && defined(CONFIG_LINK_POWER_MANAGEMENT)
+#ifdef CONFIG_LINK_POWER_MANAGEMENT
 	struct link_device *ld = &mld->link_dev;
 	unsigned int magic;
 	int ap_wakeup;
@@ -181,65 +181,4 @@ void print_dev_snapshot(struct mem_link_device *mld, struct mem_snapshot *mst,
 		(mst->dir == RX) ? mst->int2ap : mst->int2cp);
 #endif
 }
-
-/**
-@brief		save a dump of memory I/F
-
-Performs actual file operation for saving a dump of a memory interface.
-
-@param mld	the pointer to a mem_link_device instance
-*/
-void save_mem_dump(struct mem_link_device *mld)
-{
-#ifdef DEBUG_MODEM_IF
-	struct link_device *ld = &mld->link_dev;
-	char *path = mld->dump_path;
-	struct file *fp;
-	struct utc_time t;
-
-	get_utc_time(&t);
-	snprintf(path, MIF_MAX_PATH_LEN, "%s/%s_%d%02d%02d_%02d%02d%02d.dump",
-		MIF_LOG_DIR, ld->name, t.year, t.mon, t.day, t.hour, t.min,
-		t.sec);
-
-	fp = mif_open_file(path);
-	if (!fp) {
-		mif_err("%s: ERR! %s open fail\n", ld->name, path);
-		return;
-	}
-	mif_err("%s: %s opened\n", ld->name, path);
-
-	mif_save_file(fp, mld->base, mld->size);
-
-	mif_close_file(fp);
 #endif
-}
-
-/**
-@brief		work function for memory dump
-
-Invokes save_mem_dump() to performs file operation for saving a dump of a memory
-interface.
-
-@param ws	the pointer to a work_struct instance
-*/
-void mem_dump_work(struct work_struct *ws)
-{
-#ifdef DEBUG_MODEM_IF
-	struct mem_link_device *mld;
-
-	mld = container_of(ws, struct mem_link_device, dump_work);
-	if (!mld) {
-		mif_err("ERR! no mld\n");
-		return;
-	}
-
-	save_mem_dump(mld);
-#endif
-}
-
-/**
-@}
-*/
-#endif
-

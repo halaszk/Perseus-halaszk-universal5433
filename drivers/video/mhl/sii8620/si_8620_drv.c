@@ -4865,6 +4865,15 @@ void si_mhl_tx_read_devcap_fifo(struct drv_hw_context *hw_context,
 	/* Retrieve the DEVCAP register values from the FIFO */
 	mhl_tx_read_reg_block(hw_context, REG_EDID_FIFO_RD_DATA,
 			      DEVCAP_SIZE, dev_cap_buf->devcap_cache);
+
+#ifdef CONFIG_MHL3_SEC_FEATURE
+	pr_info("sii8620 : %s():%d, Ver: 0x%2x, Link mode: 0x%02x\n", __func__,
+		__LINE__, dev_cap_buf->mdc.mhl_version, dev_cap_buf->mdc.vid_link_mode);
+	if (((dev_cap_buf->mdc.mhl_version & 0xf0) == 0x20) &&
+		!(dev_cap_buf->mdc.vid_link_mode & 0x08))
+		dev_cap_buf->mdc.mhl_version = 0x10;
+#endif
+
 	MHL_TX_DBG_INFO("%sgot DEVCAP%s\n", ANSI_ESC_GREEN_TEXT,
 			ANSI_ESC_RESET_TEXT);
 }

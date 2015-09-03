@@ -377,7 +377,7 @@ static struct task_struct *select_bad_process_low(unsigned int *ppoints,
 #endif
 
 	rcu_read_lock();
-	do_each_thread(g, p) {
+	for_each_process_thread(g, p) {
 		unsigned int points;
 #ifdef CONFIG_OOM_SCAN_WA_PREVENT_WRONG_SEARCH
 		skip_search_thread = false;
@@ -411,15 +411,17 @@ static struct task_struct *select_bad_process_low(unsigned int *ppoints,
 			chosen = p;
 			chosen_points = points;
 		}
-	} while_each_thread(g, p);
+	}
 
 	if (chosen)
 	{
-#ifdef CONFIG_OOM_SCAN_SKIP_SEARCH_THREAD
+#ifdef CONFIG_OOM_SCAN_WA_PREVENT_WRONG_SEARCH
 		if(chosen->pid != chosen->tgid ) {
 			pr_warning("%s is selected: pid=%d, tgid=%d, "
+				"flags=%x, state=%lx, exit_state=%x, "
 				"oom_score_adj=%hd\n",
 				chosen->comm, chosen->pid, chosen->tgid,
+				chosen->flags, chosen->state, chosen->exit_state,
 				chosen->signal->oom_score_adj);
 		}
 #endif

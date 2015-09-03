@@ -11,7 +11,11 @@
 #include "decon_dt.h"
 #include "decon_pm.h"
 #include "regs-decon.h"
+#include "regs-dsim.h"
 #include "decon_debug.h"
+#ifdef CONFIG_DEBUG_FS
+#include <linux/debugfs.h>
+#endif
 
 #define DUMP_DECON_REGISTER(s) \
 	val = readl(pdispdrv->decon_driver.sfb->regs + (s)); \
@@ -330,4 +334,67 @@ void dump_s3c_fb_win_variant(struct s3c_fb_win_variant *p_fb_win_variant)
 	pr_err("[INFO] palette_sz: 0x%0X\n", p_fb_win_variant->palette_sz);
 	pr_err("[INFO] valid_bpp: 0x%0X\n", p_fb_win_variant->valid_bpp);
 }
+
+static void dump_register(void __iomem *reg, u32 pa, u32 end_offset)
+{
+	unsigned int i, pos = 0;
+	unsigned char linebuf[80] = {0,};
+
+	memset(linebuf, 0, sizeof(linebuf));
+	pos = sprintf(linebuf, "%08X| ", pa);
+	hex_dump_to_buffer(reg, 16, 16, 4, linebuf + pos, sizeof(linebuf) - pos, false);
+	pr_err("%s\n", linebuf);
+
+	for (i = 0; i <= end_offset; i += 16) {
+		memset(linebuf, 0, sizeof(linebuf));
+		pos = sprintf(linebuf, "%08X| ", pa + i);
+		hex_dump_to_buffer(reg + i, 16, 16, 4, linebuf + pos, sizeof(linebuf) - pos, false);
+		pr_err("%s\n", linebuf);
+	}
+}
+
+void disp_dump(struct display_driver *pdispdrv, unsigned int idx)
+{
+	if (unlikely(pdispdrv->disp_dump_status & (1 << idx))) {
+		pr_info("%s: %08x, %d", __func__, pdispdrv->disp_dump_status, idx);
+		dump_register(pdispdrv->decon_driver.sfb->regs, pdispdrv->decon_driver.regs->start, TRIGCON);
+		dump_register(pdispdrv->dsi_driver.dsim->reg_base, pdispdrv->dsi_driver.regs->start, DSIM_PHYTIMING2);
+		BUG();
+	}
+}
+
+#ifdef CONFIG_DEBUG_FS
+static int disp_dump_set(void *data, u64 val)
+{
+	struct display_driver *pdispdrv = data;
+
+	pdispdrv->disp_dump_status = val;
+
+	return 0;
+}
+
+static int disp_dump_get(void *data, u64 *val)
+{
+	struct display_driver *pdispdrv = data;
+
+	*val = pdispdrv->disp_dump_status;
+
+	return 0;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(disp_dump_ops, disp_dump_get, disp_dump_set, "%llx\n");
+
+void disp_debugfs_init(struct display_driver *pdispdrv)
+{
+	static struct dentry *debugfs_dentry;
+
+	debugfs_dentry = debugfs_create_dir("disp", NULL);
+
+	debugfs_create_file("dump", 0644, debugfs_dentry, pdispdrv, &disp_dump_ops);
+}
+#else
+void disp_debugfs_init(struct display_driver *pdispdrv)
+{
+}
+#endif
 

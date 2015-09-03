@@ -1,17 +1,17 @@
 /*
-   'src_compress_deflate_infblock.c' Obfuscated by COBF (Version 1.06 2006-01-07 by BB) at Sun Nov 16 20:01:26 2014
+   'src_compress_deflate_deflate.c' Obfuscated by COBF (Version 1.06 2006-01-07 by BB) at Mon Dec 22 18:00:49 2014
 */
 #include"cobf.h"
 #ifdef _WIN32
-#if defined( UNDER_CE) && defined( bb341) || ! defined( bb343)
-#define bb335 1
-#define bb351 1
+#if defined( UNDER_CE) && defined( bb334) || ! defined( bb341)
+#define bb357 1
+#define bb356 1
 #else
-#define bb340 bb348
-#define bb331 1
-#define bb345 1
+#define bb335 bb350
+#define bb358 1
+#define bb348 1
 #endif
-#define bb333 1
+#define bb360 1
 #include"uncobf.h"
 #include<ndis.h>
 #include"cobf.h"
@@ -24,11 +24,11 @@
 #include<stdio.h>
 #include<basetsd.h>
 #include"cobf.h"
-bba bbs bbl bbf, *bb1;bba bbs bbe bbq, *bb93;bba bb135 bb123, *bb358;
-bba bbs bbl bb39, *bb72;bba bbs bb135 bbk, *bb59;bba bbe bbu, *bb134;
-bba bbh bbf*bb89;
-#ifdef bb311
-bba bbd bb60, *bb122;
+bba bbt bbl bbf, *bb3;bba bbt bbe bbo, *bb80;bba bb137 bb125, *bb351;
+bba bbt bbl bb41, *bb73;bba bbt bb137 bbk, *bb59;bba bbe bbu, *bb134;
+bba bbh bbf*bb79;
+#ifdef bb307
+bba bbd bb61, *bb124;
 #endif
 #else
 #include"uncobf.h"
@@ -37,14 +37,14 @@ bba bbd bb60, *bb122;
 #include<linux/time.h>
 #include<linux/slab.h>
 #include"cobf.h"
-#ifndef bb116
-#define bb116
+#ifndef bb118
+#define bb118
 #ifdef _WIN32
 #include"uncobf.h"
 #include<wtypes.h>
 #include"cobf.h"
 #else
-#ifdef bb112
+#ifdef bb121
 #include"uncobf.h"
 #include<linux/types.h>
 #include"cobf.h"
@@ -56,222 +56,223 @@ bba bbd bb60, *bb122;
 #endif
 #endif
 #ifdef _WIN32
-bba bb119 bb215;
+#ifdef _MSC_VER
+bba bb117 bb224;
+#endif
 #else
-bba bbe bbu, *bb134, *bb282;
-#define bb202 1
-#define bb201 0
-bba bb275 bb292, *bb279, *bb217;bba bbe bb246, *bb262, *bb285;bba bbs
-bbq, *bb93, *bb253;bba bb5 bb266, *bb288;bba bbs bb5 bb265, *bb284;
-bba bb5 bb113, *bb211;bba bbs bb5 bb63, *bb287;bba bb63 bb219, *bb240
-;bba bb63 bb252, *bb261;bba bb113 bb119, *bb251;bba bb256 bb259;bba
-bb277 bb123;bba bb218 bb83;bba bb117 bb114;bba bb117 bb206;
-#ifdef bb208
-bba bb209 bb39, *bb72;bba bb250 bbk, *bb59;bba bb205 bbd, *bb29;bba
-bb207 bb56, *bb120;
+bba bbe bbu, *bb134, *bb216;
+#define bb200 1
+#define bb202 0
+bba bb261 bb249, *bb205, *bb252;bba bbe bb278, *bb255, *bb227;bba bbt
+bbo, *bb80, *bb215;bba bb8 bb266, *bb221;bba bbt bb8 bb226, *bb230;
+bba bb8 bb119, *bb212;bba bbt bb8 bb63, *bb237;bba bb63 bb228, *bb251
+;bba bb63 bb259, *bb220;bba bb119 bb117, *bb217;bba bb244 bb289;bba
+bb210 bb125;bba bb262 bb85;bba bb112 bb116;bba bb112 bb235;
+#ifdef bb234
+bba bb233 bb41, *bb73;bba bb287 bbk, *bb59;bba bb209 bbd, *bb31;bba
+bb222 bb57, *bb120;
 #else
-bba bb232 bb39, *bb72;bba bb272 bbk, *bb59;bba bb276 bbd, *bb29;bba
-bb239 bb56, *bb120;
+bba bb231 bb41, *bb73;bba bb253 bbk, *bb59;bba bb245 bbd, *bb31;bba
+bb229 bb57, *bb120;
 #endif
-bba bb39 bbf, *bb1, *bb249;bba bbk bb221, *bb264, *bb216;bba bbk bb269
-, *bb271, *bb227;bba bbd bb60, *bb122, *bb273;bba bb83 bb37, *bb233, *
-bb223;bba bbd bb230, *bb255, *bb260;bba bb114 bb248, *bb236, *bb237;
-bba bb56 bb244, *bb289, *bb278;
-#define bb141 bbb
-bba bbb*bb210, *bb77;bba bbh bbb*bb286;bba bbl bb242;bba bbl*bb243;
-bba bbh bbl*bb82;
-#if defined( bb112)
-bba bbe bb111;
+bba bb41 bbf, *bb3, *bb263;bba bbk bb206, *bb225, *bb286;bba bbk bb282
+, *bb246, *bb284;bba bbd bb61, *bb124, *bb269;bba bb85 bb38, *bb241, *
+bb223;bba bbd bb239, *bb265, *bb243;bba bb116 bb272, *bb213, *bb281;
+bba bb57 bb270, *bb240, *bb208;
+#define bb143 bbb
+bba bbb*bb247, *bb81;bba bbh bbb*bb271;bba bbl bb218;bba bbl*bb207;
+bba bbh bbl*bb62;
+#if defined( bb121)
+bba bbe bb115;
 #endif
-bba bb111 bb19;bba bb19*bb257;bba bbh bb19*bb190;
-#if defined( bb238) || defined( bb214)
-bba bb19 bb36;bba bb19 bb118;
+bba bb115 bb19;bba bb19*bb273;bba bbh bb19*bb186;
+#if defined( bb268) || defined( bb248)
+bba bb19 bb37;bba bb19 bb111;
 #else
-bba bbl bb36;bba bbs bbl bb118;
+bba bbl bb37;bba bbt bbl bb111;
 #endif
-bba bbh bb36*bb234;bba bb36*bb224;bba bb60 bb274, *bb281;bba bbb*
-bb106;bba bb106*bb235;
-#define bb213( bb35) bbi bb35##__ { bbe bb225; }; bba bbi bb35##__  * \
- bb35
-bba bbi{bb37 bb189,bb212,bb222,bb263;}bb220, *bb254, *bb283;bba bbi{
-bb37 bb8,bb193;}bb245, *bb270, *bb231;bba bbi{bb37 bb228,bb268;}bb267
-, *bb291, *bb241;
+bba bbh bb37*bb279;bba bb37*bb277;bba bb61 bb211, *bb219;bba bbb*
+bb107;bba bb107*bb257;
+#define bb250( bb36) bbj bb36##__ { bbe bb267; }; bba bbj bb36##__  * \
+ bb36
+bba bbj{bb38 bb190,bb260,bb214,bb285;}bb232, *bb238, *bb283;bba bbj{
+bb38 bb10,bb177;}bb254, *bb280, *bb242;bba bbj{bb38 bb264,bb275;}
+bb274, *bb288, *bb276;
 #endif
-bba bbh bbf*bb89;
+bba bbh bbf*bb79;
 #endif
-bba bbf bb101;
+bba bbf bb103;
 #define IN
 #define OUT
 #ifdef _DEBUG
-#define bb146( bbc) bb32( bbc)
+#define bb147( bbc) bb27( bbc)
 #else
-#define bb146( bbc) ( bbb)( bbc)
+#define bb147( bbc) ( bbb)( bbc)
 #endif
-bba bbe bb161, *bb173;
-#define bb226 0
-#define bb318 1
-#define bb300 2
-#define bb320 3
-#define bb347 4
-bba bbe bb357;bba bbb*bb121;
+bba bbe bb160, *bb172;
+#define bb293 0
+#define bb313 1
+#define bb297 2
+#define bb325 3
+#define bb354 4
+bba bbe bb361;bba bbb*bb123;
 #endif
 #ifdef _WIN32
 #ifndef UNDER_CE
-#define bb31 bb344
-#define bb43 bb339
-bba bbs bb5 bb31;bba bb5 bb43;
+#define bb32 bb346
+#define bb43 bb347
+bba bbt bb8 bb32;bba bb8 bb43;
 #endif
 #else
 #endif
 #ifdef _WIN32
-bbb*bb128(bb31 bb47);bbb bb109(bbb* );bbb*bb137(bb31 bb159,bb31 bb47);
+bbb*bb127(bb32 bb48);bbb bb108(bbb* );bbb*bb138(bb32 bb158,bb32 bb48);
 #else
-#define bb128( bbc) bb147(1, bbc, bb140)
-#define bb109( bbc) bb342( bbc)
-#define bb137( bbc, bbn) bb147( bbc, bbn, bb140)
+#define bb127( bbc) bb146(1, bbc, bb141)
+#define bb108( bbc) bb340( bbc)
+#define bb138( bbc, bbp) bb146( bbc, bbp, bb141)
 #endif
 #ifdef _WIN32
-#define bb32( bbc) bb346( bbc)
+#define bb27( bbc) bb339( bbc)
 #else
 #ifdef _DEBUG
-bbe bb144(bbh bbl*bb96,bbh bbl*bb25,bbs bb229);
-#define bb32( bbc) ( bbb)(( bbc) || ( bb144(# bbc, __FILE__, __LINE__ \
+bbe bb145(bbh bbl*bb98,bbh bbl*bb26,bbt bb258);
+#define bb27( bbc) ( bbb)(( bbc) || ( bb145(# bbc, __FILE__, __LINE__ \
 )))
 #else
-#define bb32( bbc) (( bbb)0)
+#define bb27( bbc) (( bbb)0)
 #endif
 #endif
-bb43 bb302(bb43*bb322);
+bb43 bb301(bb43*bb319);
 #ifndef _WIN32
-bbe bb327(bbh bbl*bbg);bbe bb324(bbh bbl*bb20,...);
+bbe bb331(bbh bbl*bbg);bbe bb320(bbh bbl*bb20,...);
 #endif
 #ifdef _WIN32
-bba bb355 bb97;
-#define bb139( bbc) bb330( bbc)
-#define bb142( bbc) bb350( bbc)
-#define bb133( bbc) bb356( bbc)
-#define bb132( bbc) bb332( bbc)
+bba bb355 bb95;
+#define bb142( bbc) bb353( bbc)
+#define bb144( bbc) bb336( bbc)
+#define bb135( bbc) bb359( bbc)
+#define bb133( bbc) bb342( bbc)
 #else
-bba bb337 bb97;
-#define bb139( bbc) ( bbb)(  *  bbc = bb334( bbc))
-#define bb142( bbc) (( bbb)0)
-#define bb133( bbc) bb349( bbc)
-#define bb132( bbc) bb354( bbc)
+bba bb343 bb95;
+#define bb142( bbc) ( bbb)(  *  bbc = bb337( bbc))
+#define bb144( bbc) (( bbb)0)
+#define bb135( bbc) bb352( bbc)
+#define bb133( bbc) bb344( bbc)
 #endif
 #if ( defined( _WIN32) || defined( __WIN32__)) && ! defined( WIN32)
 #define WIN32
 #endif
-#if defined( __GNUC__) || defined( WIN32) || defined( bb1225) ||  \
-defined( bb1200)
-#ifndef bb397
-#define bb397
+#if defined( __GNUC__) || defined( WIN32) || defined( bb1257) ||  \
+defined( bb1247)
+#ifndef bb407
+#define bb407
 #endif
 #endif
-#if defined( __MSDOS__) && ! defined( bb168)
-#define bb168
+#if defined( __MSDOS__) && ! defined( bb169)
+#define bb169
 #endif
-#if defined( bb168) && ! defined( bb397)
-#define bb507
+#if defined( bb169) && ! defined( bb407)
+#define bb533
 #endif
-#ifdef bb168
-#define bb1041
+#ifdef bb169
+#define bb1076
 #endif
-#if ( defined( bb168) || defined( bb1195) || defined( WIN32)) && !  \
-defined( bb136)
-#define bb136
+#if ( defined( bb169) || defined( bb1238) || defined( WIN32)) && !  \
+defined( bb139)
+#define bb139
 #endif
-#if defined( __STDC__) || defined( __cplusplus) || defined( bb1208)
-#ifndef bb136
-#define bb136
+#if defined( __STDC__) || defined( __cplusplus) || defined( bb1268)
+#ifndef bb139
+#define bb139
 #endif
 #endif
-#ifndef bb136
+#ifndef bb139
 #ifndef bbh
 #define bbh
 #endif
 #endif
 #if defined( __BORLANDC__) && ( __BORLANDC__ < 0x500)
-#define bb1107
+#define bb1148
 #endif
-#ifndef bb290
-#ifdef bb507
-#define bb290 8
+#ifndef bb292
+#ifdef bb533
+#define bb292 8
 #else
-#define bb290 9
+#define bb292 9
 #endif
 #endif
-#ifndef bbp
-#ifdef bb136
-#define bbp( bb406) bb406
+#ifndef bbq
+#ifdef bb139
+#define bbq( bb421) bb421
 #else
-#define bbp( bb406) ()
+#define bbq( bb421) ()
 #endif
 #endif
-bba bbf bb153;bba bbs bbe bb7;bba bbs bb5 bb24;bba bb153 bb30;bba bbl
-bb440;bba bbe bb1099;bba bb7 bb166;bba bb24 bb167;
-#ifdef bb136
-bba bbb*bb70;bba bbb*bb184;
+bba bbf bb154;bba bbt bbe bb9;bba bbt bb8 bb25;bba bb154 bb34;bba bbl
+bb447;bba bbe bb1171;bba bb9 bb165;bba bb25 bb167;
+#ifdef bb139
+bba bbb*bb72;bba bbb*bb191;
 #else
-bba bb153*bb70;bba bb153*bb184;
+bba bb154*bb72;bba bb154*bb191;
 #endif
 #ifdef __cplusplus
 bbr"\x43"{
 #endif
-bba bb70( *bb504)bbp((bb70 bb110,bb7 bb496,bb7 bb47));bba bbb( *bb503
-)bbp((bb70 bb110,bb70 bb1139));bbi bb376;bba bbi bb1187{bb30*bb127;
-bb7 bb148;bb24 bb191;bb30*bb597;bb7 bb384;bb24 bb613;bbl*bb323;bbi
-bb376*bb23;bb504 bb401;bb503 bb372;bb70 bb110;bbe bb968;bb24 bb367;
-bb24 bb1153;}bb439;bba bb439*bb17;bbr bbh bbl*bb1159 bbp((bbb));bbr
-bbe bb511 bbp((bb17 bb16,bbe bb175));bbr bbe bb944 bbp((bb17 bb16));
-bbr bbe bb1051 bbp((bb17 bb16,bbe bb175));bbr bbe bb955 bbp((bb17 bb16
-));bbr bbe bb1178 bbp((bb17 bb16,bbh bb30*bb426,bb7 bb436));bbr bbe
-bb1151 bbp((bb17 bb130,bb17 bb185));bbr bbe bb1053 bbp((bb17 bb16));
-bbr bbe bb1176 bbp((bb17 bb16,bbe bb124,bbe bb295));bbr bbe bb1149 bbp
-((bb17 bb16,bbh bb30*bb426,bb7 bb436));bbr bbe bb1150 bbp((bb17 bb16));
-bbr bbe bb1013 bbp((bb17 bb16));bbr bbe bb1152 bbp((bb30*bb130,bb167*
-bb312,bbh bb30*bb185,bb24 bb325));bbr bbe bb1148 bbp((bb30*bb130,
-bb167*bb312,bbh bb30*bb185,bb24 bb325,bbe bb124));bbr bbe bb1162 bbp(
-(bb30*bb130,bb167*bb312,bbh bb30*bb185,bb24 bb325));bba bb184 bb34;
-bbr bb34 bb1210 bbp((bbh bbl*bb1006,bbh bbl*bb57));bbr bb34 bb1211 bbp
-((bbe bb472,bbh bbl*bb57));bbr bbe bb1228 bbp((bb34 bb25,bbe bb124,
-bbe bb295));bbr bbe bb1191 bbp((bb34 bb25,bb184 bb40,bbs bb21));bbr
-bbe bb1188 bbp((bb34 bb25,bbh bb184 bb40,bbs bb21));bbr bbe bb1227 bbp
-((bb34 bb25,bbh bbl*bb1230,...));bbr bbe bb1190 bbp((bb34 bb25,bbh bbl
- *bbg));bbr bbl*bb1182 bbp((bb34 bb25,bbl*bb40,bbe bb21));bbr bbe
-bb1201 bbp((bb34 bb25,bbe bbo));bbr bbe bb1183 bbp((bb34 bb25));bbr
-bbe bb1216 bbp((bb34 bb25,bbe bb175));bbr bb5 bb1198 bbp((bb34 bb25,
-bb5 bb92,bbe bb1206));bbr bbe bb1181 bbp((bb34 bb25));bbr bb5 bb1193
-bbp((bb34 bb25));bbr bbe bb1199 bbp((bb34 bb25));bbr bbe bb1207 bbp((
-bb34 bb25));bbr bbh bbl*bb1186 bbp((bb34 bb25,bbe*bb1180));bbr bb24
-bb986 bbp((bb24 bb367,bbh bb30*bb40,bb7 bb21));bbr bb24 bb1168 bbp((
-bb24 bb380,bbh bb30*bb40,bb7 bb21));bbr bbe bb1115 bbp((bb17 bb16,bbe
-bb124,bbh bbl*bb188,bbe bb195));bbr bbe bb1126 bbp((bb17 bb16,bbh bbl
- *bb188,bbe bb195));bbr bbe bb1048 bbp((bb17 bb16,bbe bb124,bbe bb566
-,bbe bb454,bbe bb956,bbe bb295,bbh bbl*bb188,bbe bb195));bbr bbe
-bb1082 bbp((bb17 bb16,bbe bb454,bbh bbl*bb188,bbe bb195));bbr bbh bbl
- *bb1169 bbp((bbe bb18));bbr bbe bb1174 bbp((bb17 bby));bbr bbh bb167
- *bb1163 bbp((bbb));
+bba bb72( *bb526)bbq((bb72 bb122,bb9 bb510,bb9 bb48));bba bbb( *bb524
+)bbq((bb72 bb122,bb72 bb1138));bbj bb390;bba bbj bb1221{bb34*bb128;
+bb9 bb149;bb25 bb193;bb34*bb619;bb9 bb397;bb25 bb642;bbl*bb327;bbj
+bb390*bb23;bb526 bb414;bb524 bb379;bb72 bb122;bbe bb1000;bb25 bb377;
+bb25 bb1189;}bb451;bba bb451*bb16;bbr bbh bbl*bb1196 bbq((bbb));bbr
+bbe bb529 bbq((bb16 bb15,bbe bb176));bbr bbe bb971 bbq((bb16 bb15));
+bbr bbe bb1086 bbq((bb16 bb15,bbe bb176));bbr bbe bb959 bbq((bb16 bb15
+));bbr bbe bb1217 bbq((bb16 bb15,bbh bb34*bb441,bb9 bb449));bbr bbe
+bb1188 bbq((bb16 bb132,bb16 bb185));bbr bbe bb1089 bbq((bb16 bb15));
+bbr bbe bb1215 bbq((bb16 bb15,bbe bb126,bbe bb303));bbr bbe bb1218 bbq
+((bb16 bb15,bbh bb34*bb441,bb9 bb449));bbr bbe bb1197 bbq((bb16 bb15));
+bbr bbe bb1045 bbq((bb16 bb15));bbr bbe bb1187 bbq((bb34*bb132,bb167*
+bb321,bbh bb34*bb185,bb25 bb332));bbr bbe bb1181 bbq((bb34*bb132,
+bb167*bb321,bbh bb34*bb185,bb25 bb332,bbe bb126));bbr bbe bb1202 bbq(
+(bb34*bb132,bb167*bb321,bbh bb34*bb185,bb25 bb332));bba bb191 bb39;
+bbr bb39 bb1237 bbq((bbh bbl*bb1039,bbh bbl*bb45));bbr bb39 bb1239 bbq
+((bbe bb486,bbh bbl*bb45));bbr bbe bb1262 bbq((bb39 bb26,bbe bb126,
+bbe bb303));bbr bbe bb1226 bbq((bb39 bb26,bb191 bb42,bbt bb22));bbr
+bbe bb1222 bbq((bb39 bb26,bbh bb191 bb42,bbt bb22));bbr bbe bb1248 bbq
+((bb39 bb26,bbh bbl*bb1265,...));bbr bbe bb1223 bbq((bb39 bb26,bbh bbl
+ *bbg));bbr bbl*bb1270 bbq((bb39 bb26,bbl*bb42,bbe bb22));bbr bbe
+bb1242 bbq((bb39 bb26,bbe bbn));bbr bbe bb1271 bbq((bb39 bb26));bbr
+bbe bb1259 bbq((bb39 bb26,bbe bb176));bbr bb8 bb1228 bbq((bb39 bb26,
+bb8 bb97,bbe bb1233));bbr bbe bb1269 bbq((bb39 bb26));bbr bb8 bb1244
+bbq((bb39 bb26));bbr bbe bb1231 bbq((bb39 bb26));bbr bbe bb1234 bbq((
+bb39 bb26));bbr bbh bbl*bb1220 bbq((bb39 bb26,bbe*bb1267));bbr bb25
+bb1018 bbq((bb25 bb377,bbh bb34*bb42,bb9 bb22));bbr bb25 bb1206 bbq((
+bb25 bb391,bbh bb34*bb42,bb9 bb22));bbr bbe bb1149 bbq((bb16 bb15,bbe
+bb126,bbh bbl*bb195,bbe bb196));bbr bbe bb1158 bbq((bb16 bb15,bbh bbl
+ *bb195,bbe bb196));bbr bbe bb1124 bbq((bb16 bb15,bbe bb126,bbe bb590
+,bbe bb466,bbe bb967,bbe bb303,bbh bbl*bb195,bbe bb196));bbr bbe
+bb1122 bbq((bb16 bb15,bbe bb466,bbh bbl*bb195,bbe bb196));bbr bbh bbl
+ *bb1209 bbq((bbe bb18));bbr bbe bb1214 bbq((bb16 bb0));bbr bbh bb167
+ *bb1204 bbq((bbb));
 #ifdef __cplusplus
 }
 #endif
-#define bb963 1
-#ifdef bb136
-#if defined( bb1741)
+#ifdef bb139
+#if defined( bb1773)
 #else
 #endif
 #endif
-bba bbs bbl bb155;bba bb155 bb1209;bba bbs bb135 bb126;bba bb126 bb501
-;bba bbs bb5 bb398;bbr bbh bbl*bb1067[10 ];
-#if bb290 >= 8
-#define bb788 8
+bba bbt bbl bb156;bba bb156 bb1236;bba bbt bb137 bb130;bba bb130 bb521
+;bba bbt bb8 bb410;bbr bbh bbl*bb1101[10 ];
+#if bb292 >= 8
+#define bb811 8
 #else
-#define bb788 bb290
+#define bb811 bb292
 #endif
-#ifdef bb168
-#define bb420 0x00
+#ifdef bb169
+#define bb436 0x00
 #if defined( __TURBOC__) || defined( __BORLANDC__)
-#if( __STDC__ == 1) && ( defined( bb1792) || defined( bb1770))
-bbb bb941 bb1337(bbb*bb103);bbb*bb941 bb1341(bbs bb5 bb1740);
+#if( __STDC__ == 1) && ( defined( bb1831) || defined( bb1809))
+bbb bb983 bb1377(bbb*bb105);bbb*bb983 bb1380(bbt bb8 bb1772);
 #else
 #include"uncobf.h"
 #include<alloc.h>
@@ -284,178 +285,400 @@ bbb bb941 bb1337(bbb*bb103);bbb*bb941 bb1341(bbs bb5 bb1740);
 #endif
 #endif
 #ifdef WIN32
-#define bb420 0x0b
+#define bb436 0x0b
 #endif
 #if ( defined( _MSC_VER) && ( _MSC_VER > 600))
-#define bb1752( bb472, bb131) bb1788( bb472, bb131)
+#define bb1786( bb486, bb131) bb1824( bb486, bb131)
 #endif
-#ifndef bb420
-#define bb420 0x03
+#ifndef bb436
+#define bb436 0x03
 #endif
-#if defined( bb1546) && ! defined( _MSC_VER) && ! defined( bb1773)
-#define bb963
+#if defined( bb1571) && ! defined( _MSC_VER) && ! defined( bb1811)
+#define bb1019
 #endif
-bba bb24( *bb934)bbp((bb24 bb475,bbh bb30*bb40,bb7 bb21));bb70 bb1166
-bbp((bb70 bb110,bbs bb496,bbs bb47));bbb bb1160 bbp((bb70 bb110,bb70
-bb913));bbi bb1103;bba bbi bb1103 bb303;bbr bb303*bb2011 bbp((bb17 bby
-,bb934 bbo,bb7 bbv));bbr bbe bb1981 bbp((bb303* ,bb17,bbe));bbr bbb
-bb1791 bbp((bb303* ,bb17,bb167* ));bbr bbe bb1995 bbp((bb303* ,bb17));
-bbr bbb bb2024 bbp((bb303*bbg,bbh bb30*bbt,bb7 bb11));bbr bbe bb1979
-bbp((bb303*bbg));bba bbi bb1374 bb152;bbi bb1374{bb556{bbi{bb153
-bb1175;bb153 bb959;}bb505;bb7 bb1548;}bb502;bb7 bb611;};bbr bbe bb2014
-bbp((bb166* ,bb166* ,bb152* * ,bb152* ,bb17));bbr bbe bb1997 bbp((bb7
-,bb7,bb166* ,bb166* ,bb166* ,bb152* * ,bb152* * ,bb152* ,bb17));bbr
-bbe bb1967 bbp((bb166* ,bb166* ,bb152* * ,bb152* * ,bb17));bbi bb1281
-;bba bbi bb1281 bb722;bbr bb722*bb1968 bbp((bb7,bb7,bb152* ,bb152* ,
-bb17));bbr bbe bb2071 bbp((bb303* ,bb17,bbe));bbr bbb bb1990 bbp((
-bb722* ,bb17));bba bb10{bb1768,bb2026,bb2038,bb2075,bb2017,bb1978,
-bb1959,bb1884,bb1784,bb921}bb1901;bbi bb1103{bb1901 bb57;bb556{bb7
-bb189;bbi{bb7 bb1023;bb7 bb163;bb166*bb1129;bb7 bb1724;bb152*bb1769;}
-bb444;bbi{bb722*bb1761;}bb1751;}bb149;bb7 bb1885;bb7 bb366;bb24 bb361
-;bb152*bb1807;bb30*bb158;bb30*bb442;bb30*bb369;bb30*bb198;bb934 bb1561
-;bb24 bb475;};bb41 bbh bb7 bb1145[17 ]={0x0000 ,0x0001 ,0x0003 ,0x0007 ,
-0x000f ,0x001f ,0x003f ,0x007f ,0x00ff ,0x01ff ,0x03ff ,0x07ff ,0x0fff ,0x1fff
-,0x3fff ,0x7fff ,0xffff };bbr bbe bb392 bbp((bb303* ,bb17,bbe));bbi bb376
-{bbe bb445;};bbi bb1281{bbe bb445;};bb41 bbh bb7 bb2333[]={16 ,17 ,18 ,0
-,8 ,7 ,9 ,6 ,10 ,5 ,11 ,4 ,12 ,3 ,13 ,2 ,14 ,1 ,15 };bbb bb1791(bbg,bby,bbo)bb303*
-bbg;bb17 bby;bb167*bbo;{bbm(bbo!=0 ) *bbo=bbg->bb475;bbm(bbg->bb57==
-bb2017||bbg->bb57==bb1978)( * ((bby)->bb372))((bby)->bb110,(bb70)(bbg
-->bb149.bb444.bb1129));bbm(bbg->bb57==bb1959)bb1990(bbg->bb149.bb1751
-.bb1761,bby);bbg->bb57=bb1768;bbg->bb366=0 ;bbg->bb361=0 ;bbg->bb369=
-bbg->bb198=bbg->bb158;bbm(bbg->bb1561!=0 )bby->bb367=bbg->bb475=( *bbg
-->bb1561)(0L ,(bbh bb30* )0 ,0 );;}bb303*bb2011(bby,bbo,bbv)bb17 bby;
-bb934 bbo;bb7 bbv;{bb303*bbg;bbm((bbg=(bb303* )( * ((bby)->bb401))((
-bby)->bb110,(1 ),(bb12(bbi bb1103))))==0 )bb2 bbg;bbm((bbg->bb1807=(
-bb152* )( * ((bby)->bb401))((bby)->bb110,(bb12(bb152)),(1440 )))==0 ){(
- * ((bby)->bb372))((bby)->bb110,(bb70)(bbg));bb2 0 ;}bbm((bbg->bb158=(
-bb30* )( * ((bby)->bb401))((bby)->bb110,(1 ),(bbv)))==0 ){( * ((bby)->
-bb372))((bby)->bb110,(bb70)(bbg->bb1807));( * ((bby)->bb372))((bby)->
-bb110,(bb70)(bbg));bb2 0 ;}bbg->bb442=bbg->bb158+bbv;bbg->bb1561=bbo;
-bbg->bb57=bb1768;;bb1791(bbg,bby,0 );bb2 bbg;}bbe bb1981(bbg,bby,bb26)bb303
- *bbg;bb17 bby;bbe bb26;{bb7 bb45;bb24 bbn;bb7 bb3;bb30*bb28;bb7 bb11
-;bb30*bb84;bb7 bb95;{{bb28=bby->bb127;bb11=bby->bb148;bbn=bbg->bb361;
-bb3=bbg->bb366;}{bb84=bbg->bb198;bb95=(bb7)(bb7)(bb84<bbg->bb369?bbg
-->bb369-bb84-1 :bbg->bb442-bb84);}}bb107(1 )bb296(bbg->bb57){bb15 bb1768
-:{bb107(bb3<(3 )){{bbm(bb11)bb26=0 ;bb54{{{bbg->bb361=bbn;bbg->bb366=
-bb3;}{bby->bb148=bb11;bby->bb191+=(bb24)(bb28-bby->bb127);bby->bb127=
-bb28;}{bbg->bb198=bb84;}}bb2 bb392(bbg,bby,bb26);}};bbn|=((bb24)(bb11
---, *bb28++))<<bb3;bb3+=(bb7)8 ;}}bb45=(bb7)bbn&7 ;bbg->bb1885=bb45&1 ;
-bb296(bb45>>1 ){bb15 0 :;{bbn>>=(3 );bb3-=(3 );}bb45=bb3&7 ;{bbn>>=(bb45);
-bb3-=(bb45);}bbg->bb57=bb2026;bb22;bb15 1 :;{bb7 bb55,bb961;bb152*
-bb1005, *bb1000;bb1967(&bb55,&bb961,&bb1005,&bb1000,bby);bbg->bb149.
-bb1751.bb1761=bb1968(bb55,bb961,bb1005,bb1000,bby);bbm(bbg->bb149.
-bb1751.bb1761==0 ){bb26=(-4 );{{{bbg->bb361=bbn;bbg->bb366=bb3;}{bby->
-bb148=bb11;bby->bb191+=(bb24)(bb28-bby->bb127);bby->bb127=bb28;}{bbg
-->bb198=bb84;}}bb2 bb392(bbg,bby,bb26);}}}{bbn>>=(3 );bb3-=(3 );}bbg->
-bb57=bb1959;bb22;bb15 2 :;{bbn>>=(3 );bb3-=(3 );}bbg->bb57=bb2075;bb22;
-bb15 3 :{bbn>>=(3 );bb3-=(3 );}bbg->bb57=bb921;bby->bb323=(bbl* )"";bb26
-=(-3 );{{{bbg->bb361=bbn;bbg->bb366=bb3;}{bby->bb148=bb11;bby->bb191+=
-(bb24)(bb28-bby->bb127);bby->bb127=bb28;}{bbg->bb198=bb84;}}bb2 bb392
-(bbg,bby,bb26);}}bb22;bb15 bb2026:{bb107(bb3<(32 )){{bbm(bb11)bb26=0 ;
-bb54{{{bbg->bb361=bbn;bbg->bb366=bb3;}{bby->bb148=bb11;bby->bb191+=(
-bb24)(bb28-bby->bb127);bby->bb127=bb28;}{bbg->bb198=bb84;}}bb2 bb392(
-bbg,bby,bb26);}};bbn|=((bb24)(bb11--, *bb28++))<<bb3;bb3+=(bb7)8 ;}}
-bbm((((~bbn)>>16 )&0xffff )!=(bbn&0xffff )){bbg->bb57=bb921;bby->bb323=(
-bbl* )"";bb26=(-3 );{{{bbg->bb361=bbn;bbg->bb366=bb3;}{bby->bb148=bb11
-;bby->bb191+=(bb24)(bb28-bby->bb127);bby->bb127=bb28;}{bbg->bb198=
-bb84;}}bb2 bb392(bbg,bby,bb26);}}bbg->bb149.bb189=(bb7)bbn&0xffff ;bbn
-=bb3=0 ;;bbg->bb57=bbg->bb149.bb189?bb2038:(bbg->bb1885?bb1884:bb1768);
-bb22;bb15 bb2038:bbm(bb11==0 ){{{bbg->bb361=bbn;bbg->bb366=bb3;}{bby->
-bb148=bb11;bby->bb191+=(bb24)(bb28-bby->bb127);bby->bb127=bb28;}{bbg
-->bb198=bb84;}}bb2 bb392(bbg,bby,bb26);}{bbm(bb95==0 ){{bbm(bb84==bbg
-->bb442&&bbg->bb369!=bbg->bb158){bb84=bbg->bb158;bb95=(bb7)(bb7)(bb84
-<bbg->bb369?bbg->bb369-bb84-1 :bbg->bb442-bb84);}}bbm(bb95==0 ){{{bbg->
-bb198=bb84;}bb26=bb392(bbg,bby,bb26);{bb84=bbg->bb198;bb95=(bb7)(bb7)(
-bb84<bbg->bb369?bbg->bb369-bb84-1 :bbg->bb442-bb84);}}{bbm(bb84==bbg->
-bb442&&bbg->bb369!=bbg->bb158){bb84=bbg->bb158;bb95=(bb7)(bb7)(bb84<
-bbg->bb369?bbg->bb369-bb84-1 :bbg->bb442-bb84);}}bbm(bb95==0 ){{{bbg->
-bb361=bbn;bbg->bb366=bb3;}{bby->bb148=bb11;bby->bb191+=(bb24)(bb28-
-bby->bb127);bby->bb127=bb28;}{bbg->bb198=bb84;}}bb2 bb392(bbg,bby,
-bb26);}}}bb26=0 ;}bb45=bbg->bb149.bb189;bbm(bb45>bb11)bb45=bb11;bbm(
-bb45>bb95)bb45=bb95;bb81(bb84,bb28,bb45);bb28+=bb45;bb11-=bb45;bb84+=
-bb45;bb95-=bb45;bbm((bbg->bb149.bb189-=bb45)!=0 )bb22;;bbg->bb57=bbg->
-bb1885?bb1884:bb1768;bb22;bb15 bb2075:{bb107(bb3<(14 )){{bbm(bb11)bb26
-=0 ;bb54{{{bbg->bb361=bbn;bbg->bb366=bb3;}{bby->bb148=bb11;bby->bb191
-+=(bb24)(bb28-bby->bb127);bby->bb127=bb28;}{bbg->bb198=bb84;}}bb2
-bb392(bbg,bby,bb26);}};bbn|=((bb24)(bb11--, *bb28++))<<bb3;bb3+=(bb7)8
-;}}bbg->bb149.bb444.bb1023=bb45=(bb7)bbn&0x3fff ;bbm((bb45&0x1f )>29 ||(
-(bb45>>5 )&0x1f )>29 ){bbg->bb57=bb921;bby->bb323=(bbl* )"";bb26=(-3 );{{
-{bbg->bb361=bbn;bbg->bb366=bb3;}{bby->bb148=bb11;bby->bb191+=(bb24)(
-bb28-bby->bb127);bby->bb127=bb28;}{bbg->bb198=bb84;}}bb2 bb392(bbg,
-bby,bb26);}}bb45=258 +(bb45&0x1f )+((bb45>>5 )&0x1f );bbm((bbg->bb149.
-bb444.bb1129=(bb166* )( * ((bby)->bb401))((bby)->bb110,(bb45),(bb12(
-bb7))))==0 ){bb26=(-4 );{{{bbg->bb361=bbn;bbg->bb366=bb3;}{bby->bb148=
-bb11;bby->bb191+=(bb24)(bb28-bby->bb127);bby->bb127=bb28;}{bbg->bb198
-=bb84;}}bb2 bb392(bbg,bby,bb26);}}{bbn>>=(14 );bb3-=(14 );}bbg->bb149.
-bb444.bb163=0 ;;bbg->bb57=bb2017;bb15 bb2017:bb107(bbg->bb149.bb444.
-bb163<4 +(bbg->bb149.bb444.bb1023>>10 )){{bb107(bb3<(3 )){{bbm(bb11)bb26
-=0 ;bb54{{{bbg->bb361=bbn;bbg->bb366=bb3;}{bby->bb148=bb11;bby->bb191
-+=(bb24)(bb28-bby->bb127);bby->bb127=bb28;}{bbg->bb198=bb84;}}bb2
-bb392(bbg,bby,bb26);}};bbn|=((bb24)(bb11--, *bb28++))<<bb3;bb3+=(bb7)8
-;}}bbg->bb149.bb444.bb1129[bb2333[bbg->bb149.bb444.bb163++]]=(bb7)bbn
-&7 ;{bbn>>=(3 );bb3-=(3 );}}bb107(bbg->bb149.bb444.bb163<19 )bbg->bb149.
-bb444.bb1129[bb2333[bbg->bb149.bb444.bb163++]]=0 ;bbg->bb149.bb444.
-bb1724=7 ;bb45=bb2014(bbg->bb149.bb444.bb1129,&bbg->bb149.bb444.bb1724
-,&bbg->bb149.bb444.bb1769,bbg->bb1807,bby);bbm(bb45!=0 ){( * ((bby)->
-bb372))((bby)->bb110,(bb70)(bbg->bb149.bb444.bb1129));bb26=bb45;bbm(
-bb26==(-3 ))bbg->bb57=bb921;{{{bbg->bb361=bbn;bbg->bb366=bb3;}{bby->
-bb148=bb11;bby->bb191+=(bb24)(bb28-bby->bb127);bby->bb127=bb28;}{bbg
-->bb198=bb84;}}bb2 bb392(bbg,bby,bb26);}}bbg->bb149.bb444.bb163=0 ;;
-bbg->bb57=bb1978;bb15 bb1978:bb107(bb45=bbg->bb149.bb444.bb1023,bbg->
-bb149.bb444.bb163<258 +(bb45&0x1f )+((bb45>>5 )&0x1f )){bb152*bb42;bb7 bbz
-,bb75,bbo;bb45=bbg->bb149.bb444.bb1724;{bb107(bb3<(bb45)){{bbm(bb11)bb26
-=0 ;bb54{{{bbg->bb361=bbn;bbg->bb366=bb3;}{bby->bb148=bb11;bby->bb191
-+=(bb24)(bb28-bby->bb127);bby->bb127=bb28;}{bbg->bb198=bb84;}}bb2
-bb392(bbg,bby,bb26);}};bbn|=((bb24)(bb11--, *bb28++))<<bb3;bb3+=(bb7)8
-;}}bb42=bbg->bb149.bb444.bb1769+((bb7)bbn&bb1145[bb45]);bb45=bb42->
-bb502.bb505.bb959;bbo=bb42->bb611;bbm(bbo<16 ){{bbn>>=(bb45);bb3-=(
-bb45);}bbg->bb149.bb444.bb1129[bbg->bb149.bb444.bb163++]=bbo;}bb54{
-bbz=bbo==18 ?7 :bbo-14 ;bb75=bbo==18 ?11 :3 ;{bb107(bb3<(bb45+bbz)){{bbm(
-bb11)bb26=0 ;bb54{{{bbg->bb361=bbn;bbg->bb366=bb3;}{bby->bb148=bb11;
-bby->bb191+=(bb24)(bb28-bby->bb127);bby->bb127=bb28;}{bbg->bb198=bb84
-;}}bb2 bb392(bbg,bby,bb26);}};bbn|=((bb24)(bb11--, *bb28++))<<bb3;bb3
-+=(bb7)8 ;}}{bbn>>=(bb45);bb3-=(bb45);}bb75+=(bb7)bbn&bb1145[bbz];{bbn
->>=(bbz);bb3-=(bbz);}bbz=bbg->bb149.bb444.bb163;bb45=bbg->bb149.bb444
-.bb1023;bbm(bbz+bb75>258 +(bb45&0x1f )+((bb45>>5 )&0x1f )||(bbo==16 &&bbz<
-1 )){( * ((bby)->bb372))((bby)->bb110,(bb70)(bbg->bb149.bb444.bb1129));
-bbg->bb57=bb921;bby->bb323=(bbl* )"";bb26=(-3 );{{{bbg->bb361=bbn;bbg
-->bb366=bb3;}{bby->bb148=bb11;bby->bb191+=(bb24)(bb28-bby->bb127);bby
-->bb127=bb28;}{bbg->bb198=bb84;}}bb2 bb392(bbg,bby,bb26);}}bbo=bbo==
-16 ?bbg->bb149.bb444.bb1129[bbz-1 ]:0 ;bb574{bbg->bb149.bb444.bb1129[bbz
-++]=bbo;}bb107(--bb75);bbg->bb149.bb444.bb163=bbz;}}bbg->bb149.bb444.
-bb1769=0 ;{bb7 bb55,bb961;bb152*bb1005, *bb1000;bb722*bbo;bb55=9 ;bb961
-=6 ;bb45=bbg->bb149.bb444.bb1023;bb45=bb1997(257 +(bb45&0x1f ),1 +((bb45
->>5 )&0x1f ),bbg->bb149.bb444.bb1129,&bb55,&bb961,&bb1005,&bb1000,bbg->
-bb1807,bby);( * ((bby)->bb372))((bby)->bb110,(bb70)(bbg->bb149.bb444.
-bb1129));bbm(bb45!=0 ){bbm(bb45==(bb7)(-3 ))bbg->bb57=bb921;bb26=bb45;{
-{{bbg->bb361=bbn;bbg->bb366=bb3;}{bby->bb148=bb11;bby->bb191+=(bb24)(
-bb28-bby->bb127);bby->bb127=bb28;}{bbg->bb198=bb84;}}bb2 bb392(bbg,
-bby,bb26);}};bbm((bbo=bb1968(bb55,bb961,bb1005,bb1000,bby))==0 ){bb26=
-(-4 );{{{bbg->bb361=bbn;bbg->bb366=bb3;}{bby->bb148=bb11;bby->bb191+=(
-bb24)(bb28-bby->bb127);bby->bb127=bb28;}{bbg->bb198=bb84;}}bb2 bb392(
-bbg,bby,bb26);}}bbg->bb149.bb1751.bb1761=bbo;}bbg->bb57=bb1959;bb15
-bb1959:{{bbg->bb361=bbn;bbg->bb366=bb3;}{bby->bb148=bb11;bby->bb191+=
-(bb24)(bb28-bby->bb127);bby->bb127=bb28;}{bbg->bb198=bb84;}}bbm((bb26
-=bb2071(bbg,bby,bb26))!=1 )bb2 bb392(bbg,bby,bb26);bb26=0 ;bb1990(bbg->
-bb149.bb1751.bb1761,bby);{{bb28=bby->bb127;bb11=bby->bb148;bbn=bbg->
-bb361;bb3=bbg->bb366;}{bb84=bbg->bb198;bb95=(bb7)(bb7)(bb84<bbg->
-bb369?bbg->bb369-bb84-1 :bbg->bb442-bb84);}};bbm(!bbg->bb1885){bbg->
-bb57=bb1768;bb22;}bbg->bb57=bb1884;bb15 bb1884:{{bbg->bb198=bb84;}
-bb26=bb392(bbg,bby,bb26);{bb84=bbg->bb198;bb95=(bb7)(bb7)(bb84<bbg->
-bb369?bbg->bb369-bb84-1 :bbg->bb442-bb84);}}bbm(bbg->bb369!=bbg->bb198
-){{{bbg->bb361=bbn;bbg->bb366=bb3;}{bby->bb148=bb11;bby->bb191+=(bb24
-)(bb28-bby->bb127);bby->bb127=bb28;}{bbg->bb198=bb84;}}bb2 bb392(bbg,
-bby,bb26);}bbg->bb57=bb1784;bb15 bb1784:bb26=1 ;{{{bbg->bb361=bbn;bbg
-->bb366=bb3;}{bby->bb148=bb11;bby->bb191+=(bb24)(bb28-bby->bb127);bby
-->bb127=bb28;}{bbg->bb198=bb84;}}bb2 bb392(bbg,bby,bb26);}bb15 bb921:
-bb26=(-3 );{{{bbg->bb361=bbn;bbg->bb366=bb3;}{bby->bb148=bb11;bby->
-bb191+=(bb24)(bb28-bby->bb127);bby->bb127=bb28;}{bbg->bb198=bb84;}}
-bb2 bb392(bbg,bby,bb26);}bb419:bb26=(-2 );{{{bbg->bb361=bbn;bbg->bb366
-=bb3;}{bby->bb148=bb11;bby->bb191+=(bb24)(bb28-bby->bb127);bby->bb127
-=bb28;}{bbg->bb198=bb84;}}bb2 bb392(bbg,bby,bb26);}}}bbe bb1995(bbg,
-bby)bb303*bbg;bb17 bby;{bb1791(bbg,bby,0 );( * ((bby)->bb372))((bby)->
-bb110,(bb70)(bbg->bb158));( * ((bby)->bb372))((bby)->bb110,(bb70)(bbg
-->bb1807));( * ((bby)->bb372))((bby)->bb110,(bb70)(bbg));;bb2 0 ;}bbb
-bb2024(bbg,bbt,bb11)bb303*bbg;bbh bb30*bbt;bb7 bb11;{bb81(bbg->bb158,
-bbt,bb11);bbg->bb369=bbg->bb198=bbg->bb158+bb11;}bbe bb1979(bbg)bb303
- *bbg;{bb2 bbg->bb57==bb2026;}
+bba bb25( *bb985)bbq((bb25 bb502,bbh bb34*bb42,bb9 bb22));bb72 bb1210
+bbq((bb72 bb122,bbt bb510,bbt bb48));bbb bb1199 bbq((bb72 bb122,bb72
+bb935));bba bbj bb2009{bb329{bb130 bb444;bb130 bb171;}bb294;bb329{
+bb130 bb2234;bb130 bb22;}bb52;}bb475;bba bbj bb2346 bb2069;bba bbj
+bb1995{bb475*bb1780;bbe bb522;bb2069*bb1736;}bb1765;bba bb130 bb1072;
+bba bb1072 bb1390;bba bbt bb1356;bba bbj bb390{bb16 bb15;bbe bb368;
+bb34*bb173;bb410 bb2190;bb34*bb1921;bbe bb189;bbe bb1386;bb154 bb1000
+;bb154 bb590;bbe bb1948;bb9 bb957;bb9 bb2235;bb9 bb1850;bb34*bb159;
+bb410 bb2297;bb1390*bb998;bb1390*bb395;bb9 bb515;bb9 bb1365;bb9 bb2202
+;bb9 bb1755;bb9 bb1629;bb8 bb443;bb9 bb970;bb1356 bb2369;bbe bb1993;
+bb9 bb187;bb9 bb2088;bb9 bb473;bb9 bb1318;bb9 bb2251;bb9 bb2121;bbe
+bb126;bbe bb303;bb9 bb2255;bbe bb1888;bbj bb2009 bb1001[(2 * (256 +1 +29
+)+1 )];bbj bb2009 bb1693[2 *30 +1 ];bbj bb2009 bb552[2 *19 +1 ];bbj bb1995
+bb1992;bbj bb1995 bb1914;bbj bb1995 bb2126;bb130 bb1229[15 +1 ];bbe
+bb542[2 * (256 +1 +29 )+1 ];bbe bb1523;bbe bb1998;bb156 bb1281[2 * (256 +1 +
+29 )+1 ];bb1236*bb1743;bb9 bb1159;bb9 bb637;bb521*bb1661;bb410 bb1961;
+bb410 bb2185;bb9 bb2300;bbe bb2053;bb130 bb102;bbe bb84;}bb192;bbb
+bb2283 bbq((bb192*bbg));bbe bb2467 bbq((bb192*bbg,bbt bb429,bbt bb1162
+));bbb bb1637 bbq((bb192*bbg,bb447*bb42,bb410 bb1333,bbe bb1147));bbb
+bb2323 bbq((bb192*bbg));bbb bb2218 bbq((bb192*bbg,bb447*bb42,bb410
+bb1333,bbe bb1147));bb40 bbh bb475 bb1766[(256 +1 +29 )+2 ]={{{12 },{8 }},{
+{140 },{8 }},{{76 },{8 }},{{204 },{8 }},{{44 },{8 }},{{172 },{8 }},{{108 },{8 }},
+{{236 },{8 }},{{28 },{8 }},{{156 },{8 }},{{92 },{8 }},{{220 },{8 }},{{60 },{8 }},
+{{188 },{8 }},{{124 },{8 }},{{252 },{8 }},{{2 },{8 }},{{130 },{8 }},{{66 },{8 }},
+{{194 },{8 }},{{34 },{8 }},{{162 },{8 }},{{98 },{8 }},{{226 },{8 }},{{18 },{8 }},
+{{146 },{8 }},{{82 },{8 }},{{210 },{8 }},{{50 },{8 }},{{178 },{8 }},{{114 },{8 }}
+,{{242 },{8 }},{{10 },{8 }},{{138 },{8 }},{{74 },{8 }},{{202 },{8 }},{{42 },{8 }}
+,{{170 },{8 }},{{106 },{8 }},{{234 },{8 }},{{26 },{8 }},{{154 },{8 }},{{90 },{8 }
+},{{218 },{8 }},{{58 },{8 }},{{186 },{8 }},{{122 },{8 }},{{250 },{8 }},{{6 },{8 }
+},{{134 },{8 }},{{70 },{8 }},{{198 },{8 }},{{38 },{8 }},{{166 },{8 }},{{102 },{8
+}},{{230 },{8 }},{{22 },{8 }},{{150 },{8 }},{{86 },{8 }},{{214 },{8 }},{{54 },{8
+}},{{182 },{8 }},{{118 },{8 }},{{246 },{8 }},{{14 },{8 }},{{142 },{8 }},{{78 },{
+8 }},{{206 },{8 }},{{46 },{8 }},{{174 },{8 }},{{110 },{8 }},{{238 },{8 }},{{30 },
+{8 }},{{158 },{8 }},{{94 },{8 }},{{222 },{8 }},{{62 },{8 }},{{190 },{8 }},{{126 }
+,{8 }},{{254 },{8 }},{{1 },{8 }},{{129 },{8 }},{{65 },{8 }},{{193 },{8 }},{{33 },
+{8 }},{{161 },{8 }},{{97 },{8 }},{{225 },{8 }},{{17 },{8 }},{{145 },{8 }},{{81 },
+{8 }},{{209 },{8 }},{{49 },{8 }},{{177 },{8 }},{{113 },{8 }},{{241 },{8 }},{{9 },
+{8 }},{{137 },{8 }},{{73 },{8 }},{{201 },{8 }},{{41 },{8 }},{{169 },{8 }},{{105 }
+,{8 }},{{233 },{8 }},{{25 },{8 }},{{153 },{8 }},{{89 },{8 }},{{217 },{8 }},{{57 }
+,{8 }},{{185 },{8 }},{{121 },{8 }},{{249 },{8 }},{{5 },{8 }},{{133 },{8 }},{{69 }
+,{8 }},{{197 },{8 }},{{37 },{8 }},{{165 },{8 }},{{101 },{8 }},{{229 },{8 }},{{21
+},{8 }},{{149 },{8 }},{{85 },{8 }},{{213 },{8 }},{{53 },{8 }},{{181 },{8 }},{{
+117 },{8 }},{{245 },{8 }},{{13 },{8 }},{{141 },{8 }},{{77 },{8 }},{{205 },{8 }},{
+{45 },{8 }},{{173 },{8 }},{{109 },{8 }},{{237 },{8 }},{{29 },{8 }},{{157 },{8 }},
+{{93 },{8 }},{{221 },{8 }},{{61 },{8 }},{{189 },{8 }},{{125 },{8 }},{{253 },{8 }}
+,{{19 },{9 }},{{275 },{9 }},{{147 },{9 }},{{403 },{9 }},{{83 },{9 }},{{339 },{9 }
+},{{211 },{9 }},{{467 },{9 }},{{51 },{9 }},{{307 },{9 }},{{179 },{9 }},{{435 },{
+9 }},{{115 },{9 }},{{371 },{9 }},{{243 },{9 }},{{499 },{9 }},{{11 },{9 }},{{267 }
+,{9 }},{{139 },{9 }},{{395 },{9 }},{{75 },{9 }},{{331 },{9 }},{{203 },{9 }},{{
+459 },{9 }},{{43 },{9 }},{{299 },{9 }},{{171 },{9 }},{{427 },{9 }},{{107 },{9 }},
+{{363 },{9 }},{{235 },{9 }},{{491 },{9 }},{{27 },{9 }},{{283 },{9 }},{{155 },{9 }
+},{{411 },{9 }},{{91 },{9 }},{{347 },{9 }},{{219 },{9 }},{{475 },{9 }},{{59 },{9
+}},{{315 },{9 }},{{187 },{9 }},{{443 },{9 }},{{123 },{9 }},{{379 },{9 }},{{251 }
+,{9 }},{{507 },{9 }},{{7 },{9 }},{{263 },{9 }},{{135 },{9 }},{{391 },{9 }},{{71 }
+,{9 }},{{327 },{9 }},{{199 },{9 }},{{455 },{9 }},{{39 },{9 }},{{295 },{9 }},{{
+167 },{9 }},{{423 },{9 }},{{103 },{9 }},{{359 },{9 }},{{231 },{9 }},{{487 },{9 }}
+,{{23 },{9 }},{{279 },{9 }},{{151 },{9 }},{{407 },{9 }},{{87 },{9 }},{{343 },{9 }
+},{{215 },{9 }},{{471 },{9 }},{{55 },{9 }},{{311 },{9 }},{{183 },{9 }},{{439 },{
+9 }},{{119 },{9 }},{{375 },{9 }},{{247 },{9 }},{{503 },{9 }},{{15 },{9 }},{{271 }
+,{9 }},{{143 },{9 }},{{399 },{9 }},{{79 },{9 }},{{335 },{9 }},{{207 },{9 }},{{
+463 },{9 }},{{47 },{9 }},{{303 },{9 }},{{175 },{9 }},{{431 },{9 }},{{111 },{9 }},
+{{367 },{9 }},{{239 },{9 }},{{495 },{9 }},{{31 },{9 }},{{287 },{9 }},{{159 },{9 }
+},{{415 },{9 }},{{95 },{9 }},{{351 },{9 }},{{223 },{9 }},{{479 },{9 }},{{63 },{9
+}},{{319 },{9 }},{{191 },{9 }},{{447 },{9 }},{{127 },{9 }},{{383 },{9 }},{{255 }
+,{9 }},{{511 },{9 }},{{0 },{7 }},{{64 },{7 }},{{32 },{7 }},{{96 },{7 }},{{16 },{7
+}},{{80 },{7 }},{{48 },{7 }},{{112 },{7 }},{{8 },{7 }},{{72 },{7 }},{{40 },{7 }},
+{{104 },{7 }},{{24 },{7 }},{{88 },{7 }},{{56 },{7 }},{{120 },{7 }},{{4 },{7 }},{{
+68 },{7 }},{{36 },{7 }},{{100 },{7 }},{{20 },{7 }},{{84 },{7 }},{{52 },{7 }},{{
+116 },{7 }},{{3 },{8 }},{{131 },{8 }},{{67 },{8 }},{{195 },{8 }},{{35 },{8 }},{{
+163 },{8 }},{{99 },{8 }},{{227 },{8 }}};bb40 bbh bb475 bb2304[30 ]={{{0 },{5 }
+},{{16 },{5 }},{{8 },{5 }},{{24 },{5 }},{{4 },{5 }},{{20 },{5 }},{{12 },{5 }},{{
+28 },{5 }},{{2 },{5 }},{{18 },{5 }},{{10 },{5 }},{{26 },{5 }},{{6 },{5 }},{{22 },{
+5 }},{{14 },{5 }},{{30 },{5 }},{{1 },{5 }},{{17 },{5 }},{{9 },{5 }},{{25 },{5 }},{
+{5 },{5 }},{{21 },{5 }},{{13 },{5 }},{{29 },{5 }},{{3 },{5 }},{{19 },{5 }},{{11 },
+{5 }},{{27 },{5 }},{{7 },{5 }},{{23 },{5 }}};bb40 bbh bb156 bb1764[512 ]={0 ,1
+,2 ,3 ,4 ,4 ,5 ,5 ,6 ,6 ,6 ,6 ,7 ,7 ,7 ,7 ,8 ,8 ,8 ,8 ,8 ,8 ,8 ,8 ,9 ,9 ,9 ,9 ,9 ,9 ,9 ,9 ,10 ,10 ,10
+,10 ,10 ,10 ,10 ,10 ,10 ,10 ,10 ,10 ,10 ,10 ,10 ,10 ,11 ,11 ,11 ,11 ,11 ,11 ,11 ,11 ,11 ,11
+,11 ,11 ,11 ,11 ,11 ,11 ,12 ,12 ,12 ,12 ,12 ,12 ,12 ,12 ,12 ,12 ,12 ,12 ,12 ,12 ,12 ,12 ,12
+,12 ,12 ,12 ,12 ,12 ,12 ,12 ,12 ,12 ,12 ,12 ,12 ,12 ,12 ,12 ,13 ,13 ,13 ,13 ,13 ,13 ,13 ,13
+,13 ,13 ,13 ,13 ,13 ,13 ,13 ,13 ,13 ,13 ,13 ,13 ,13 ,13 ,13 ,13 ,13 ,13 ,13 ,13 ,13 ,13 ,13
+,13 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14
+,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14
+,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,14 ,15 ,15 ,15 ,15
+,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15
+,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15
+,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15 ,15 ,0 ,0 ,16 ,17 ,18 ,18 ,19 ,19 ,20 ,
+20 ,20 ,20 ,21 ,21 ,21 ,21 ,22 ,22 ,22 ,22 ,22 ,22 ,22 ,22 ,23 ,23 ,23 ,23 ,23 ,23 ,23 ,23 ,
+24 ,24 ,24 ,24 ,24 ,24 ,24 ,24 ,24 ,24 ,24 ,24 ,24 ,24 ,24 ,24 ,25 ,25 ,25 ,25 ,25 ,25 ,25 ,
+25 ,25 ,25 ,25 ,25 ,25 ,25 ,25 ,25 ,26 ,26 ,26 ,26 ,26 ,26 ,26 ,26 ,26 ,26 ,26 ,26 ,26 ,26 ,
+26 ,26 ,26 ,26 ,26 ,26 ,26 ,26 ,26 ,26 ,26 ,26 ,26 ,26 ,26 ,26 ,26 ,26 ,27 ,27 ,27 ,27 ,27 ,
+27 ,27 ,27 ,27 ,27 ,27 ,27 ,27 ,27 ,27 ,27 ,27 ,27 ,27 ,27 ,27 ,27 ,27 ,27 ,27 ,27 ,27 ,27 ,
+27 ,27 ,27 ,27 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,
+28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,
+28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,28 ,29 ,
+29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,
+29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,
+29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 ,29 };bb40 bbh bb156
+bb2116[258 -3 +1 ]={0 ,1 ,2 ,3 ,4 ,5 ,6 ,7 ,8 ,8 ,9 ,9 ,10 ,10 ,11 ,11 ,12 ,12 ,12 ,12 ,13 ,
+13 ,13 ,13 ,14 ,14 ,14 ,14 ,15 ,15 ,15 ,15 ,16 ,16 ,16 ,16 ,16 ,16 ,16 ,16 ,17 ,17 ,17 ,17 ,
+17 ,17 ,17 ,17 ,18 ,18 ,18 ,18 ,18 ,18 ,18 ,18 ,19 ,19 ,19 ,19 ,19 ,19 ,19 ,19 ,20 ,20 ,20 ,
+20 ,20 ,20 ,20 ,20 ,20 ,20 ,20 ,20 ,20 ,20 ,20 ,20 ,21 ,21 ,21 ,21 ,21 ,21 ,21 ,21 ,21 ,21 ,
+21 ,21 ,21 ,21 ,21 ,21 ,22 ,22 ,22 ,22 ,22 ,22 ,22 ,22 ,22 ,22 ,22 ,22 ,22 ,22 ,22 ,22 ,23 ,
+23 ,23 ,23 ,23 ,23 ,23 ,23 ,23 ,23 ,23 ,23 ,23 ,23 ,23 ,23 ,24 ,24 ,24 ,24 ,24 ,24 ,24 ,24 ,
+24 ,24 ,24 ,24 ,24 ,24 ,24 ,24 ,24 ,24 ,24 ,24 ,24 ,24 ,24 ,24 ,24 ,24 ,24 ,24 ,24 ,24 ,24 ,
+24 ,25 ,25 ,25 ,25 ,25 ,25 ,25 ,25 ,25 ,25 ,25 ,25 ,25 ,25 ,25 ,25 ,25 ,25 ,25 ,25 ,25 ,25 ,
+25 ,25 ,25 ,25 ,25 ,25 ,25 ,25 ,25 ,25 ,26 ,26 ,26 ,26 ,26 ,26 ,26 ,26 ,26 ,26 ,26 ,26 ,26 ,
+26 ,26 ,26 ,26 ,26 ,26 ,26 ,26 ,26 ,26 ,26 ,26 ,26 ,26 ,26 ,26 ,26 ,26 ,26 ,27 ,27 ,27 ,27 ,
+27 ,27 ,27 ,27 ,27 ,27 ,27 ,27 ,27 ,27 ,27 ,27 ,27 ,27 ,27 ,27 ,27 ,27 ,27 ,27 ,27 ,27 ,27 ,
+27 ,27 ,27 ,27 ,28 };bb40 bbh bbe bb2407[29 ]={0 ,1 ,2 ,3 ,4 ,5 ,6 ,7 ,8 ,10 ,12 ,14 ,
+16 ,20 ,24 ,28 ,32 ,40 ,48 ,56 ,64 ,80 ,96 ,112 ,128 ,160 ,192 ,224 ,0 };bb40 bbh bbe
+bb2493[30 ]={0 ,1 ,2 ,3 ,4 ,6 ,8 ,12 ,16 ,24 ,32 ,48 ,64 ,96 ,128 ,192 ,256 ,384 ,512 ,
+768 ,1024 ,1536 ,2048 ,3072 ,4096 ,6144 ,8192 ,12288 ,16384 ,24576 };bba bb13{
+bb1325,bb2230,bb1794,bb2213}bb1870;bba bb1870( *bb2464)bbq((bb192*bbg
+,bbe bb176));bb40 bbb bb2264 bbq((bb192*bbg));bb40 bb1870 bb2459 bbq(
+(bb192*bbg,bbe bb176));bb40 bb1870 bb2231 bbq((bb192*bbg,bbe bb176));
+bb40 bb1870 bb2003 bbq((bb192*bbg,bbe bb176));bb40 bbb bb2509 bbq((
+bb192*bbg));bb40 bbb bb2071 bbq((bb192*bbg,bb9 bbp));bb40 bbb bb1308
+bbq((bb16 bb15));bb40 bbe bb2513 bbq((bb16 bb15,bb34*bb42,bbt bb48));
+bb40 bb9 bb2327 bbq((bb192*bbg,bb1356 bb2054));bba bbj bb2703{bb130
+bb2512;bb130 bb2515;bb130 bb2461;bb130 bb2420;bb2464 bb2084;}bb2582;
+bb40 bbh bb2582 bb1367[10 ]={{0 ,0 ,0 ,0 ,bb2459},{4 ,4 ,8 ,4 ,bb2231},{4 ,5 ,16
+,8 ,bb2231},{4 ,6 ,32 ,32 ,bb2231},{4 ,4 ,16 ,16 ,bb2003},{8 ,16 ,32 ,32 ,bb2003},
+{8 ,16 ,128 ,128 ,bb2003},{8 ,32 ,128 ,256 ,bb2003},{32 ,128 ,258 ,1024 ,bb2003},
+{32 ,258 ,258 ,4096 ,bb2003}};bbj bb2346{bbe bb460;};bbe bb1149(bb15,
+bb126,bb195,bb196)bb16 bb15;bbe bb126;bbh bbl*bb195;bbe bb196;{bb4
+bb1124(bb15,bb126,8 ,15 ,bb811,0 ,bb195,bb196);}bbe bb1124(bb15,bb126,
+bb590,bb466,bb967,bb303,bb195,bb196)bb16 bb15;bbe bb126;bbe bb590;bbe
+bb466;bbe bb967;bbe bb303;bbh bbl*bb195;bbe bb196;{bb192*bbg;bbe
+bb1386=0 ;bb40 bbh bbl*bb2653="\x31\x2e\x31\x2e\x33";bb521*bb1934;bbm(
+bb195==0 ||bb195[0 ]!=bb2653[0 ]||bb196!=bb12(bb451)){bb4(-6 );}bbm(bb15
+==0 )bb4(-2 );bb15->bb327=0 ;bbm(bb15->bb414==0 ){bb15->bb414=bb1210;bb15
+->bb122=(bb72)0 ;}bbm(bb15->bb379==0 )bb15->bb379=bb1199;bbm(bb126==(-1
+))bb126=6 ;bbm(bb466<0 ){bb1386=1 ;bb466=-bb466;}bbm(bb967<1 ||bb967>
+bb292||bb590!=8 ||bb466<8 ||bb466>15 ||bb126<0 ||bb126>9 ||bb303<0 ||bb303>
+2 ){bb4(-2 );}bbg=(bb192* )( * ((bb15)->bb414))((bb15)->bb122,(1 ),(bb12
+(bb192)));bbm(bbg==0 )bb4(-4 );bb15->bb23=(bbj bb390* )bbg;bbg->bb15=
+bb15;bbg->bb1386=bb1386;bbg->bb2235=bb466;bbg->bb957=1 <<bbg->bb2235;
+bbg->bb1850=bbg->bb957-1 ;bbg->bb2202=bb967+7 ;bbg->bb1365=1 <<bbg->
+bb2202;bbg->bb1755=bbg->bb1365-1 ;bbg->bb1629=((bbg->bb2202+3 -1 )/3 );
+bbg->bb159=(bb34* )( * ((bb15)->bb414))((bb15)->bb122,(bbg->bb957),(2
+ *bb12(bb154)));bbg->bb998=(bb1390* )( * ((bb15)->bb414))((bb15)->
+bb122,(bbg->bb957),(bb12(bb1072)));bbg->bb395=(bb1390* )( * ((bb15)->
+bb414))((bb15)->bb122,(bbg->bb1365),(bb12(bb1072)));bbg->bb1159=1 <<(
+bb967+6 );bb1934=(bb521* )( * ((bb15)->bb414))((bb15)->bb122,(bbg->
+bb1159),(bb12(bb130)+2 ));bbg->bb173=(bb1236* )bb1934;bbg->bb2190=(
+bb410)bbg->bb1159* (bb12(bb130)+2L );bbm(bbg->bb159==0 ||bbg->bb998==0
+||bbg->bb395==0 ||bbg->bb173==0 ){bb15->bb327=(bbl* )bb1101[2 -((-4 ))];
+bb971(bb15);bb4(-4 );}bbg->bb1661=bb1934+bbg->bb1159/bb12(bb130);bbg->
+bb1743=bbg->bb173+(1 +bb12(bb130)) *bbg->bb1159;bbg->bb126=bb126;bbg->
+bb303=bb303;bbg->bb590=(bb154)bb590;bb4 bb1089(bb15);}bbe bb1217(bb15
+,bb441,bb449)bb16 bb15;bbh bb34*bb441;bb9 bb449;{bb192*bbg;bb9 bb483=
+bb449;bb9 bb11;bb1356 bb1166=0 ;bbm(bb15==0 ||bb15->bb23==0 ||bb441==0 ||
+bb15->bb23->bb368!=42 )bb4(-2 );bbg=bb15->bb23;bb15->bb377=bb1018(bb15
+->bb377,bb441,bb449);bbm(bb483<3 )bb4 0 ;bbm(bb483>((bbg)->bb957-(258 +3
++1 ))){bb483=((bbg)->bb957-(258 +3 +1 ));bb441+=bb449-bb483;}bb74(bbg->
+bb159,bb441,bb483);bbg->bb187=bb483;bbg->bb443=(bb8)bb483;bbg->bb515=
+bbg->bb159[0 ];(bbg->bb515=(((bbg->bb515)<<bbg->bb1629)^(bbg->bb159[1 ]
+))&bbg->bb1755);bb90(bb11=0 ;bb11<=bb483-3 ;bb11++){((bbg->bb515=(((bbg
+->bb515)<<bbg->bb1629)^(bbg->bb159[(bb11)+(3 -1 )]))&bbg->bb1755),bbg->
+bb998[(bb11)&bbg->bb1850]=bb1166=bbg->bb395[bbg->bb515],bbg->bb395[
+bbg->bb515]=(bb1072)(bb11));}bbm(bb1166)bb1166=0 ;bb4 0 ;}bbe bb1089(
+bb15)bb16 bb15;{bb192*bbg;bbm(bb15==0 ||bb15->bb23==0 ||bb15->bb414==0
+||bb15->bb379==0 )bb4(-2 );bb15->bb193=bb15->bb642=0 ;bb15->bb327=0 ;bb15
+->bb1000=2 ;bbg=(bb192* )bb15->bb23;bbg->bb189=0 ;bbg->bb1921=bbg->
+bb173;bbm(bbg->bb1386<0 ){bbg->bb1386=0 ;}bbg->bb368=bbg->bb1386?113 :42
+;bb15->bb377=1 ;bbg->bb1948=0 ;bb2283(bbg);bb2509(bbg);bb4 0 ;}bbe bb1215
+(bb15,bb126,bb303)bb16 bb15;bbe bb126;bbe bb303;{bb192*bbg;bb2464
+bb2084;bbe bb18=0 ;bbm(bb15==0 ||bb15->bb23==0 )bb4(-2 );bbg=bb15->bb23;
+bbm(bb126==(-1 )){bb126=6 ;}bbm(bb126<0 ||bb126>9 ||bb303<0 ||bb303>2 ){bb4
+(-2 );}bb2084=bb1367[bbg->bb126].bb2084;bbm(bb2084!=bb1367[bb126].
+bb2084&&bb15->bb193!=0 ){bb18=bb529(bb15,1 );}bbm(bbg->bb126!=bb126){
+bbg->bb126=bb126;bbg->bb2121=bb1367[bb126].bb2515;bbg->bb2255=bb1367[
+bb126].bb2512;bbg->bb1888=bb1367[bb126].bb2461;bbg->bb2251=bb1367[
+bb126].bb2420;}bbg->bb303=bb303;bb4 bb18;}bb40 bbb bb2071(bbg,bbp)bb192
+ *bbg;bb9 bbp;{{bbg->bb173[bbg->bb189++]=((bb154)(bbp>>8 ));};{bbg->
+bb173[bbg->bb189++]=((bb154)(bbp&0xff ));};}bb40 bbb bb1308(bb15)bb16
+bb15;{bbt bb22=bb15->bb23->bb189;bbm(bb22>bb15->bb397)bb22=bb15->
+bb397;bbm(bb22==0 )bb4;bb74(bb15->bb619,bb15->bb23->bb1921,bb22);bb15
+->bb619+=bb22;bb15->bb23->bb1921+=bb22;bb15->bb642+=bb22;bb15->bb397
+-=bb22;bb15->bb23->bb189-=bb22;bbm(bb15->bb23->bb189==0 ){bb15->bb23->
+bb1921=bb15->bb23->bb173;}}bbe bb529(bb15,bb176)bb16 bb15;bbe bb176;{
+bbe bb2417;bb192*bbg;bbm(bb15==0 ||bb15->bb23==0 ||bb176>4 ||bb176<0 ){
+bb4(-2 );}bbg=bb15->bb23;bbm(bb15->bb619==0 ||(bb15->bb128==0 &&bb15->
+bb149!=0 )||(bbg->bb368==666 &&bb176!=4 )){bb4(bb15->bb327=(bbl* )bb1101
+[2 -((-2 ))],((-2 )));}bbm(bb15->bb397==0 )bb4(bb15->bb327=(bbl* )bb1101[
+2 -((-5 ))],((-5 )));bbg->bb15=bb15;bb2417=bbg->bb1948;bbg->bb1948=bb176
+;bbm(bbg->bb368==42 ){bb9 bb1017=(8 +((bbg->bb2235-8 )<<4 ))<<8 ;bb9 bb2371
+=(bbg->bb126-1 )>>1 ;bbm(bb2371>3 )bb2371=3 ;bb1017|=(bb2371<<6 );bbm(bbg
+->bb187!=0 )bb1017|=0x20 ;bb1017+=31 -(bb1017%31 );bbg->bb368=113 ;bb2071(
+bbg,bb1017);bbm(bbg->bb187!=0 ){bb2071(bbg,(bb9)(bb15->bb377>>16 ));
+bb2071(bbg,(bb9)(bb15->bb377&0xffff ));}bb15->bb377=1L ;}bbm(bbg->bb189
+!=0 ){bb1308(bb15);bbm(bb15->bb397==0 ){bbg->bb1948=-1 ;bb4 0 ;}}bb50 bbm
+(bb15->bb149==0 &&bb176<=bb2417&&bb176!=4 ){bb4(bb15->bb327=(bbl* )bb1101
+[2 -((-5 ))],((-5 )));}bbm(bbg->bb368==666 &&bb15->bb149!=0 ){bb4(bb15->
+bb327=(bbl* )bb1101[2 -((-5 ))],((-5 )));}bbm(bb15->bb149!=0 ||bbg->bb473
+!=0 ||(bb176!=0 &&bbg->bb368!=666 )){bb1870 bb2046;bb2046=( * (bb1367[
+bbg->bb126].bb2084))(bbg,bb176);bbm(bb2046==bb1794||bb2046==bb2213){
+bbg->bb368=666 ;}bbm(bb2046==bb1325||bb2046==bb1794){bbm(bb15->bb397==
+0 ){bbg->bb1948=-1 ;}bb4 0 ;}bbm(bb2046==bb2230){bbm(bb176==1 ){bb2323(
+bbg);}bb50{bb2218(bbg,(bbl* )0 ,0L ,0 );bbm(bb176==3 ){bbg->bb395[bbg->
+bb1365-1 ]=0 ;bb960((bb34* )bbg->bb395,0 ,(bbt)(bbg->bb1365-1 ) *bb12( *
+bbg->bb395));;}}bb1308(bb15);bbm(bb15->bb397==0 ){bbg->bb1948=-1 ;bb4 0
+;}}};bbm(bb176!=4 )bb4 0 ;bbm(bbg->bb1386)bb4 1 ;bb2071(bbg,(bb9)(bb15->
+bb377>>16 ));bb2071(bbg,(bb9)(bb15->bb377&0xffff ));bb1308(bb15);bbg->
+bb1386=-1 ;bb4 bbg->bb189!=0 ?0 :1 ;}bbe bb971(bb15)bb16 bb15;{bbe bb368;
+bbm(bb15==0 ||bb15->bb23==0 )bb4(-2 );bb368=bb15->bb23->bb368;bbm(bb368
+!=42 &&bb368!=113 &&bb368!=666 ){bb4(-2 );}{bbm(bb15->bb23->bb173)( * ((
+bb15)->bb379))((bb15)->bb122,(bb72)(bb15->bb23->bb173));};{bbm(bb15->
+bb23->bb395)( * ((bb15)->bb379))((bb15)->bb122,(bb72)(bb15->bb23->
+bb395));};{bbm(bb15->bb23->bb998)( * ((bb15)->bb379))((bb15)->bb122,(
+bb72)(bb15->bb23->bb998));};{bbm(bb15->bb23->bb159)( * ((bb15)->bb379
+))((bb15)->bb122,(bb72)(bb15->bb23->bb159));};( * ((bb15)->bb379))((
+bb15)->bb122,(bb72)(bb15->bb23));bb15->bb23=0 ;bb4 bb368==113 ?(-3 ):0 ;}
+bbe bb1188(bb132,bb185)bb16 bb132;bb16 bb185;{
+#ifdef bb533
+bb4(-2 );
+#else
+bb192*bb440;bb192*bb1871;bb521*bb1934;bbm(bb185==0 ||bb132==0 ||bb185->
+bb23==0 ){bb4(-2 );}bb1871=bb185->bb23; *bb132= *bb185;bb440=(bb192* )(
+ * ((bb132)->bb414))((bb132)->bb122,(1 ),(bb12(bb192)));bbm(bb440==0 )bb4
+(-4 );bb132->bb23=(bbj bb390* )bb440; *bb440= *bb1871;bb440->bb15=
+bb132;bb440->bb159=(bb34* )( * ((bb132)->bb414))((bb132)->bb122,(
+bb440->bb957),(2 *bb12(bb154)));bb440->bb998=(bb1390* )( * ((bb132)->
+bb414))((bb132)->bb122,(bb440->bb957),(bb12(bb1072)));bb440->bb395=(
+bb1390* )( * ((bb132)->bb414))((bb132)->bb122,(bb440->bb1365),(bb12(
+bb1072)));bb1934=(bb521* )( * ((bb132)->bb414))((bb132)->bb122,(bb440
+->bb1159),(bb12(bb130)+2 ));bb440->bb173=(bb1236* )bb1934;bbm(bb440->
+bb159==0 ||bb440->bb998==0 ||bb440->bb395==0 ||bb440->bb173==0 ){bb971(
+bb132);bb4(-4 );}bb74(bb440->bb159,bb1871->bb159,bb440->bb957*2 *bb12(
+bb154));bb74((bb34* )bb440->bb998,(bb34* )bb1871->bb998,bb440->bb957*
+bb12(bb1072));bb74((bb34* )bb440->bb395,(bb34* )bb1871->bb395,bb440->
+bb1365*bb12(bb1072));bb74(bb440->bb173,bb1871->bb173,(bb9)bb440->
+bb2190);bb440->bb1921=bb440->bb173+(bb1871->bb1921-bb1871->bb173);
+bb440->bb1661=bb1934+bb440->bb1159/bb12(bb130);bb440->bb1743=bb440->
+bb173+(1 +bb12(bb130)) *bb440->bb1159;bb440->bb1992.bb1780=bb440->
+bb1001;bb440->bb1914.bb1780=bb440->bb1693;bb440->bb2126.bb1780=bb440
+->bb552;bb4 0 ;
+#endif
+}bb40 bbe bb2513(bb15,bb42,bb48)bb16 bb15;bb34*bb42;bbt bb48;{bbt bb22
+=bb15->bb149;bbm(bb22>bb48)bb22=bb48;bbm(bb22==0 )bb4 0 ;bb15->bb149-=
+bb22;bbm(!bb15->bb23->bb1386){bb15->bb377=bb1018(bb15->bb377,bb15->
+bb128,bb22);}bb74(bb42,bb15->bb128,bb22);bb15->bb128+=bb22;bb15->
+bb193+=bb22;bb4(bbe)bb22;}bb40 bbb bb2509(bbg)bb192*bbg;{bbg->bb2297=
+(bb410)2L *bbg->bb957;bbg->bb395[bbg->bb1365-1 ]=0 ;bb960((bb34* )bbg->
+bb395,0 ,(bbt)(bbg->bb1365-1 ) *bb12( *bbg->bb395));;bbg->bb2121=bb1367
+[bbg->bb126].bb2515;bbg->bb2255=bb1367[bbg->bb126].bb2512;bbg->bb1888
+=bb1367[bbg->bb126].bb2461;bbg->bb2251=bb1367[bbg->bb126].bb2420;bbg
+->bb187=0 ;bbg->bb443=0L ;bbg->bb473=0 ;bbg->bb970=bbg->bb1318=3 -1 ;bbg->
+bb1993=0 ;bbg->bb515=0 ;}bb40 bb9 bb2327(bbg,bb2054)bb192*bbg;bb1356
+bb2054;{bbt bb2389=bbg->bb2251;bb943 bb34*bb509=bbg->bb159+bbg->bb187
+;bb943 bb34*bb624;bb943 bbe bb22;bbe bb1224=bbg->bb1318;bbe bb1888=
+bbg->bb1888;bb1356 bb2652=bbg->bb187>(bb1356)((bbg)->bb957-(258 +3 +1 ))?
+bbg->bb187-(bb1356)((bbg)->bb957-(258 +3 +1 )):0 ;bb1390*bb998=bbg->bb998
+;bb9 bb2547=bbg->bb1850;
+#ifdef bb1076
+bb943 bb34*bb1947=bbg->bb159+bbg->bb187+258 -1 ;bb943 bb130 bb2610= * (
+bb521* )bb509;bb943 bb130 bb2188= * (bb521* )(bb509+bb1224-1 );
+#else
+bb943 bb34*bb1947=bbg->bb159+bbg->bb187+258 ;bb943 bb154 bb2388=bb509[
+bb1224-1 ];bb943 bb154 bb2188=bb509[bb1224];
+#endif
+;bbm(bbg->bb1318>=bbg->bb2255){bb2389>>=2 ;}bbm((bb9)bb1888>bbg->bb473
+)bb1888=bbg->bb473;;bb599{;bb624=bbg->bb159+bb2054;
+#if ( defined( bb1076) && bb2660 == 258)
+bbm( * (bb521* )(bb624+bb1224-1 )!=bb2188|| * (bb521* )bb624!=bb2610)bb1698
+;;bb509++,bb624++;bb599{}bb109( * (bb521* )(bb509+=2 )== * (bb521* )(
+bb624+=2 )&& * (bb521* )(bb509+=2 )== * (bb521* )(bb624+=2 )&& * (bb521*
+)(bb509+=2 )== * (bb521* )(bb624+=2 )&& * (bb521* )(bb509+=2 )== * (
+bb521* )(bb624+=2 )&&bb509<bb1947);;bbm( *bb509== *bb624)bb509++;bb22=
+(258 -1 )-(bbe)(bb1947-bb509);bb509=bb1947-(258 -1 );
+#else
+bbm(bb624[bb1224]!=bb2188||bb624[bb1224-1 ]!=bb2388|| *bb624!= *bb509
+|| * ++bb624!=bb509[1 ])bb1698;bb509+=2 ,bb624++;;bb599{}bb109( * ++
+bb509== * ++bb624&& * ++bb509== * ++bb624&& * ++bb509== * ++bb624&& *
+++bb509== * ++bb624&& * ++bb509== * ++bb624&& * ++bb509== * ++bb624&&
+ * ++bb509== * ++bb624&& * ++bb509== * ++bb624&&bb509<bb1947);;bb22=
+258 -(bbe)(bb1947-bb509);bb509=bb1947-258 ;
+#endif
+bbm(bb22>bb1224){bbg->bb2088=bb2054;bb1224=bb22;bbm(bb22>=bb1888)bb21
+;
+#ifdef bb1076
+bb2188= * (bb521* )(bb509+bb1224-1 );
+#else
+bb2388=bb509[bb1224-1 ];bb2188=bb509[bb1224];
+#endif
+}}bb109((bb2054=bb998[bb2054&bb2547])>bb2652&&--bb2389!=0 );bbm((bb9)bb1224
+<=bbg->bb473)bb4(bb9)bb1224;bb4 bbg->bb473;}bb40 bbb bb2264(bbg)bb192
+ *bbg;{bb943 bbt bb11,bb82;bb943 bb1390*bb28;bbt bb1982;bb9 bb1255=
+bbg->bb957;bb599{bb1982=(bbt)(bbg->bb2297-(bb410)bbg->bb473-(bb410)bbg
+->bb187);bbm(bb1982==0 &&bbg->bb187==0 &&bbg->bb473==0 ){bb1982=bb1255;}
+bb50 bbm(bb1982==(bbt)(-1 )){bb1982--;}bb50 bbm(bbg->bb187>=bb1255+((
+bbg)->bb957-(258 +3 +1 ))){bb74(bbg->bb159,bbg->bb159+bb1255,(bbt)bb1255
+);bbg->bb2088-=bb1255;bbg->bb187-=bb1255;bbg->bb443-=(bb8)bb1255;bb11
+=bbg->bb1365;bb28=&bbg->bb395[bb11];bb599{bb82= * --bb28; *bb28=(
+bb1072)(bb82>=bb1255?bb82-bb1255:0 );}bb109(--bb11);bb11=bb1255;bb28=&
+bbg->bb998[bb11];bb599{bb82= * --bb28; *bb28=(bb1072)(bb82>=bb1255?
+bb82-bb1255:0 );}bb109(--bb11);bb1982+=bb1255;}bbm(bbg->bb15->bb149==0
+)bb4;;bb11=bb2513(bbg->bb15,bbg->bb159+bbg->bb187+bbg->bb473,bb1982);
+bbg->bb473+=bb11;bbm(bbg->bb473>=3 ){bbg->bb515=bbg->bb159[bbg->bb187]
+;(bbg->bb515=(((bbg->bb515)<<bbg->bb1629)^(bbg->bb159[bbg->bb187+1 ]))&
+bbg->bb1755);}}bb109(bbg->bb473<(258 +3 +1 )&&bbg->bb15->bb149!=0 );}bb40
+bb1870 bb2459(bbg,bb176)bb192*bbg;bbe bb176;{bb410 bb2342=0xffff ;
+bb410 bb2225;bbm(bb2342>bbg->bb2190-5 ){bb2342=bbg->bb2190-5 ;}bb90(;;){
+bbm(bbg->bb473<=1 ){;bb2264(bbg);bbm(bbg->bb473==0 &&bb176==0 )bb4 bb1325
+;bbm(bbg->bb473==0 )bb21;};bbg->bb187+=bbg->bb473;bbg->bb473=0 ;bb2225=
+bbg->bb443+bb2342;bbm(bbg->bb187==0 ||(bb410)bbg->bb187>=bb2225){bbg->
+bb473=(bb9)(bbg->bb187-bb2225);bbg->bb187=(bb9)bb2225;{{bb1637(bbg,(
+bbg->bb443>=0L ?(bb447* )&bbg->bb159[(bbt)bbg->bb443]:(bb447* )0 ),(
+bb410)((bb8)bbg->bb187-bbg->bb443),(0 ));bbg->bb443=bbg->bb187;bb1308(
+bbg->bb15);;};bbm(bbg->bb15->bb397==0 )bb4(0 )?bb1794:bb1325;};}bbm(bbg
+->bb187-(bb9)bbg->bb443>=((bbg)->bb957-(258 +3 +1 ))){{{bb1637(bbg,(bbg
+->bb443>=0L ?(bb447* )&bbg->bb159[(bbt)bbg->bb443]:(bb447* )0 ),(bb410)(
+(bb8)bbg->bb187-bbg->bb443),(0 ));bbg->bb443=bbg->bb187;bb1308(bbg->
+bb15);;};bbm(bbg->bb15->bb397==0 )bb4(0 )?bb1794:bb1325;};}}{{bb1637(
+bbg,(bbg->bb443>=0L ?(bb447* )&bbg->bb159[(bbt)bbg->bb443]:(bb447* )0 ),
+(bb410)((bb8)bbg->bb187-bbg->bb443),(bb176==4 ));bbg->bb443=bbg->bb187
+;bb1308(bbg->bb15);;};bbm(bbg->bb15->bb397==0 )bb4(bb176==4 )?bb1794:
+bb1325;};bb4 bb176==4 ?bb2213:bb2230;}bb40 bb1870 bb2231(bbg,bb176)bb192
+ *bbg;bbe bb176;{bb1356 bb1166=0 ;bbe bb1799;bb90(;;){bbm(bbg->bb473<(
+258 +3 +1 )){bb2264(bbg);bbm(bbg->bb473<(258 +3 +1 )&&bb176==0 ){bb4 bb1325;
+}bbm(bbg->bb473==0 )bb21;}bbm(bbg->bb473>=3 ){((bbg->bb515=(((bbg->
+bb515)<<bbg->bb1629)^(bbg->bb159[(bbg->bb187)+(3 -1 )]))&bbg->bb1755),
+bbg->bb998[(bbg->bb187)&bbg->bb1850]=bb1166=bbg->bb395[bbg->bb515],
+bbg->bb395[bbg->bb515]=(bb1072)(bbg->bb187));}bbm(bb1166!=0 &&bbg->
+bb187-bb1166<=((bbg)->bb957-(258 +3 +1 ))){bbm(bbg->bb303!=2 ){bbg->bb970
+=bb2327(bbg,bb1166);}}bbm(bbg->bb970>=3 ){;{bb156 bb22=(bbg->bb970-3 );
+bb130 bb429=(bbg->bb187-bbg->bb2088);bbg->bb1661[bbg->bb637]=bb429;
+bbg->bb1743[bbg->bb637++]=bb22;bb429--;bbg->bb1001[bb2116[bb22]+256 +1
+].bb294.bb444++;bbg->bb1693[((bb429)<256 ?bb1764[bb429]:bb1764[256 +((
+bb429)>>7 )])].bb294.bb444++;bb1799=(bbg->bb637==bbg->bb1159-1 );};bbg
+->bb473-=bbg->bb970;bbm(bbg->bb970<=bbg->bb2121&&bbg->bb473>=3 ){bbg->
+bb970--;bb599{bbg->bb187++;((bbg->bb515=(((bbg->bb515)<<bbg->bb1629)^
+(bbg->bb159[(bbg->bb187)+(3 -1 )]))&bbg->bb1755),bbg->bb998[(bbg->bb187
+)&bbg->bb1850]=bb1166=bbg->bb395[bbg->bb515],bbg->bb395[bbg->bb515]=(
+bb1072)(bbg->bb187));}bb109(--bbg->bb970!=0 );bbg->bb187++;}bb50{bbg->
+bb187+=bbg->bb970;bbg->bb970=0 ;bbg->bb515=bbg->bb159[bbg->bb187];(bbg
+->bb515=(((bbg->bb515)<<bbg->bb1629)^(bbg->bb159[bbg->bb187+1 ]))&bbg
+->bb1755);}}bb50{;{bb156 bb1891=(bbg->bb159[bbg->bb187]);bbg->bb1661[
+bbg->bb637]=0 ;bbg->bb1743[bbg->bb637++]=bb1891;bbg->bb1001[bb1891].
+bb294.bb444++;bb1799=(bbg->bb637==bbg->bb1159-1 );};bbg->bb473--;bbg->
+bb187++;}bbm(bb1799){{bb1637(bbg,(bbg->bb443>=0L ?(bb447* )&bbg->bb159
+[(bbt)bbg->bb443]:(bb447* )0 ),(bb410)((bb8)bbg->bb187-bbg->bb443),(0 ));
+bbg->bb443=bbg->bb187;bb1308(bbg->bb15);;};bbm(bbg->bb15->bb397==0 )bb4
+(0 )?bb1794:bb1325;};}{{bb1637(bbg,(bbg->bb443>=0L ?(bb447* )&bbg->
+bb159[(bbt)bbg->bb443]:(bb447* )0 ),(bb410)((bb8)bbg->bb187-bbg->bb443
+),(bb176==4 ));bbg->bb443=bbg->bb187;bb1308(bbg->bb15);;};bbm(bbg->
+bb15->bb397==0 )bb4(bb176==4 )?bb1794:bb1325;};bb4 bb176==4 ?bb2213:
+bb2230;}bb40 bb1870 bb2003(bbg,bb176)bb192*bbg;bbe bb176;{bb1356
+bb1166=0 ;bbe bb1799;bb90(;;){bbm(bbg->bb473<(258 +3 +1 )){bb2264(bbg);
+bbm(bbg->bb473<(258 +3 +1 )&&bb176==0 ){bb4 bb1325;}bbm(bbg->bb473==0 )bb21
+;}bbm(bbg->bb473>=3 ){((bbg->bb515=(((bbg->bb515)<<bbg->bb1629)^(bbg->
+bb159[(bbg->bb187)+(3 -1 )]))&bbg->bb1755),bbg->bb998[(bbg->bb187)&bbg
+->bb1850]=bb1166=bbg->bb395[bbg->bb515],bbg->bb395[bbg->bb515]=(
+bb1072)(bbg->bb187));}bbg->bb1318=bbg->bb970,bbg->bb2369=bbg->bb2088;
+bbg->bb970=3 -1 ;bbm(bb1166!=0 &&bbg->bb1318<bbg->bb2121&&bbg->bb187-
+bb1166<=((bbg)->bb957-(258 +3 +1 ))){bbm(bbg->bb303!=2 ){bbg->bb970=
+bb2327(bbg,bb1166);}bbm(bbg->bb970<=5 &&(bbg->bb303==1 ||(bbg->bb970==3
+&&bbg->bb187-bbg->bb2088>4096 ))){bbg->bb970=3 -1 ;}}bbm(bbg->bb1318>=3
+&&bbg->bb970<=bbg->bb1318){bb9 bb2560=bbg->bb187+bbg->bb473-3 ;;{bb156
+bb22=(bbg->bb1318-3 );bb130 bb429=(bbg->bb187-1 -bbg->bb2369);bbg->
+bb1661[bbg->bb637]=bb429;bbg->bb1743[bbg->bb637++]=bb22;bb429--;bbg->
+bb1001[bb2116[bb22]+256 +1 ].bb294.bb444++;bbg->bb1693[((bb429)<256 ?
+bb1764[bb429]:bb1764[256 +((bb429)>>7 )])].bb294.bb444++;bb1799=(bbg->
+bb637==bbg->bb1159-1 );};bbg->bb473-=bbg->bb1318-1 ;bbg->bb1318-=2 ;
+bb599{bbm(++bbg->bb187<=bb2560){((bbg->bb515=(((bbg->bb515)<<bbg->
+bb1629)^(bbg->bb159[(bbg->bb187)+(3 -1 )]))&bbg->bb1755),bbg->bb998[(
+bbg->bb187)&bbg->bb1850]=bb1166=bbg->bb395[bbg->bb515],bbg->bb395[bbg
+->bb515]=(bb1072)(bbg->bb187));}}bb109(--bbg->bb1318!=0 );bbg->bb1993=
+0 ;bbg->bb970=3 -1 ;bbg->bb187++;bbm(bb1799){{bb1637(bbg,(bbg->bb443>=0L
+?(bb447* )&bbg->bb159[(bbt)bbg->bb443]:(bb447* )0 ),(bb410)((bb8)bbg->
+bb187-bbg->bb443),(0 ));bbg->bb443=bbg->bb187;bb1308(bbg->bb15);;};bbm
+(bbg->bb15->bb397==0 )bb4(0 )?bb1794:bb1325;};}bb50 bbm(bbg->bb1993){;{
+bb156 bb1891=(bbg->bb159[bbg->bb187-1 ]);bbg->bb1661[bbg->bb637]=0 ;bbg
+->bb1743[bbg->bb637++]=bb1891;bbg->bb1001[bb1891].bb294.bb444++;
+bb1799=(bbg->bb637==bbg->bb1159-1 );};bbm(bb1799){{bb1637(bbg,(bbg->
+bb443>=0L ?(bb447* )&bbg->bb159[(bbt)bbg->bb443]:(bb447* )0 ),(bb410)((
+bb8)bbg->bb187-bbg->bb443),(0 ));bbg->bb443=bbg->bb187;bb1308(bbg->
+bb15);;};}bbg->bb187++;bbg->bb473--;bbm(bbg->bb15->bb397==0 )bb4 bb1325
+;}bb50{bbg->bb1993=1 ;bbg->bb187++;bbg->bb473--;}};bbm(bbg->bb1993){;{
+bb156 bb1891=(bbg->bb159[bbg->bb187-1 ]);bbg->bb1661[bbg->bb637]=0 ;bbg
+->bb1743[bbg->bb637++]=bb1891;bbg->bb1001[bb1891].bb294.bb444++;
+bb1799=(bbg->bb637==bbg->bb1159-1 );};bbg->bb1993=0 ;}{{bb1637(bbg,(bbg
+->bb443>=0L ?(bb447* )&bbg->bb159[(bbt)bbg->bb443]:(bb447* )0 ),(bb410)(
+(bb8)bbg->bb187-bbg->bb443),(bb176==4 ));bbg->bb443=bbg->bb187;bb1308(
+bbg->bb15);;};bbm(bbg->bb15->bb397==0 )bb4(bb176==4 )?bb1794:bb1325;};
+bb4 bb176==4 ?bb2213:bb2230;}

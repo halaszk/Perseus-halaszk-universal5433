@@ -6,21 +6,21 @@
 # Created on :  14 Feb 2014
 # Copyright (c) Samsung Electronics 2014
 
-# Given a vmlinux file and a System.map, this scripts finds bytes belonging to
+# Given a vmlinux file and a System.map, this scripts finds bytes belonging to 
 # Kernel Crypto within vmlinux file.(Under section .text, .init.text, .exit.text and .rodata)
 # After collecting all the bytes, it calculates a hmac(sha256) on those bytes.
 # Generated hmac is put back into a crypto rodata variable within vmlinux file itself.
 # This makes the build time hmac available at runtime, for integrity check.
-#
+# 
 # To find crypto bytes, this scripts heavily relies on output of arm-eabi-readelf.
 # If the output of arm-eabi-readelf changes in future, this script might need changes.
-#
+# 
 # Pre-conditions : $READELF, $HOSTCC variables are set.
 #
-#
+# 
 
 if test $# -ne 2; then
-	echo "Usage: $0 vmlinux System.map"
+	echo "Usage: $0 vmlinux System.map" 
 	exit 1
 fi
 
@@ -52,13 +52,11 @@ declare -A array
 array[0]=".text first_crypto_text last_crypto_text \$5 \$6"
 array[1]=".rodata first_crypto_rodata last_crypto_rodata \$5 \$6"
 array[2]=".init.text first_crypto_init last_crypto_init \$4 \$5"
-array[3]=".exit.text first_crypto_exit last_crypto_exit \$4 \$5"
 
 # # FOR ASM CRYPTO FILES
-array[4]=".text first_crypto_asm_text last_crypto_asm_text \$5 \$6"
-array[5]=".rodata first_crypto_asm_rodata last_crypto_asm_rodata \$5 \$6"
-array[6]=".init.text first_crypto_asm_init last_crypto_asm_init \$4 \$5"
-array[7]=".exit.text first_crypto_asm_exit last_crypto_asm_exit \$4 \$5"
+array[3]=".text first_crypto_asm_text last_crypto_asm_text \$5 \$6"
+array[4]=".rodata first_crypto_asm_rodata last_crypto_asm_rodata \$5 \$6"
+array[5]=".init.text first_crypto_asm_init last_crypto_asm_init \$4 \$5"
 
 
 rm -f offsets_sizes.txt
@@ -69,7 +67,7 @@ reg='^[0-9A-Fa-f]+$'
 #Total bytes of all crypto sections scanned. Used later for error checking
 total_bytes=0;
 
-# For each type of Section :
+# For each type of Section : 
 # first_addr  = Address of first_crypto_text, first_crypto_rodata, etc.
 # last_addr   = Address of last_crypto_text, last_crypto_rodata etc.
 # start_addr  = Starting Address of a section within vmlinux
@@ -78,7 +76,7 @@ total_bytes=0;
 # size        = size of crypto bytes.
 
 # Output is offsets_sizes.txt, of the format
-#   Section Name   crypto_bytes_offset crypto_bytes_size
+#   Section Name   crypto_bytes_offset crypto_bytes_size 
 #                   (in decimal)        (in decimal)
 #      .text           2531072            114576
 #    .rodata           9289648             55388
@@ -91,8 +89,8 @@ for i in "${array[@]}"; do
 	k=1
         #This loop creates var1, var2 etc and set them to individual strings of a row in array
 	for j in $i; do
-		export var$k=$j
-		let k+=1
+		export var$k=$j 
+		let k+=1	
 	done
 
 	first_addr=`cat $system_map_var|grep -w $var2|awk '{print $1}'`
@@ -101,10 +99,10 @@ for i in "${array[@]}"; do
 	last_addr=`cat $system_map_var|grep -w $var3|awk '{print $1}'`
 	if  [[ ! $last_addr =~ $reg ]]; then echo "$0 : last_addr invalid"; exit 1; fi
 
-	start_addr=`cat vmlinux.elf |grep -w $var1|grep PROGBITS|awk '{print '$var4'}'`
+	start_addr=`cat vmlinux.elf |grep -w "$var1 "|grep PROGBITS|awk '{print '$var4'}'`
 	if  [[ ! $start_addr =~ $reg ]]; then echo "$0 : start_addr invalid"; exit 1; fi
 
-	offset=`cat vmlinux.elf |grep -w $var1|grep PROGBITS|awk '{print '$var5'}'`
+	offset=`cat vmlinux.elf |grep -w "$var1 "|grep PROGBITS|awk '{print '$var5'}'`
 	if  [[ ! $offset =~ $reg ]]; then echo "$0 : offset invalid"; exit 1; fi
 
 	if [[ $((16#$first_addr)) -lt $((16#$start_addr)) ]]; then echo "$0 : first_addr < start_addr"; exit 1; fi
@@ -136,7 +134,7 @@ if [ $retval -ne 0 ]; then
 fi
 
 rm -f builtime_bytes.txt #used for debugging
-rm -f builtime_bytes.bin #used for calculating hmac
+rm -f builtime_bytes.bin #used for calculating hmac 
 
 date_var=`date`
 echo "Created on : " $date_var > builtime_bytes.txt
@@ -191,7 +189,7 @@ fi
 
 file_size=`cat crypto_hmac.bin| wc -c`
 
-# hmac(sha256) produces 32 bytes of hmac
+# hmac(sha256) produces 32 bytes of hmac 
 if [ $file_size -ne 32 ]; then
 	echo "$0: Unexpected size of Hash file : " $file_size
 	exit 1

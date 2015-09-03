@@ -76,7 +76,7 @@ extern s32 bbm_com_video_deselect(HANDLE handle, u8 subch_id, u8 buf_id,
 					u8 cdi_id);
 extern s32 bbm_com_audio_deselect(HANDLE handle, u8 subch_id, u8 buf_id);
 extern s32 bbm_com_data_deselect(HANDLE handle, u8 subch_id, u8 buf_id);
-extern s32 bbm_com_hostif_select(HANDLE handle, u8 hostif, u32 param);
+extern s32 bbm_com_hostif_select(HANDLE handle, u8 hostif, unsigned long param);
 extern s32 bbm_com_hostif_deselect(HANDLE handle);
 extern s32 bbm_com_fic_callback_register(u32 userdata, s32 (*callback)(
 					u32 userdata, u8 *data, s32 length));

@@ -501,14 +501,40 @@ static inline void clean_pmd_entry(void *pmd)
 /*
  * Convert calls to our calling convention.
  */
-#define local_flush_tlb_range(vma,start,end)	__cpu_flush_user_tlb_range(start,end,vma)
-#define local_flush_tlb_kernel_range(s,e)	__cpu_flush_kern_tlb_range(s,e)
+#define __local_flush_tlb_range(vma,start,end)	__cpu_flush_user_tlb_range(start,end,vma)
+#define __local_flush_tlb_kernel_range(s,e)	__cpu_flush_kern_tlb_range(s,e)
+
+/*
+ * This is meant to avoid soft lock-ups on large TLB flushing ranges and not
+ * necessarily a performance improvement.
+ */
+#define MAX_TLB_RANGE	(1024UL << PAGE_SHIFT)
+
+
 
 #ifndef CONFIG_SMP
 #define flush_tlb_all		local_flush_tlb_all
 #define flush_tlb_mm		local_flush_tlb_mm
 #define flush_tlb_page		local_flush_tlb_page
 #define flush_tlb_kernel_page	local_flush_tlb_kernel_page
+
+static inline void local_flush_tlb_range(struct vm_area_struct *vma,
+				   unsigned long start, unsigned long end)
+{
+	if ((end - start) <= MAX_TLB_RANGE)
+		__local_flush_tlb_range(vma, start, end);
+	else
+		flush_tlb_mm(vma->vm_mm);
+}
+
+static inline void local_flush_tlb_kernel_range(unsigned long start, unsigned long end)
+{
+	if ((end - start) <= MAX_TLB_RANGE)
+		__local_flush_tlb_kernel_range(start, end);
+	else
+		flush_tlb_all();
+}
+
 #define flush_tlb_range		local_flush_tlb_range
 #define flush_tlb_kernel_range	local_flush_tlb_kernel_range
 #define flush_bp_all		local_flush_bp_all
@@ -517,6 +543,24 @@ extern void flush_tlb_all(void);
 extern void flush_tlb_mm(struct mm_struct *mm);
 extern void flush_tlb_page(struct vm_area_struct *vma, unsigned long uaddr);
 extern void flush_tlb_kernel_page(unsigned long kaddr);
+
+static inline void local_flush_tlb_range(struct vm_area_struct *vma,
+				   unsigned long start, unsigned long end)
+{
+	if ((end - start) <= MAX_TLB_RANGE)
+		__local_flush_tlb_range(vma, start, end);
+	else
+		flush_tlb_mm(vma->vm_mm);
+}
+
+static inline void local_flush_tlb_kernel_range(unsigned long start, unsigned long end)
+{
+	if ((end - start) <= MAX_TLB_RANGE)
+		__local_flush_tlb_kernel_range(start, end);
+	else
+		flush_tlb_all();
+}
+
 extern void flush_tlb_range(struct vm_area_struct *vma, unsigned long start, unsigned long end);
 extern void flush_tlb_kernel_range(unsigned long start, unsigned long end);
 extern void flush_bp_all(void);

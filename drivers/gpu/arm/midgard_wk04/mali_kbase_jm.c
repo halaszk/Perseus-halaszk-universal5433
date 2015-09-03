@@ -1121,7 +1121,8 @@ void kbasep_reset_timeout_worker(struct work_struct *data)
 
 	/* S.LSI intergration */
 	gpu_register_dump();
-	KBASE_TRACE_DUMP(kbdev);
+	/* Remove the rbuf dump because of too many log */
+	/* KBASE_TRACE_DUMP(kbdev); */
 
 	bckp_state = kbdev->hwcnt.state;
 	kbdev->hwcnt.state = KBASE_INSTR_STATE_RESETTING;

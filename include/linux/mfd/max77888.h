@@ -62,6 +62,10 @@ struct max77888_haptic_platform_data {
 };
 #endif
 
+#ifdef CONFIG_LEDS_MAX77888
+struct max77888_led_platform_data;
+#endif
+
 struct max77888_regulator_data {
 	int id;
 	struct regulator_init_data *initdata;
@@ -85,6 +89,10 @@ struct max77888_platform_data {
 	/* haptic motor data */
 	struct max77888_haptic_platform_data *haptic_data;
 #endif
+#endif
+#ifdef CONFIG_LEDS_MAX77888
+	/* led (flash/torch) data */
+	struct max77888_led_platform_data *led_data;
 #endif
 #if defined(CONFIG_CHARGER_MAX77888)
 	/* charger data */

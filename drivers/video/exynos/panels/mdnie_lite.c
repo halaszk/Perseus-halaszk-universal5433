@@ -19,23 +19,6 @@
 
 #include "mdnie.h"
 
-#if defined(CONFIG_DECON_LCD_S6E3FA2)
-#include "mdnie_lite_table_k.h"
-#elif defined(CONFIG_DECON_LCD_S6E3HA0)
-#include "mdnie_lite_table_kq.h"
-#elif defined(CONFIG_DECON_LCD_EA8064G)
-#include "mdnie_lite_table_s.h"
-#elif defined(CONFIG_DECON_LCD_S6E3HA2)
-#include "mdnie_lite_table_tr.h"
-#elif defined(CONFIG_DECON_LCD_S6E3HF2)
-#include "mdnie_lite_table_tb.h"
-#elif defined(CONFIG_DECON_LCD_S6E3HA1)
-#include "mdnie_lite_table_klimt.h"
-#endif
-#if defined(CONFIG_TDMB)
-#include "mdnie_lite_table_dmb.h"
-#endif
-
 #define MDNIE_SYSFS_PREFIX		"/sdcard/mdnie/"
 #define PANEL_COORDINATE_PATH	"/sys/class/lcd/panel/color_coordinate"
 
@@ -56,12 +39,12 @@
 static struct class *mdnie_class;
 
 /* Do not call mdnie write directly */
-static int mdnie_write(struct mdnie_info *mdnie, struct mdnie_table *table)
+static int mdnie_write(struct mdnie_info *mdnie, struct mdnie_table *table, unsigned int num)
 {
 	int ret = 0;
 
 	if (mdnie->enable)
-		ret = mdnie->ops.write(mdnie->data, table->tune, MDNIE_CMD_MAX);
+		ret = mdnie->ops.write(mdnie->data, table->seq, num);
 
 	return ret;
 }
@@ -71,9 +54,9 @@ static int mdnie_write_table(struct mdnie_info *mdnie, struct mdnie_table *table
 	int i, ret = 0;
 	struct mdnie_table *buf = NULL;
 
-	for (i = 0; i < MDNIE_CMD_MAX; i++) {
-		if (IS_ERR_OR_NULL(table->tune[i].sequence)) {
-			dev_err(mdnie->dev, "mdnie sequence %s is null, %x\n", table->name, (u32)table->tune[i].sequence);
+	for (i = 0; table->seq[i].len; i++) {
+		if (IS_ERR_OR_NULL(table->seq[i].cmd)) {
+			dev_err(mdnie->dev, "mdnie sequence %s %dth command is null,\n", table->name, i);
 			return -EPERM;
 		}
 	}
@@ -82,7 +65,7 @@ static int mdnie_write_table(struct mdnie_info *mdnie, struct mdnie_table *table
 
 	buf = table;
 
-	ret = mdnie_write(mdnie, buf);
+	ret = mdnie_write(mdnie, buf, i);
 
 	mutex_unlock(&mdnie->dev_lock);
 
@@ -96,26 +79,26 @@ static struct mdnie_table *mdnie_find_table(struct mdnie_info *mdnie)
 	mutex_lock(&mdnie->lock);
 
 	if (IS_ACCESSIBILITY(mdnie->accessibility)) {
-		table = &accessibility_table[mdnie->accessibility];
+		table = &mdnie->tune->accessibility_table[mdnie->accessibility];
 		goto exit;
 #ifdef CONFIG_LCD_HMT
 	} else if (IS_HMT(mdnie->hmt_mode)) {
-		table = &hmt_table[mdnie->hmt_mode];
+		table = &mdnie->tune->hmt_table[mdnie->hmt_mode];
 		goto exit;
 #endif
 	} else if (IS_HBM(mdnie->auto_brightness)) {
-		if((mdnie->scenario == BROWSER_MODE) || (mdnie->scenario == EBOOK_MODE))
-			table = &hbm_table[HBM_ON_TEXT];
+		if ((mdnie->scenario == BROWSER_MODE) || (mdnie->scenario == EBOOK_MODE))
+			table = &mdnie->tune->hbm_table[HBM_ON_TEXT];
 		else
-			table = &hbm_table[HBM_ON];
+			table = &mdnie->tune->hbm_table[HBM_ON];
 		goto exit;
 #if defined(CONFIG_TDMB)
 	} else if (IS_DMB(mdnie->scenario)) {
-		table = &dmb_table[mdnie->mode];
+		table = &mdnie->tune->dmb_table[mdnie->mode];
 		goto exit;
 #endif
 	} else if (IS_SCENARIO(mdnie->scenario)) {
-		table = &tuning_table[mdnie->scenario][mdnie->mode];
+		table = &mdnie->tune->main_table[mdnie->scenario][mdnie->mode];
 		goto exit;
 	}
 
@@ -127,22 +110,17 @@ exit:
 
 static void mdnie_update_sequence(struct mdnie_info *mdnie, struct mdnie_table *table)
 {
-	struct mdnie_table *t = NULL;
+	if (mdnie->tuning)
+		mdnie_request_table(mdnie->path, table);
 
-	if (mdnie->tuning) {
-		t = mdnie_request_table(mdnie->path, table);
-		if (!IS_ERR_OR_NULL(t) && !IS_ERR_OR_NULL(t->name))
-			mdnie_write_table(mdnie, t);
-		else
-			mdnie_write_table(mdnie, table);
-	} else
-		mdnie_write_table(mdnie, table);
+	mdnie_write_table(mdnie, table);
 	return;
 }
 
 static void mdnie_update(struct mdnie_info *mdnie)
 {
 	struct mdnie_table *table = NULL;
+	struct mdnie_scr_info *scr_info = mdnie->tune->scr_info;
 
 	if (!mdnie->enable) {
 		dev_err(mdnie->dev, "mdnie state is off\n");
@@ -154,9 +132,9 @@ static void mdnie_update(struct mdnie_info *mdnie)
 		mdnie_update_sequence(mdnie, table);
 		dev_info(mdnie->dev, "%s\n", table->name);
 
-		mdnie->white_r = table->tune[MDNIE_CMD1].sequence[MDNIE_WHITE_R];
-		mdnie->white_g = table->tune[MDNIE_CMD1].sequence[MDNIE_WHITE_G];
-		mdnie->white_b = table->tune[MDNIE_CMD1].sequence[MDNIE_WHITE_B];
+		mdnie->white_r = table->seq[scr_info->index].cmd[scr_info->white_r];
+		mdnie->white_g = table->seq[scr_info->index].cmd[scr_info->white_g];
+		mdnie->white_b = table->seq[scr_info->index].cmd[scr_info->white_b];
 	}
 
 	return;
@@ -166,20 +144,21 @@ static void update_color_position(struct mdnie_info *mdnie, unsigned int idx)
 {
 	u8 mode, scenario;
 	mdnie_t *wbuf;
+	struct mdnie_scr_info *scr_info = mdnie->tune->scr_info;
 
 	dev_info(mdnie->dev, "%s: idx=%d\n", __func__, idx);
 
 	mutex_lock(&mdnie->lock);
 
-	for (mode = 0; mode < MODE_MAX; mode++) {
+	for (mode = 0; mode < READING; mode++) {
 		for (scenario = 0; scenario <= EMAIL_MODE; scenario++) {
-			wbuf = tuning_table[scenario][mode].tune[MDNIE_CMD1].sequence;
+			wbuf = mdnie->tune->main_table[scenario][mode].seq[scr_info->index].cmd;
 			if (IS_ERR_OR_NULL(wbuf))
 				continue;
 			if (scenario != EBOOK_MODE) {
-				wbuf[MDNIE_WHITE_R] = coordinate_data[mode][idx][0];
-				wbuf[MDNIE_WHITE_G] = coordinate_data[mode][idx][1];
-				wbuf[MDNIE_WHITE_B] = coordinate_data[mode][idx][2];
+				wbuf[scr_info->white_r] = mdnie->tune->coordinate_table[mode][idx * 3 + 0];
+				wbuf[scr_info->white_g] = mdnie->tune->coordinate_table[mode][idx * 3 + 1];
+				wbuf[scr_info->white_b] = mdnie->tune->coordinate_table[mode][idx * 3 + 2];
 			}
 		}
 	}
@@ -191,7 +170,7 @@ static int get_panel_coordinate(struct mdnie_info *mdnie, int *result)
 {
 	int ret = 0;
 	char *fp = NULL;
-	unsigned short x, y;
+	int x, y;
 
 	ret = mdnie_open_file(PANEL_COORDINATE_PATH, &fp);
 	if (IS_ERR_OR_NULL(fp) || ret <= 0) {
@@ -200,17 +179,17 @@ static int get_panel_coordinate(struct mdnie_info *mdnie, int *result)
 		goto skip_color_correction;
 	}
 
-	ret = sscanf(fp, "%hu, %hu", &x, &y);
+	ret = sscanf(fp, "%d, %d", &x, &y);
 	if ((ret != 2) || (!x && !y)) {
 		dev_info(mdnie->dev, "%s: %d, %d\n", __func__, x, y);
 		ret = -EINVAL;
 		goto skip_color_correction;
 	}
 
-	result[1] = COLOR_OFFSET_F1(x, y);
-	result[2] = COLOR_OFFSET_F2(x, y);
-	result[3] = COLOR_OFFSET_F3(x, y);
-	result[4] = COLOR_OFFSET_F4(x, y);
+	result[1] = mdnie->tune->color_offset[0](x, y);
+	result[2] = mdnie->tune->color_offset[1](x, y);
+	result[3] = mdnie->tune->color_offset[2](x, y);
+	result[4] = mdnie->tune->color_offset[3](x, y);
 
 	ret = mdnie_calibration(result);
 	dev_info(mdnie->dev, "%s: %d, %d, idx=%d\n", __func__, x, y, ret);
@@ -305,7 +284,7 @@ static ssize_t tuning_show(struct device *dev,
 	struct mdnie_info *mdnie = dev_get_drvdata(dev);
 	char *pos = buf;
 	struct mdnie_table *table = NULL;
-	int i;
+	int i, idx;
 
 	pos += sprintf(pos, "++ %s: %s\n", __func__, mdnie->path);
 
@@ -321,14 +300,12 @@ static ssize_t tuning_show(struct device *dev,
 
 	table = mdnie_find_table(mdnie);
 	if (!IS_ERR_OR_NULL(table) && !IS_ERR_OR_NULL(table->name)) {
-		table = mdnie_request_table(mdnie->path, table);
-		for (i = 0; i < table->tune[MDNIE_CMD1].size; i++)
-			pos += sprintf(pos, "0x%02x ", table->tune[MDNIE_CMD1].sequence[i]);
-		pos += sprintf(pos, "\n");
-		if (MDNIE_CMD1 != MDNIE_CMD2) {
-			for (i = 0; i < table->tune[MDNIE_CMD2].size; i++)
-				pos += sprintf(pos, "0x%02x ", table->tune[MDNIE_CMD2].sequence[i]);
+		mdnie_request_table(mdnie->path, table);
+		for (idx = 0; table->seq[idx].len; idx++) {
+			for (i = 0; i < table->seq[idx].len; i++)
+				pos += sprintf(pos, "0x%02x ", table->seq[idx].cmd[i]);
 		}
+		pos += sprintf(pos, "\n");
 	}
 
 exit:
@@ -385,6 +362,7 @@ static ssize_t accessibility_store(struct device *dev,
 	unsigned int value, s[9], i = 0;
 	int ret;
 	mdnie_t *wbuf;
+	struct mdnie_scr_info *scr_info = mdnie->tune->scr_info;
 
 	ret = sscanf(buf, "%d %x %x %x %x %x %x %x %x %x",
 		&value, &s[0], &s[1], &s[2], &s[3],
@@ -405,7 +383,7 @@ static ssize_t accessibility_store(struct device *dev,
 				mutex_unlock(&mdnie->lock);
 				return -EINVAL;
 			}
-			wbuf = &accessibility_table[COLOR_BLIND].tune[MDNIE_CMD1].sequence[MDNIE_COLOR_BLIND_OFFSET];
+			wbuf = &mdnie->tune->accessibility_table[COLOR_BLIND].seq[scr_info->index].cmd[scr_info->color_blind];
 			while (i < ARRAY_SIZE(s)) {
 				wbuf[i * 2 + 0] = GET_LSB_8BIT(s[i]);
 				wbuf[i * 2 + 1] = GET_MSB_8BIT(s[i]);
@@ -473,7 +451,7 @@ static ssize_t bypass_store(struct device *dev,
 		mdnie->bypass = value;
 		mutex_unlock(&mdnie->lock);
 
-		table = &bypass_table[value];
+		table = &mdnie->tune->bypass_table[value];
 		if (!IS_ERR_OR_NULL(table)) {
 			mdnie_write_table(mdnie, table);
 			dev_info(mdnie->dev, "%s\n", table->name);
@@ -534,26 +512,29 @@ static ssize_t mdnie_show(struct device *dev,
 
 	table = mdnie_find_table(mdnie);
 
-	for (i = 0; i < MDNIE_CMD_MAX; i++) {
-		if (IS_ERR_OR_NULL(table->tune[i].sequence)) {
-			dev_err(mdnie->dev, "mdnie sequence %s is null, %x\n", table->name, (u32)table->tune[i].sequence);
+	for (i = 0; table->seq[i].len; i++) {
+		if (IS_ERR_OR_NULL(table->seq[i].cmd)) {
+			dev_err(mdnie->dev, "mdnie sequence %s %dth command is null,\n", table->name, i);
 			goto exit;
 		}
 	}
 
-	/* should be fixed later, or removed */
-	/* mdnie->ops.write(mdnie->data, table->tune[LEVEL1_KEY_UNLOCK].sequence, table->tune[LEVEL1_KEY_UNLOCK].size); */
-
 	pos += sprintf(pos, "+ %s\n", table->name);
 
-	for (j = MDNIE_CMD1; j <= MDNIE_CMD2; j++) {
-		buffer = kzalloc(table->tune[j].size, GFP_KERNEL);
+	for (j = 0; table->seq[j].len; j++) {
+		if (!table->update_flag[j]) {
+			mdnie->ops.write(mdnie->data, &table->seq[j], 1);
+			continue;
+		}
 
-		mdnie->ops.read(mdnie->data, table->tune[j].sequence[0], buffer, table->tune[j].size - 1);
+		buffer = kzalloc(table->seq[j].len, GFP_KERNEL);
 
-		for (i = 0; i < table->tune[j].size - 1; i++) {
-			pos += sprintf(pos, "%3d:\t0x%02x\t0x%02x", i + 1, table->tune[j].sequence[i+1], buffer[i]);
-			if (table->tune[j].sequence[i+1] != buffer[i])
+		mdnie->ops.read(mdnie->data, table->seq[j].cmd[0], buffer, table->seq[j].len - 1);
+
+		pos += sprintf(pos, "  0:\t0x%02x\t0x%02x\n", table->seq[j].cmd[0], table->seq[j].cmd[0]);
+		for (i = 0; i < table->seq[j].len - 1; i++) {
+			pos += sprintf(pos, "%3d:\t0x%02x\t0x%02x", i + 1, table->seq[j].cmd[i+1], buffer[i]);
+			if (table->seq[j].cmd[i+1] != buffer[i])
 				pos += sprintf(pos, "\t(X)");
 			pos += sprintf(pos, "\n");
 		}
@@ -562,8 +543,6 @@ static ssize_t mdnie_show(struct device *dev,
 	}
 
 	pos += sprintf(pos, "- %s\n", table->name);
-
-	/* mdnie->ops.write(mdnie->data, table->tune[LEVEL1_KEY_LOCK].sequence, table->tune[LEVEL1_KEY_LOCK].size); */
 
 exit:
 	return pos - buf;
@@ -584,6 +563,7 @@ static ssize_t sensorRGB_store(struct device *dev,
 	struct mdnie_table *table = NULL;
 	unsigned int white_red, white_green, white_blue;
 	int ret;
+	struct mdnie_scr_info *scr_info = mdnie->tune->scr_info;
 
 	ret = sscanf(buf, "%d %d %d"
 		, &white_red, &white_green, &white_blue);
@@ -602,17 +582,17 @@ static ssize_t sensorRGB_store(struct device *dev,
 		memcpy(&(mdnie->table_buffer),
 			table, sizeof(struct mdnie_table));
 		memcpy(mdnie->sequence_buffer,
-			table->tune[MDNIE_CMD1].sequence,
-			table->tune[MDNIE_CMD1].size);
-		mdnie->table_buffer.tune[MDNIE_CMD1].sequence
+			table->seq[scr_info->index].cmd,
+			table->seq[scr_info->index].len);
+		mdnie->table_buffer.seq[scr_info->index].cmd
 			= mdnie->sequence_buffer;
 
-		mdnie->table_buffer.tune[MDNIE_CMD1].sequence
-			[MDNIE_WHITE_R] = (unsigned char)white_red;
-		mdnie->table_buffer.tune[MDNIE_CMD1].sequence
-			[MDNIE_WHITE_G] = (unsigned char)white_green;
-		mdnie->table_buffer.tune[MDNIE_CMD1].sequence
-			[MDNIE_WHITE_B] = (unsigned char)white_blue;
+		mdnie->table_buffer.seq[scr_info->index].cmd
+			[scr_info->white_r] = (unsigned char)white_red;
+		mdnie->table_buffer.seq[scr_info->index].cmd
+			[scr_info->white_g] = (unsigned char)white_green;
+		mdnie->table_buffer.seq[scr_info->index].cmd
+			[scr_info->white_b] = (unsigned char)white_blue;
 
 		mdnie->white_r = white_red;
 		mdnie->white_g = white_green;
@@ -623,6 +603,7 @@ static ssize_t sensorRGB_store(struct device *dev,
 
 	return count;
 }
+
 #ifdef CONFIG_LCD_HMT
 static ssize_t hmtColorTemp_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
@@ -716,19 +697,21 @@ static int mdnie_register_fb(struct mdnie_info *mdnie)
 	return fb_register_client(&mdnie->fb_notif);
 }
 
-int mdnie_register(struct device *p, void *data, mdnie_w w, mdnie_r r)
+int mdnie_register(struct device *p, void *data, mdnie_w w, mdnie_r r, struct mdnie_tune *tune)
 {
 	int ret = 0;
 	struct mdnie_info *mdnie;
+	static unsigned int mdnie_no;
 
-	mdnie_class = class_create(THIS_MODULE, "mdnie");
 	if (IS_ERR_OR_NULL(mdnie_class)) {
-		pr_err("failed to create mdnie class\n");
-		ret = -EINVAL;
-		goto error0;
+		mdnie_class = class_create(THIS_MODULE, "mdnie");
+		if (IS_ERR_OR_NULL(mdnie_class)) {
+			pr_err("failed to create mdnie class\n");
+			ret = -EINVAL;
+			goto error0;
+		}
+		mdnie_class->dev_attrs = mdnie_attributes;
 	}
-
-	mdnie_class->dev_attrs = mdnie_attributes;
 
 	mdnie = kzalloc(sizeof(struct mdnie_info), GFP_KERNEL);
 	if (!mdnie) {
@@ -737,13 +720,14 @@ int mdnie_register(struct device *p, void *data, mdnie_w w, mdnie_r r)
 		goto error1;
 	}
 
-	mdnie->dev = device_create(mdnie_class, p, 0, &mdnie, "mdnie");
+	mdnie->dev = device_create(mdnie_class, p, 0, &mdnie, !mdnie_no ? "mdnie" : "mdnie%d", mdnie_no);
 	if (IS_ERR_OR_NULL(mdnie->dev)) {
 		pr_err("failed to create mdnie device\n");
 		ret = -EINVAL;
 		goto error2;
 	}
 
+	mdnie_no++;
 	mdnie->scenario = UI_MODE;
 	mdnie->mode = STANDARD;
 	mdnie->enable = 0;
@@ -754,6 +738,8 @@ int mdnie_register(struct device *p, void *data, mdnie_w w, mdnie_r r)
 	mdnie->data = data;
 	mdnie->ops.write = w;
 	mdnie->ops.read = r;
+
+	mdnie->tune = tune;
 
 	mutex_init(&mdnie->lock);
 	mutex_init(&mdnie->dev_lock);

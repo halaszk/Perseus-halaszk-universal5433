@@ -44,6 +44,8 @@
 
 #include "ion_priv.h"
 
+extern int boot_mode_security;
+
 /**
  * struct ion_device - the metadata of the ion device node
  * @dev:		the actual misc device
@@ -123,6 +125,8 @@ struct ion_handle {
 	unsigned int kmap_cnt;
 	int id;
 };
+
+static struct ion_device *g_idev;
 
 static inline struct page *ion_buffer_page(struct page *page)
 {
@@ -881,25 +885,58 @@ static int ion_debug_client_show(struct seq_file *s, void *unused)
 	struct rb_node *n;
 	size_t sizes[ION_NUM_HEAP_IDS] = {0};
 	const char *names[ION_NUM_HEAP_IDS] = {0};
+	size_t sizes_pss[ION_NUM_HEAP_IDS] = {0};
 	int i;
+
+	down_read(&g_idev->lock);
+
+	/* check validity of the client */
+	for (n = rb_first(&g_idev->clients); n; n = rb_next(n)) {
+		struct ion_client *c = rb_entry(n, struct ion_client, node);
+		if (client == c)
+			break;
+	}
+
+	if (IS_ERR_OR_NULL(n)) {
+		pr_err("%s: invalid client %p\n", __func__, client);
+		up_read(&g_idev->lock);
+		return -EINVAL;
+	}
+
+	seq_printf(s, "%16.s %16.s %4.s %16.s %4.s %10.s %8.s %9.s\n",
+			"buffer", "task", "pid", "thread", "tid", "size",
+			"# procs", "flag");
+	seq_printf(s, "----------------------------------------------"
+			"--------------------------------------------\n");
 
 	mutex_lock(&client->lock);
 	for (n = rb_first(&client->handles); n; n = rb_next(n)) {
 		struct ion_handle *handle = rb_entry(n, struct ion_handle,
 						     node);
-		unsigned int id = handle->buffer->heap->id;
+		struct ion_buffer *buffer = handle->buffer;
+		unsigned int id = buffer->heap->id;
 
 		if (!names[id])
-			names[id] = handle->buffer->heap->name;
-		sizes[id] += handle->buffer->size;
+			names[id] = buffer->heap->name;
+		sizes[id] += buffer->size;
+		sizes_pss[id] += (buffer->size / buffer->handle_count);
+		seq_printf(s, "%16p %16.s %4u %16.s %4u %10zu %8d %9lx\n",
+				buffer, buffer->task_comm, buffer->pid,
+				buffer->thread_comm, buffer->tid, buffer->size,
+				buffer->handle_count, buffer->flags);
 	}
 	mutex_unlock(&client->lock);
+	up_read(&g_idev->lock);
 
-	seq_printf(s, "%16.16s: %16.16s\n", "heap_name", "size_in_bytes");
+	seq_printf(s, "----------------------------------------------"
+			"--------------------------------------------\n");
+	seq_printf(s, "%16.16s: %16.16s %18.18s\n", "heap_name",
+				"size_in_bytes", "size_in_bytes(pss)");
 	for (i = 0; i < ION_NUM_HEAP_IDS; i++) {
 		if (!names[i])
 			continue;
-		seq_printf(s, "%16.16s: %16u\n", names[i], sizes[i]);
+		seq_printf(s, "%16.16s: %16u %18u\n",
+				names[i], sizes[i], sizes_pss[i]);
 	}
 	return 0;
 }
@@ -1839,15 +1876,16 @@ void ion_device_sync(struct ion_device *dev, struct sg_table *sgt,
 				(SZ_1M * page_idx);
 
 #ifdef CONFIG_TIMA_RKP_LAZY_MMU
-	pgd = pgd_offset_k(vaddr);
+	if(boot_mode_security)
+		pgd = pgd_offset_k(vaddr);
 
-	if (tima_is_pg_protected((unsigned long)ptep) == 1){
+	if (boot_mode_security && tima_is_pg_protected((unsigned long)ptep) == 1){
 		do_lazy_mmu = 1;
 	}
 	if (do_lazy_mmu) {
 		spin_lock(&init_mm.page_table_lock);
 		tima_send_cmd2((unsigned int)pgd, TIMA_LAZY_MMU_START, TIMA_LAZY_MMU_CMDID);
-   		flush_tlb_l2_page((pmd_t *)pgd);
+		flush_tlb_l2_page((pmd_t *)pgd);
 		spin_unlock(&init_mm.page_table_lock);
 	}
 #endif
@@ -2252,6 +2290,9 @@ struct ion_device *ion_device_create(long (*custom_ioctl)
 	ret = ion_device_reserve_vm(idev);
 	if (ret)
 		panic("ion: failed to reserve vm area\n");
+
+	/* backup of ion device: assumes there is only one ion device */
+	g_idev = idev;
 
 	return idev;
 }

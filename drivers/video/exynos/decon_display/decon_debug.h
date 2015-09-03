@@ -18,4 +18,15 @@ void dump_s3c_fb_win_variants(struct s3c_fb_win_variant p_fb_win_variant[],
 void decon_dump_registers(struct display_driver *pdispdrv);
 void decon_dump_underrun(struct display_driver *pdispdrv);
 
+enum {
+	DISP_DUMP_VSYNC_TIMEOUT,
+	DISP_DUMP_MIPI_WR_TIMEOUT,
+	DISP_DUMP_MIPI_RD_ERROR,
+	DISP_DUMP_UNDERRUN,
+	DISP_DUMP_MAX
+};
+
+void disp_dump(struct display_driver *pdispdrv, unsigned int idx);
+void disp_debugfs_init(struct display_driver *pdispdrv);
+
 #endif

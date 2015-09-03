@@ -240,8 +240,12 @@ static ssize_t store_ehci_power(struct device *dev,
 	if (!power_on && s5p_ehci->power_on) {
 		dev_info(dev, "EHCI turn off\n");
 #if defined(CONFIG_LINK_DEVICE_HSIC)
-		if (hcd->self.root_hub)
-			pm_runtime_forbid(&hcd->self.root_hub->dev);
+		if (hcd->self.root_hub) {
+			struct device *rhdev = &hcd->self.root_hub->dev;
+			cancel_work_sync(&rhdev->power.work);
+			pm_runtime_forbid(rhdev);
+		}
+		cancel_work_sync(&dev->power.work);
 		pm_runtime_forbid(dev);
 		/* Hub resume hub event flush guard time */
 		msleep(200);
@@ -804,7 +808,7 @@ static int s5p_ehci_resume(struct device *dev)
 	if (s5p_ehci->phy) {
 		usb_phy_init(s5p_ehci->phy);
 		s5p_ehci->post_lpa_resume = 0;
-		
+
 		/*
 		 * We are going to change runtime status to active.
 		 * Make sure we get the phy only if we didn't get it before.

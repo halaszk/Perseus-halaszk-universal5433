@@ -36,6 +36,7 @@
 
 #if defined(CONFIG_DECON_MDNIE_LITE)
 #include "mdnie.h"
+#include "mdnie_lite_table_k.h"
 #endif
 
 #define POWER_IS_ON(pwr)		(pwr <= FB_BLANK_NORMAL)
@@ -2237,7 +2238,7 @@ static int s6e3fa2_probe(struct mipi_dsim_device *dsim)
 	lcd->ldi_enable = 1;
 
 #if defined(CONFIG_DECON_MDNIE_LITE)
-	mdnie_register(&lcd->ld->dev, lcd, (mdnie_w)s6e3fa2_send_seq, (mdnie_r)s6e3fa2_read);
+	mdnie_register(&lcd->ld->dev, lcd, (mdnie_w)s6e3fa2_send_seq, (mdnie_r)s6e3fa2_read, &tune_info);
 #endif
 
 	dev_info(&lcd->ld->dev, "%s lcd panel driver has been probed.\n", __FILE__);

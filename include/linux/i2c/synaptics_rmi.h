@@ -49,6 +49,8 @@ struct synaptics_rmi_callbacks {
 struct synaptics_rmi4_platform_data {
 	bool x_flip;
 	bool y_flip;
+	bool x_y_chnage;
+	int x_offset;
 	unsigned int sensor_max_x;
 	unsigned int sensor_max_y;
 	unsigned int num_of_rx;
@@ -57,6 +59,9 @@ struct synaptics_rmi4_platform_data {
 	u32 panel_revision;	/* to identify panel info */
 	bool regulator_en;
 	unsigned gpio;
+#if defined(CONFIG_TOUCHSCREEN_KLIMTVE)
+	unsigned reset;
+#endif
 	int irq_type;
 	int (*gpio_config)(unsigned interrupt_gpio, bool configure);
 	int (*power)(void *data, bool on);
@@ -66,6 +71,7 @@ struct synaptics_rmi4_platform_data {
 	unsigned char (*get_ddi_type)(void);	/* to indentify ddi type */
 	void (*enable_sync)(bool on);
 	const char *firmware_name;
+	const char *firmware_name2;
 	const char *project_name;
 	const char *model_name;
 	u32	device_num;

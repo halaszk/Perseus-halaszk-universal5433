@@ -69,6 +69,7 @@ struct ssp_sensorhub_data {
 	int pcm_cnt;
 	wait_queue_head_t sensorhub_wq;
 	spinlock_t sensorhub_lock;
+	struct mutex big_events_lock;
 };
 
 int ssp_sensorhub_pcm_dump(struct ssp_sensorhub_data *hub_data);

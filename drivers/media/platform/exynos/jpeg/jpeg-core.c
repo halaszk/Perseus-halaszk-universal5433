@@ -28,7 +28,7 @@
 #include <linux/kmod.h>
 #include <linux/time.h>
 #include <linux/clk.h>
-
+#include <linux/uaccess.h>
 #include <linux/of.h>
 #include <linux/exynos_iovmm.h>
 #include <asm/page.h>
@@ -41,6 +41,9 @@
 
 #include "jpeg.h"
 #include "jpeg_regs.h"
+
+int allow_custom_qtbl = 1;
+module_param_named(allow_custom_qtbl, allow_custom_qtbl, int, 0600);
 
 static char *jpeg_clock_names[JPEG_CLK_NUM] = {
 	"gate", "child1", "parent1",
@@ -296,8 +299,16 @@ static int jpeg_1shotdev_device_run(struct m2m1shot_context *m21ctx,
 	jpeg_set_huf_table_enable(jpeg->regs, true);
 	jpeg_set_stream_size(jpeg->regs, ctx->width, ctx->height);
 
-	jpeg_set_enc_tbl(jpeg->regs, ctx->quality);
-	jpeg_set_encode_tbl_select(jpeg->regs, ctx->quality);
+	if (allow_custom_qtbl &&
+		!!(ctx->flags & EXYNOS_JPEG_CTX_CUSTOM_QTBL) &&
+			ctx->custom_qtbl) {
+		jpeg_set_enc_custom_tbl(jpeg->regs, ctx->custom_qtbl);
+	} else {
+		jpeg_set_enc_tbl(jpeg->regs, ctx->quality);
+	}
+
+	jpeg_set_encode_tbl_select(jpeg->regs);
+	jpeg_set_encode_huffman_table(jpeg->regs);
 
 	jpeg_set_image_fmt(jpeg->regs, ctx->in_fmt->reg_cfg |
 					ctx->out_fmt->reg_cfg);
@@ -346,11 +357,38 @@ static int jpeg_1shotdev_prepare_operation(struct m2m1shot_context *m21ctx,
 	struct jpeg_ctx *ctx = m21ctx->priv;
 	struct m2m1shot *shot = &task->task;
 
-	if ((shot->op.quality_level < 0) || (shot->op.quality_level > 100)) {
-		dev_err(ctx->jpeg_dev->dev,
-			"%s: JPEG quality level %d is not supported\n",
-			__func__, shot->op.quality_level);
-		return -EINVAL;
+	if (shot->reserved[1] != 0) {
+		if (!ctx->custom_qtbl)
+			ctx->custom_qtbl =
+				kmalloc(NUM_QTABLE_VALUES * 2, GFP_KERNEL);
+		if (!ctx->custom_qtbl) {
+			dev_err(ctx->jpeg_dev->dev,
+				"%s: Failed to allocate custom q-table\n",
+				__func__);
+			return -ENOMEM;
+		}
+
+		if (copy_from_user(ctx->custom_qtbl,
+				(void __user *)shot->reserved[1],
+						NUM_QTABLE_VALUES * 2)) {
+			dev_err(ctx->jpeg_dev->dev,
+				"%s: Failed to copy q-tble from user\n",
+				__func__);
+			/* ctx->custom_qtbl is freed in free_context() */
+			return -EFAULT;
+		}
+
+		ctx->flags |= EXYNOS_JPEG_CTX_CUSTOM_QTBL;
+	} else {
+		if ((shot->op.quality_level < 0) ||
+					(shot->op.quality_level > 100)) {
+			dev_err(ctx->jpeg_dev->dev,
+				"%s: JPEG quality level %d is not supported\n",
+				__func__, shot->op.quality_level);
+			return -EINVAL;
+		}
+
+		ctx->flags &= ~EXYNOS_JPEG_CTX_CUSTOM_QTBL;
 	}
 
 	ctx->quality = shot->op.quality_level;
@@ -435,6 +473,7 @@ static int jpeg_1shotdev_free_context(struct m2m1shot_context *m21ctx)
 
 	pm_runtime_put_sync(ctx->jpeg_dev->dev);
 
+	kfree(ctx->custom_qtbl);
 	kfree(ctx);
 
 	return 0;
@@ -526,6 +565,10 @@ static irqreturn_t jpeg_irq_handler(int irq, void *priv)
 				jpeg->regs + 0x200, 0x1C0, false);
 		dev_err(jpeg->dev, "End of JPEG dumping registers\n");
 		exynos_sysmmu_show_status(jpeg->dev);
+		if (jpeg->oneshot_dev)
+			m2m1shot_task_finish(jpeg->oneshot_dev,
+				m2m1shot_get_current_task(jpeg->oneshot_dev),
+				false);
 	}
 
 	spin_unlock(&jpeg->slock);

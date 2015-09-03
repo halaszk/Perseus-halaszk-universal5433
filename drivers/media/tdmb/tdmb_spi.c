@@ -20,7 +20,6 @@
 #include <linux/module.h>
 #include <linux/spi/spi.h>
 #include <linux/of_gpio.h>
-#include <mach/gpiomux.h>
 
 #include "tdmb.h"
 
@@ -32,7 +31,7 @@ static int tdmbspi_probe(struct spi_device *spi)
 
 	spi_dmb = spi;
 
-	DPRINTK("tdmbspi_probe() spi_dmb : 0x%x\n", (unsigned int)spi_dmb);
+	DPRINTK("tdmbspi_probe() spi_dmb : 0x%p\n", spi_dmb);
 
 	spi->mode = SPI_MODE_0;
 	spi->bits_per_word = 8;

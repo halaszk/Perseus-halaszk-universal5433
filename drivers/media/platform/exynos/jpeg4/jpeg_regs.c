@@ -17,6 +17,43 @@
 #include "jpeg_core.h"
 #include "regs_jpeg_v4_x.h"
 
+/*
+ * Quantization tables provided by IOC/IEC 10918-1 K.1 and K.2
+ * for YUV420 and YUV422
+ */
+static const unsigned char default_luma_qtable[64] __aligned(64) = {
+	16, 11, 10, 16, 24,  40,  51,  61,
+	12, 12, 14, 19, 26,  58,  60,  55,
+	14, 13, 16, 24, 40,  57,  69,  56,
+	14, 17, 22, 29, 51,  87,  80,  62,
+	18, 22, 37, 56, 68,  109, 103, 77,
+	24, 35, 55, 64, 81,  104, 113, 92,
+	49, 64, 78, 87, 103, 121, 120, 101,
+	72, 92, 95, 98, 112, 100, 103, 99
+};
+
+static const unsigned char default_chroma_qtable[64] __aligned(64) = {
+	17, 18, 24, 47, 99, 99, 99, 99,
+	18, 21, 26, 66, 99, 99, 99, 99,
+	24, 26, 56, 99, 99, 99, 99, 99,
+	47, 66, 99, 99, 99, 99, 99, 99,
+	99, 99, 99, 99, 99, 99, 99, 99,
+	99, 99, 99, 99, 99, 99, 99, 99,
+	99, 99, 99, 99, 99, 99, 99, 99,
+	99, 99, 99, 99, 99, 99, 99, 99
+};
+
+const unsigned char qtbl_order[64] __aligned(64) = {
+	 0,  1,  8, 16,  9,  2,  3, 10,
+	17, 24, 32, 25, 18, 11,  4,  5,
+	12, 19, 26, 33, 40, 48, 41, 34,
+	27, 20, 13,  6,  7, 14, 21, 28,
+	35, 42, 49, 56, 57, 50, 43, 36,
+	29, 22, 15, 23, 30, 37, 44, 51,
+	58, 59, 52, 45, 38, 31, 39, 46,
+	53, 60, 61, 54, 47, 55, 62, 63
+};
+
 void jpeg_sw_reset(void __iomem *base)
 {
 	unsigned int reg;
@@ -421,7 +458,7 @@ void jpeg_set_dec_tbl(void __iomem *base,
 	for (j = 0; j < NUM_QUANT_TBLS; j++) {
 		for (i = 0; i < DCTSIZE; ) {
 			for (z = 0, merge_integer = 0; z < 4; z++, i++)
-				merge_integer |= tables->q_tbl[j][jpeg_natural_order[i]] << (z * 8);
+				merge_integer |= tables->q_tbl[j][qtbl_order[i]] << (z * 8);
 			writel(merge_integer, base + S5P_JPEG_QUAN_TBL_ENTRY_REG + (i-4 + (j * DCTSIZE)));
 		}
 	}
@@ -465,23 +502,45 @@ void jpeg_set_dec_tbl(void __iomem *base,
 	}
 }
 
-void jpeg_set_enc_tbl(void __iomem *base,
-		enum jpeg_img_quality_level level)
+/*
+ * Calculate quantizer values according to the formula
+ * suggestedby IETF RFC2435.
+ */
+static inline u32 jpeg_find_qtbl_for_hw(unsigned int idx, unsigned int factor,
+		const unsigned char tbl[])
 {
-	unsigned int i, j, z;
-	unsigned int merge_integer = 0;
+	u32 val = 0;
+	u32 ent;
+	unsigned int i = idx + 4;
 
-	if (level < QUALITY_LEVEL_1 || level > QUALITY_LEVEL_6)
-		level = 0;
-
-	/* q-table */
-	for (j = 0; j < NUM_QUANT_TBLS; j++) {
-		for (i = 0; i < DCTSIZE; ) {
-			for (z = 0, merge_integer = 0; z < 4; z++, i++)
-				merge_integer |= qtbl[level][j][jpeg_natural_order[i]] << (z * 8);
-			writel(merge_integer, base + S5P_JPEG_QUAN_TBL_ENTRY_REG + (i-4 + (j * DCTSIZE)));
-		}
+	while (i-- > idx) {
+		val <<= 8;
+		ent = (tbl[qtbl_order[i]] * factor + 50) / 100;
+		val |= max(min(ent, 255U), 1U);
 	}
+
+	return val;
+}
+
+void jpeg_set_enc_tbl(void __iomem *base, unsigned int quality_factor)
+{
+	unsigned int i;
+
+	quality_factor = min(quality_factor, 100U);
+	quality_factor = max(quality_factor, 1U);
+	quality_factor = (quality_factor < 50) ?
+		5000 / quality_factor : 200 - (quality_factor * 2);
+
+	for (i = 0; i < (DCTSIZE / 4); i++)
+		__raw_writel(jpeg_find_qtbl_for_hw(i * 4, quality_factor,
+					default_luma_qtable),
+				base + S5P_JPEG_QUAN_TBL_ENTRY_REG + i * 4);
+
+	for (i = 0; i < (DCTSIZE / 4); i++)
+		__raw_writel(jpeg_find_qtbl_for_hw(i * 4, quality_factor,
+							default_chroma_qtable),
+				base + S5P_JPEG_QUAN_TBL_ENTRY_REG
+					+ DCTSIZE + (i * 4));
 
 	for (i = 0; i < 4; i++) {
 		writel((unsigned int)ITU_H_tbl_len_DC_luminance[i],
@@ -681,62 +740,14 @@ void jpeg_set_decode_tbl_select(void __iomem *base,
 	writel(reg, base + S5P_JPEG_TBL_SEL_REG);
 }
 
-void jpeg_set_encode_tbl_select(void __iomem *base,
-		enum jpeg_img_quality_level level)
+void jpeg_set_encode_tbl_select(void __iomem *base)
 {
 	unsigned int	reg;
-
-	switch (level) {
-	case QUALITY_LEVEL_1:
-		reg = S5P_JPEG_Q_TBL_COMP1_0 | S5P_JPEG_Q_TBL_COMP2_1 |
-			S5P_JPEG_Q_TBL_COMP3_1 |
-			S5P_JPEG_HUFF_TBL_COMP1_AC_0_DC_0 |
-			S5P_JPEG_HUFF_TBL_COMP2_AC_1_DC_1 |
-			S5P_JPEG_HUFF_TBL_COMP3_AC_1_DC_1;
-		break;
-	case QUALITY_LEVEL_2:
-		reg = S5P_JPEG_Q_TBL_COMP1_0 | S5P_JPEG_Q_TBL_COMP2_1 |
-			S5P_JPEG_Q_TBL_COMP3_1 |
-			S5P_JPEG_HUFF_TBL_COMP1_AC_0_DC_0 |
-			S5P_JPEG_HUFF_TBL_COMP2_AC_1_DC_1 |
-			S5P_JPEG_HUFF_TBL_COMP3_AC_1_DC_1;
-		break;
-	case QUALITY_LEVEL_3:
-		reg = S5P_JPEG_Q_TBL_COMP1_0 | S5P_JPEG_Q_TBL_COMP2_1 |
-			S5P_JPEG_Q_TBL_COMP3_1 |
-			S5P_JPEG_HUFF_TBL_COMP1_AC_0_DC_0 |
-			S5P_JPEG_HUFF_TBL_COMP2_AC_1_DC_1 |
-			S5P_JPEG_HUFF_TBL_COMP3_AC_1_DC_1;
-		break;
-	case QUALITY_LEVEL_4:
-		reg = S5P_JPEG_Q_TBL_COMP1_0 | S5P_JPEG_Q_TBL_COMP2_1 |
-			S5P_JPEG_Q_TBL_COMP3_1 |
-			S5P_JPEG_HUFF_TBL_COMP1_AC_0_DC_0 |
-			S5P_JPEG_HUFF_TBL_COMP2_AC_1_DC_1 |
-			S5P_JPEG_HUFF_TBL_COMP3_AC_1_DC_1;
-		break;
-	case QUALITY_LEVEL_5:
-		reg = S5P_JPEG_Q_TBL_COMP1_0 | S5P_JPEG_Q_TBL_COMP2_1 |
-			S5P_JPEG_Q_TBL_COMP3_1 |
-			S5P_JPEG_HUFF_TBL_COMP1_AC_0_DC_0 |
-			S5P_JPEG_HUFF_TBL_COMP2_AC_1_DC_1 |
-			S5P_JPEG_HUFF_TBL_COMP3_AC_1_DC_1;
-		break;
-	case QUALITY_LEVEL_6:
-		reg = S5P_JPEG_Q_TBL_COMP1_0 | S5P_JPEG_Q_TBL_COMP2_1 |
-			S5P_JPEG_Q_TBL_COMP3_1 |
-			S5P_JPEG_HUFF_TBL_COMP1_AC_0_DC_0 |
-			S5P_JPEG_HUFF_TBL_COMP2_AC_1_DC_1 |
-			S5P_JPEG_HUFF_TBL_COMP3_AC_1_DC_1;
-		break;
-	default:
-		reg = S5P_JPEG_Q_TBL_COMP1_0 | S5P_JPEG_Q_TBL_COMP2_1 |
-			S5P_JPEG_Q_TBL_COMP3_1 |
-			S5P_JPEG_HUFF_TBL_COMP1_AC_0_DC_0 |
-			S5P_JPEG_HUFF_TBL_COMP2_AC_1_DC_1 |
-			S5P_JPEG_HUFF_TBL_COMP3_AC_1_DC_1;
-		break;
-	}
+	reg = S5P_JPEG_Q_TBL_COMP1_0 | S5P_JPEG_Q_TBL_COMP2_1 |
+		S5P_JPEG_Q_TBL_COMP3_1 |
+		S5P_JPEG_HUFF_TBL_COMP1_AC_0_DC_0 |
+		S5P_JPEG_HUFF_TBL_COMP2_AC_1_DC_1 |
+		S5P_JPEG_HUFF_TBL_COMP3_AC_1_DC_1;
 	writel(reg, base + S5P_JPEG_TBL_SEL_REG);
 }
 

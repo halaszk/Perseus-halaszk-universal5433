@@ -318,6 +318,10 @@ static void decon_mic_set_mic_base_operation(struct decon_mic *mic, bool enable)
 		data |= DECON_MIC_CORE_ENABLE |
 			DECON_MIC_NEW_CORE | DECON_MIC_ON_REG | DECON_MIC_UPDATE_REG;
 
+#if defined(CONFIG_DECON_LCD_S6TNMR7) || defined(CONFIG_DECON_LCD_S6E3HA1)
+		data |= DECON_MIC_BS_SWAP;
+#endif
+
 #if defined(CONFIG_FB_I80_COMMAND_MODE)
 		data |= DECON_MIC_COMMAND_MODE;
 #else

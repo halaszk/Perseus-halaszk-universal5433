@@ -45,9 +45,13 @@
 #include "fimc-is-dt.h"
 #include "fimc-is-dvfs.h"
 
+#if 0
 #include "sensor/fimc-is-device-6b2.h"
 #include "sensor/fimc-is-device-imx134.h"
 #include "sensor/fimc-is-device-imx135.h"
+#else
+#include "include/fimc-is-module.h"
+#endif
 #include "fimc-is-device-sensor.h"
 #ifdef CONFIG_COMPANION_USE
 #include "fimc-is-companion-dt.h"
@@ -1123,7 +1127,14 @@ static int fimc_is_sensor_probe(struct platform_device *pdev)
 		goto p_err;
 	}
 
-	dev = pdev->id ? camera_front_dev : camera_rear_dev;
+	// Temporary Codes
+	if (pdev->id == SENSOR_POSITION_FRONT)
+		dev = camera_front_dev;
+	else if(pdev->id == SENSOR_POSITION_REAR)
+		dev = camera_rear_dev;
+	else
+		dev = NULL;
+
 	if (dev)
 		dev_set_drvdata(dev, device->pdata);
 
@@ -1375,6 +1386,8 @@ int fimc_is_sensor_s_input(struct fimc_is_device_sensor *device,
 		actuator_addr >>= ACTUATOR_I2C_ADDR_SHIFT;
 		module->ext.actuator_con.peri_setting.i2c.channel = actuator_ch;
 		module->ext.actuator_con.peri_setting.i2c.slave_address = actuator_addr;
+		if ((device->pdata->actuator_id > 0) && (device->pdata->actuator_id < ACTUATOR_NAME_END))
+			module->ext.actuator_con.product_name = device->pdata->actuator_id;
 	}
 
 #if defined(CONFIG_OIS_USE)
@@ -1392,6 +1405,8 @@ int fimc_is_sensor_s_input(struct fimc_is_device_sensor *device,
 	module->ext.sensor_con.csi_ch = device->pdata->csi_ch;
 	module->ext.sensor_con.csi_ch |= 0x0100;
 
+	if ((device->pdata->flash_id > 0) && (device->pdata->flash_id < FLADRV_NAME_END))
+		module->ext.flash_con.product_name = device->pdata->flash_id;
 	module->ext.flash_con.peri_setting.gpio.first_gpio_port_no = device->pdata->flash_first_gpio;
 	module->ext.flash_con.peri_setting.gpio.second_gpio_port_no = device->pdata->flash_second_gpio;
 

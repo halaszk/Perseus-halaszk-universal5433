@@ -53,6 +53,10 @@ struct dw_mci_exynos_priv_data {
 	int			drv_str_base_val;
 	u32			drv_str_num;
 	int			cd_gpio;
+	int			sec_sd_slot_type;
+#define SEC_DEFAULT_SD_SLOT	0 /* No detect GPIO SD slot case */
+#define SEC_HOTPLUG_SD_SLOT	1 /* detect GPIO SD slot without Tray */
+#define SEC_HYBRID_SD_SLOT	2 /* detect GPIO SD slot with Tray */
 	int			vqmmc_en_gpio;
 	int			vmmc_en_gpio;
 	u32			caps;

@@ -155,6 +155,7 @@ SECTIONS
 
 	NOTES
 
+	. = ALIGN(PAGE_SIZE);
 	_etext = .;			/* End of text and rodata section */
 
 #ifndef CONFIG_XIP_KERNEL
@@ -290,6 +291,13 @@ SECTIONS
 	}
 	. = ALIGN(1<<PAGE_SHIFT);
 #endif /* TIMA_RKP_RO_CRED */
+
+#ifdef CONFIG_RKP_DBLMAP_PROT
+	.rkp.bitmap : {
+		rkp_double_bitmap = .;
+		. = rkp_double_bitmap + 0x18000;
+	}
+#endif
 
 #ifdef CONFIG_HAVE_TCM
         /*

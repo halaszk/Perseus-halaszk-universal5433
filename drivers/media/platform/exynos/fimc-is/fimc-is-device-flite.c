@@ -1564,6 +1564,8 @@ int fimc_is_flite_close(struct v4l2_subdev *subdev)
 		ret = -EINVAL;
 		goto p_err;
 	}
+	tasklet_kill(&flite->tasklet_flite_str);
+	tasklet_kill(&flite->tasklet_flite_end);
 
 p_err:
 	return ret;

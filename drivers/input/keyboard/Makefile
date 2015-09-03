@@ -5,6 +5,7 @@
 # Each configuration option enables a list of files.
 
 obj-$(CONFIG_KEYBOARD_ABOV_TOUCH)	+= abov_touchkey.o
+obj-$(CONFIG_KEYBOARD_ABOV_TOUCH_A8)	+= abov_touchkey_a8.o
 obj-$(CONFIG_KEYBOARD_ADP5520)		+= adp5520-keys.o
 obj-$(CONFIG_KEYBOARD_ADP5588)		+= adp5588-keys.o
 obj-$(CONFIG_KEYBOARD_ADP5589)		+= adp5589-keys.o

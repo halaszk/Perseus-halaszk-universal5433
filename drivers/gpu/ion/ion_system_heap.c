@@ -205,7 +205,11 @@ static int ion_system_heap_allocate(struct ion_heap *heap,
 		ion_page_order(page) = 0;
 	}
 
-	if (all_pages_from_pool)
+	if (ion_buffer_sync_force(buffer))
+		ion_device_sync(heap->dev, table,
+				DMA_BIDIRECTIONAL, ion_buffer_flush, true);
+
+	if (all_pages_from_pool || ion_buffer_sync_force(buffer))
 		ion_buffer_set_ready(buffer);
 
 	buffer->priv_virt = table;

@@ -1,6 +1,7 @@
 /*
  * arizona.h  --  WM5102 MFD internals
  *
+ * Copyright 2014 Cirrus Logic
  * Copyright 2012 Wolfson Microelectronics plc
  *
  * Author: Mark Brown <broonie@opensource.wolfsonmicro.com>
@@ -25,9 +26,16 @@ extern const struct regmap_config wm5102_spi_regmap;
 extern const struct regmap_config florida_i2c_regmap;
 extern const struct regmap_config florida_spi_regmap;
 
+extern const struct regmap_config clearwater_16bit_i2c_regmap;
+extern const struct regmap_config clearwater_16bit_spi_regmap;
+extern const struct regmap_config clearwater_32bit_spi_regmap;
+extern const struct regmap_config clearwater_32bit_i2c_regmap;
+
 extern const struct regmap_config wm8997_i2c_regmap;
 
-extern const struct regmap_config wm8998_i2c_regmap;
+extern const struct regmap_config vegas_i2c_regmap;
+
+extern const struct regmap_config cs47l24_spi_regmap;
 
 extern const struct dev_pm_ops arizona_pm_ops;
 
@@ -40,11 +48,15 @@ extern const struct regmap_irq_chip florida_aod;
 extern const struct regmap_irq_chip florida_irq;
 extern const struct regmap_irq_chip florida_revd_irq;
 
+extern const struct regmap_irq_chip clearwater_irq;
+
 extern const struct regmap_irq_chip wm8997_aod;
 extern const struct regmap_irq_chip wm8997_irq;
 
-extern struct regmap_irq_chip wm8998_aod;
-extern struct regmap_irq_chip wm8998_irq;
+extern struct regmap_irq_chip vegas_aod;
+extern struct regmap_irq_chip vegas_irq;
+
+extern const struct regmap_irq_chip cs47l24_irq;
 
 int arizona_dev_init(struct arizona *arizona);
 int arizona_dev_exit(struct arizona *arizona);

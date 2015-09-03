@@ -210,6 +210,17 @@ struct ion_heap {
 };
 
 /**
+ * ion_buffer_sync_force - check if ION_FLAG_SYNC_FORCE is set
+ * @buffer:		buffer
+ *
+ * indicates whether this ion buffer should be cache clean after allocation
+ */
+static inline bool ion_buffer_sync_force(struct ion_buffer *buffer)
+{
+	return !!(buffer->flags & ION_FLAG_SYNC_FORCE);
+}
+
+/**
  * ion_buffer_cached - this ion buffer is cached
  * @buffer:		buffer
  *

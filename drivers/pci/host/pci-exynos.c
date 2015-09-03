@@ -1039,13 +1039,17 @@ EXPORT_SYMBOL(exynos_pcie_poweron);
 
 void exynos_pcie_poweroff(void)
 {
+	struct pcie_port *pp = &g_pcie->pp;
 	u32 __maybe_unused val;
 	int __maybe_unused count = 0;
+	unsigned long flags;
 
 	if (check_rev()) {
 		printk("------%s------ probe_ok: %d, poweronoff_flag: %d\n", __func__, probe_ok, poweronoff_flag);
 		if (poweronoff_flag && probe_ok) {
 			cancel_delayed_work_sync(&g_pcie->work);
+
+			spin_lock_irqsave(&pp->conf_lock, flags);
 			gpio_set_value(g_pcie->perst_gpio, 0);
 			/* LTSSM disable */
 			writel(PCIE_ELBI_LTSSM_DISABLE, g_pcie->elbi_base + PCIE_APP_LTSSM_ENABLE);
@@ -1053,10 +1057,11 @@ void exynos_pcie_poweroff(void)
 			writel(readl(g_pcie->phy_base + 0x55*4) | (0x1 << 3), g_pcie->phy_base + 0x55*4);
 			writel(readl(g_pcie->phy_base + 0x21*4) | (0x1 << 4), g_pcie->phy_base + 0x21*4);
 
+			poweronoff_flag = 0;
+			spin_unlock_irqrestore(&pp->conf_lock, flags);
+
 			clk_disable_unprepare(g_pcie->phy_clk);
 			clk_disable_unprepare(g_pcie->clk);
-
-			poweronoff_flag = 0;
 
 			return;
 		}

@@ -111,13 +111,6 @@ static struct dentry		*debugfs_file;
 static char fw_name[100];
 //static char setf_name[100];
 
-#if defined(CONFIG_CAMERA_EEPROM_SUPPORT_REAR)
-#define FIMC_IS_MAX_CAL_SIZE	(8 * 1024)
-#else
-#define FIMC_IS_MAX_CAL_SIZE	(64 * 1024)
-#endif
-#define FIMC_IS_MAX_CAL_SIZE_FRONT	(8 * 1024)
-
 #define FIMC_IS_DEFAULT_CAL_SIZE	(20 * 1024)
 extern bool crc32_check;
 extern bool crc32_header_check;
@@ -1216,6 +1209,12 @@ static int fimc_is_ischain_loadcalb_eeprom(struct fimc_is_device_ischain *device
 		u32 start_addr = 0;
 		int cal_size = 0;
 		struct fimc_is_from_info *finfo;
+		struct fimc_is_core *core = (struct fimc_is_core *)platform_get_drvdata(device->pdev);
+
+		if (!fimc_is_sec_check_from_ver(core, id)) {
+			err("Camera : Did not load cal data.\n");
+			return 0;
+		}
 
 		mdbgd_ischain("%s\n", device, __func__);
 
@@ -1290,11 +1289,14 @@ static int fimc_is_ischain_loadcalb(struct fimc_is_device_ischain *device,
 	char *cal_ptr;
 	struct fimc_is_from_info *sysfs_finfo;
 	char *cal_buf;
-
-#ifdef CONFIG_COMPANION_USE
 	struct fimc_is_core *core = (struct fimc_is_core *)platform_get_drvdata(device->pdev);
-#endif
+
 	mdbgd_ischain("%s\n", device, __func__);
+
+	if (!fimc_is_sec_check_from_ver(core, SENSOR_POSITION_REAR)) {
+		err("Camera : Did not load cal data.");
+		return 0;
+	}
 
 	cal_ptr = (char *)(device->imemory.kvaddr + FIMC_IS_CAL_START_ADDR);
 
@@ -1978,6 +1980,8 @@ static int fimc_is_itf_open(struct fimc_is_device_ischain *device,
 	int ret = 0;
 	struct is_region *region;
 	struct fimc_is_interface *itf;
+	struct fimc_is_module_enum *module;
+	struct fimc_is_device_sensor *sensor;
 
 	BUG_ON(!device);
 	BUG_ON(!device->is_region);
@@ -2008,11 +2012,18 @@ static int fimc_is_itf_open(struct fimc_is_device_ischain *device,
 		goto p_err;
 	}
 
+	sensor = device->sensor;
+	ret = fimc_is_sensor_g_module(sensor, &module);
+	if (ret) {
+		merr("fimc_is_sensor_g_module is fail(%d)", device, ret);
+		goto p_err;
+	}
+
 	/* HACK */
-	device->margin_left = 8;
-	device->margin_right = 8;
-	device->margin_top = 6;
-	device->margin_bottom = 4;
+	device->margin_left = module->margin_left;
+	device->margin_right =  module->margin_right;;
+	device->margin_top =  module->margin_top;;
+	device->margin_bottom =  module->margin_bottom;;
 	device->margin_width = device->margin_left + device->margin_right;
 	device->margin_height = device->margin_top + device->margin_bottom;
 	mdbgd_ischain("margin %dx%d\n", device,
@@ -3344,13 +3355,13 @@ static int fimc_is_ischain_s_3aa_size(struct fimc_is_device_ischain *device,
 
 	/* check crop size */
 	if (test_bit(FIMC_IS_GROUP_OTF_INPUT, &device->group_3aa.state)) {
-		if (bns_width <= total_width) {
+		if (bns_width < total_width) {
 			merr("crop width(%d) is bigger than input width(%d)\n",
 				device, total_width, bns_width);
 			goto p_err;
 		}
 
-		if (bns_height <= total_height) {
+		if (bns_height < total_height) {
 			merr("crop height(%d) is bigger than input height(%d)\n",
 				device, total_height, bns_height);
 			goto p_err;
@@ -3362,13 +3373,13 @@ static int fimc_is_ischain_s_3aa_size(struct fimc_is_device_ischain *device,
 		taa_dma_input = fimc_is_itf_g_param(device, frame, PARAM_3AA_VDMA1_INPUT);
 		taa_dma_input->cmd = DMA_INPUT_COMMAND_DISABLE;
 	} else {
-		if (sensor_width <= total_width) {
+		if (sensor_width < total_width) {
 			merr("crop width(%d) is bigger than input width(%d)\n",
 				device, total_width, sensor_width);
 			goto p_err;
 		}
 
-		if (sensor_height <= total_height) {
+		if (sensor_height < total_height) {
 			merr("crop height(%d) is bigger than input height(%d)\n",
 				device, total_height, sensor_height);
 			goto p_err;
@@ -6993,6 +7004,7 @@ int fimc_is_ischain_3aa_callback(struct fimc_is_device_ischain *device,
 #ifdef ENABLE_FAST_SHOT
 	uint32_t af_trigger_bk;
 	enum aa_capture_intent captureIntent_bk;
+	enum aa_ae_flashmode aeflashMode_bk;
 #endif
 
 #ifdef DBG_STREAMING
@@ -7053,12 +7065,14 @@ int fimc_is_ischain_3aa_callback(struct fimc_is_device_ischain *device,
 	if (test_bit(FIMC_IS_GROUP_OTF_INPUT, &group->state)) {
 		af_trigger_bk = frame->shot->ctl.aa.afTrigger;
 		captureIntent_bk = frame->shot->ctl.aa.captureIntent;
+		aeflashMode_bk = frame->shot->ctl.aa.aeflashMode;
 		memcpy(&frame->shot->ctl.aa, &group->fast_ctl.aa,
 			sizeof(struct camera2_aa_ctl));
 		memcpy(&frame->shot->ctl.scaler, &group->fast_ctl.scaler,
 			sizeof(struct camera2_scaler_ctl));
 		frame->shot->ctl.aa.afTrigger = af_trigger_bk;
 		frame->shot->ctl.aa.captureIntent = captureIntent_bk;
+		frame->shot->ctl.aa.aeflashMode = aeflashMode_bk;
 	}
 #endif
 	if (test_bit(FIMC_IS_GROUP_OTF_INPUT, &group->state)) {

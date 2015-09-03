@@ -679,10 +679,10 @@ static void exynos_report_trigger(void)
 		else
 			th_zone->therm_dev->passive_delay = PASSIVE_INTERVAL;
 	}
+	mutex_unlock(&th_zone->therm_dev->lock);
 
 	snprintf(data, sizeof(data), "%u", i);
 	kobject_uevent_env(&th_zone->therm_dev->device.kobj, KOBJ_CHANGE, envp);
-	mutex_unlock(&th_zone->therm_dev->lock);
 }
 
 /* Register with the in-kernel thermal management */

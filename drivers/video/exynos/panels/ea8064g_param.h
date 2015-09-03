@@ -170,19 +170,6 @@ static const unsigned char SEQ_ESD_FG_POLARITY[] = {
 	0x20
 };
 
-static unsigned char SEQ_PARTIAL_AREA[] = {
-	0x30,
-	0x00, 0x00, 0x00, 0x00
-};
-
-static const unsigned char SEQ_NORMAL_MODE_ON[] = {
-	0x13,
-};
-
-static const unsigned char SEQ_PARTIAL_MODE_ON[] = {
-	0x12,
-};
-
 enum {
 	HBM_STATUS_OFF,
 	HBM_STATUS_ON,
@@ -274,42 +261,5 @@ static const unsigned char ELVSS_TABLE[ACL_STATUS_MAX][ELVSS_STATUS_MAX] = {
 };
 
 static const unsigned char MPS_TABLE[ACL_STATUS_MAX] = {0x5C, 0x4C};
-
-#ifdef CONFIG_LCD_ALPM
-static const unsigned char SEQ_ALPM_60NIT[] = {
-	0x51,
-	0xFF
-};
-
-static const unsigned char SEQ_ALPM_10NIT[] = {
-	0x51,
-	0x7F
-};
-
-static const unsigned char SEQ_IDLE_MODE_ON[] = {
-	0x39,
-};
-
-static const unsigned char SEQ_IDLE_MODE_OFF[] = {
-	0x38,
-};
-
-static struct lcd_seq_info SEQ_ALPM_ON_SET[] = {
-	{(u8 *)SEQ_DISPLAY_OFF, ARRAY_SIZE(SEQ_DISPLAY_OFF), 20},
-	{(u8 *)SEQ_PARTIAL_AREA, ARRAY_SIZE(SEQ_PARTIAL_AREA), 0},
-	{(u8 *)SEQ_ALPM_60NIT, ARRAY_SIZE(SEQ_ALPM_60NIT), 0},
-	{(u8 *)SEQ_ALPM_10NIT, ARRAY_SIZE(SEQ_ALPM_10NIT), 0},
-	{(u8 *)SEQ_IDLE_MODE_ON, ARRAY_SIZE(SEQ_IDLE_MODE_ON), 0},
-	{(u8 *)SEQ_PARTIAL_MODE_ON, ARRAY_SIZE(SEQ_PARTIAL_MODE_ON), 20},
-	{(u8 *)SEQ_DISPLAY_ON, ARRAY_SIZE(SEQ_DISPLAY_ON), 0},
-};
-
-static struct lcd_seq_info SEQ_ALPM_OFF_SET[] = {
-	{(u8 *)SEQ_DISPLAY_OFF, ARRAY_SIZE(SEQ_DISPLAY_OFF), 20},
-	{(u8 *)SEQ_IDLE_MODE_OFF, ARRAY_SIZE(SEQ_IDLE_MODE_OFF), 0},
-	{(u8 *)SEQ_NORMAL_MODE_ON, ARRAY_SIZE(SEQ_NORMAL_MODE_ON), 20},
-	{(u8 *)SEQ_DISPLAY_ON, ARRAY_SIZE(SEQ_DISPLAY_ON), 0},
-};
-#endif
 
 #endif /* __EA8064G_PARAM_H__ */

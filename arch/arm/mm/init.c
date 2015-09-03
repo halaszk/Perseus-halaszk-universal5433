@@ -35,6 +35,9 @@
 #include <asm/mach/map.h>
 
 #include "mm.h"
+#include <asm/cp15.h>
+
+extern int boot_mode_security;
 
 static unsigned long phys_initrd_start __initdata = 0;
 static unsigned long phys_initrd_size __initdata = 0;
@@ -342,7 +345,8 @@ void __init arm_memblock_init(struct meminfo *mi, struct machine_desc *mdesc)
 		memblock_add(mi->bank[i].start, mi->bank[i].size);
 
 #ifdef CONFIG_TIMA_RKP_30
-	memblock_reserve(__pa(_text), PAGE_SIZE);
+	if (boot_mode_security)
+		memblock_reserve(__pa(_text), PAGE_SIZE);
 #endif /*CONFIG_TIMA_RKP_30*/
 	/* Register the kernel text, kernel data and initrd with memblock. */
 #ifdef CONFIG_XIP_KERNEL
@@ -737,6 +741,12 @@ void free_initmem(void)
 	poison_init_mem(__init_begin, __init_end - __init_begin);
 	if (!machine_is_integrator() && !machine_is_cintegrator())
 		free_initmem_default(0);
+#ifdef CONFIG_SOC_EXYNOS5433
+#ifdef CONFIG_TIMA_RKP
+	if (boot_mode_security)
+		tima_send_cmd5(0, 0, 0, 0, 0, RKP_DEFERRED_INIT);
+#endif
+#endif
 }
 
 #ifdef CONFIG_BLK_DEV_INITRD

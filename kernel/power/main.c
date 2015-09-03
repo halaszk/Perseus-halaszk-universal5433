@@ -40,7 +40,11 @@ EXPORT_SYMBOL_GPL(unregister_pm_notifier);
 
 int pm_notifier_call_chain(unsigned long val)
 {
+#ifdef CONFIG_SEC_DEBUG_AUX_SUSPEND
+	int ret = blocking_notifier_call_chain(&pm_chain_head, val, (void *)0xFFEDCBA9);
+#else
 	int ret = blocking_notifier_call_chain(&pm_chain_head, val, NULL);
+#endif
 
 	return notifier_to_errno(ret);
 }

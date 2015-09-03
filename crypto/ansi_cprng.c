@@ -135,7 +135,7 @@ static int _get_more_prng_bytes(struct prng_context *ctx, int cont_test)
 			 * random data that we did last time around through this
 			 */
 #if FIPS_FUNC_TEST == 5
-            memcpy(ctx->rand_data, ctx->last_rand_data, DEFAULT_BLK_SZ);
+            		memcpy(ctx->rand_data, ctx->last_rand_data, DEFAULT_BLK_SZ);
 #endif
 			if (!memcmp(ctx->rand_data, ctx->last_rand_data,
 					DEFAULT_BLK_SZ)) {
@@ -143,7 +143,8 @@ static int _get_more_prng_bytes(struct prng_context *ctx, int cont_test)
 #ifdef CONFIG_CRYPTO_FIPS
 					set_in_fips_err();
 #else
-					panic("cprng %p Failed repetition check!\n", ctx);					
+					panic("cprng %p Failed repetition check!\n",
+						ctx);
 #endif
 				}
 
@@ -397,36 +398,14 @@ static int cprng_reset(struct crypto_rng *tfm, u8 *seed, unsigned int slen)
 	return 0;
 }
 
-static struct crypto_alg rng_alg = {
-	.cra_name		= "stdrng",
-	.cra_driver_name	= "ansi_cprng",
-	.cra_priority		= 100,
-	.cra_flags		= CRYPTO_ALG_TYPE_RNG,
-	.cra_ctxsize		= sizeof(struct prng_context),
-	.cra_type		= &crypto_rng_type,
-	.cra_module		= THIS_MODULE,
-	.cra_list		= LIST_HEAD_INIT(rng_alg.cra_list),
-	.cra_init		= cprng_init,
-	.cra_exit		= cprng_exit,
-	.cra_u			= {
-		.rng = {
-			.rng_make_random	= cprng_get_random,
-			.rng_reset		= cprng_reset,
-			.seedsize = DEFAULT_PRNG_KSZ + 2*DEFAULT_BLK_SZ,
-		}
-	}
-};
-
 #ifdef CONFIG_CRYPTO_FIPS
 static int fips_cprng_get_random(struct crypto_rng *tfm, u8 *rdata,
 			    unsigned int dlen)
 {
 	struct prng_context *prng = crypto_rng_ctx(tfm);
 
-#ifdef CONFIG_CRYPTO_FIPS
 	if (unlikely(in_fips_err()))
 		return -EINVAL;
-#endif
 
 	return get_prng_bytes(rdata, dlen, prng, 1);
 }
@@ -458,8 +437,27 @@ static int fips_cprng_reset(struct crypto_rng *tfm, u8 *seed, unsigned int slen)
 out:
 	return rc;
 }
+#endif
 
-static struct crypto_alg fips_rng_alg = {
+static struct crypto_alg rng_algs[] = { {
+	.cra_name		= "stdrng",
+	.cra_driver_name	= "ansi_cprng",
+	.cra_priority		= 100,
+	.cra_flags		= CRYPTO_ALG_TYPE_RNG,
+	.cra_ctxsize		= sizeof(struct prng_context),
+	.cra_type		= &crypto_rng_type,
+	.cra_module		= THIS_MODULE,
+	.cra_init		= cprng_init,
+	.cra_exit		= cprng_exit,
+	.cra_u			= {
+		.rng = {
+			.rng_make_random	= cprng_get_random,
+			.rng_reset		= cprng_reset,
+			.seedsize = DEFAULT_PRNG_KSZ + 2*DEFAULT_BLK_SZ,
+		}
+	}
+#ifdef CONFIG_CRYPTO_FIPS
+}, {
 	.cra_name		= "fips(ansi_cprng)",
 	.cra_driver_name	= "fips_ansi_cprng",
 	.cra_priority		= 300,
@@ -467,7 +465,6 @@ static struct crypto_alg fips_rng_alg = {
 	.cra_ctxsize		= sizeof(struct prng_context),
 	.cra_type		= &crypto_rng_type,
 	.cra_module		= THIS_MODULE,
-	.cra_list		= LIST_HEAD_INIT(rng_alg.cra_list),
 	.cra_init		= cprng_init,
 	.cra_exit		= cprng_exit,
 	.cra_u			= {
@@ -477,33 +474,18 @@ static struct crypto_alg fips_rng_alg = {
 			.seedsize = DEFAULT_PRNG_KSZ + 2*DEFAULT_BLK_SZ,
 		}
 	}
-};
 #endif
+} };
 
 /* Module initalization */
 static int __init prng_mod_init(void)
 {
-	int rc = 0;
-
-	rc = crypto_register_alg(&rng_alg);
-#ifdef CONFIG_CRYPTO_FIPS
-	if (rc)
-		goto out;
-
-	rc = crypto_register_alg(&fips_rng_alg);
-
-out:
-#endif
-	return rc;
+	return crypto_register_algs(rng_algs, ARRAY_SIZE(rng_algs));
 }
 
 static void __exit prng_mod_fini(void)
 {
-	crypto_unregister_alg(&rng_alg);
-#ifdef CONFIG_CRYPTO_FIPS
-	crypto_unregister_alg(&fips_rng_alg);
-#endif
-	return;
+	crypto_unregister_algs(rng_algs, ARRAY_SIZE(rng_algs));
 }
 
 MODULE_LICENSE("GPL");

@@ -27,6 +27,7 @@ struct touchkey_platform_data {
 	u32 irq_gpio_flags;
 	u32 sda_gpio_flags;
 	u32 scl_gpio_flags;
+	u32 multi_fw_ver;
 	bool i2c_gpio;
 	u32 stabilizing_time;
 	u32 ic_type;

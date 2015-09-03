@@ -738,8 +738,12 @@ static int ice40lm_gpio_setting(void)
 	ret += gpio_request_one(g_pdata->irda_irq, GPIOF_IN, "FPGA_IRDA_IRQ");
 	ret += gpio_request_one(g_pdata->spi_en_rstn, GPIOF_OUT_INIT_LOW, "FPGA_SPI_EN");
 
-	if (power_type == PWR_LDO)
-		ret += gpio_request_one(g_pdata->ir_en, GPIOF_OUT_INIT_LOW, "FPGA_IR_EN");
+	if (power_type == PWR_LDO) {
+		if (g_pdata->spi_en_rstn != g_pdata->ir_en)
+			ret += gpio_request_one(g_pdata->ir_en, GPIOF_OUT_INIT_LOW, "FPGA_IR_EN");
+		else
+			pr_info("%s: skip duplicated gpio request\n", __func__);
+	}
 
 /* i2c-gpio drv already request below pins */
 	gpio_free(g_pdata->spi_si_sda);

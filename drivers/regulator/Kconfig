@@ -20,7 +20,6 @@ menuconfig REGULATOR
 
 	  If unsure, say no.
 
-
 if REGULATOR
 
 config REGULATOR_DEBUG
@@ -268,11 +267,29 @@ config REGULATOR_MAX77843
 	  Exynos-5 chips to control VCC_CORE and
 	  VCC_USIM voltages.
 
+config REGULATOR_MAX77849
+	tristate "Maxim 77849 regulator"
+	depends on MFD_MAX77849
+	help
+	  This driver controls a Maxim 77849 regulator
+	  via I2C bus. The provided regulator is suitable for
+	  Exynos-5 chips to control VCC_CORE and
+	  VCC_USIM voltages.
+
 config REGULATOR_MAX77888
 	tristate "Maxim 77888 regulator"
 	depends on MFD_MAX77888
 	help
 	  This driver controls a Maxim 77888 regulator
+	  via I2C bus. The provided regulator is suitable for
+	  Exynos-5 chips to control VCC_CORE and
+	  VCC_USIM voltages.
+
+config REGULATOR_SM5703
+	tristate "SM5703 regulator"
+	depends on MFD_SM5703
+	help
+	  This driver controls a SM5703 regulator
 	  via I2C bus. The provided regulator is suitable for
 	  Exynos-5 chips to control VCC_CORE and
 	  VCC_USIM voltages.
@@ -558,6 +575,12 @@ config REGULATOR_NCP6335B
 	  regulator that delivers a digitally programmable output from an
 	  input voltage supply of 2.5V to 5.5V. The output voltage is
 	  programmed through an I2C interface.
+
+config REGULATOR_RT5033
+	depends on MFD_RT5033
+	tristate "RT5033 LDO and Buck"
+	help
+	 Say y here to support the regulators found on the Richtek RT5033 I/F PMIC.
 
 endif
 

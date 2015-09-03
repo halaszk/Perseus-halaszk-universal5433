@@ -2,7 +2,6 @@
 # Makefile for regulator drivers.
 #
 
-
 obj-$(CONFIG_REGULATOR) += core.o dummy.o fixed-helper.o
 obj-$(CONFIG_OF) += of_regulator.o
 obj-$(CONFIG_REGULATOR_FIXED_VOLTAGE) += fixed.o
@@ -43,7 +42,9 @@ obj-$(CONFIG_REGULATOR_MAX8998) += max8998.o
 obj-$(CONFIG_REGULATOR_MAX77686) += max77686.o
 obj-$(CONFIG_REGULATOR_MAX77804) += max77804.o
 obj-$(CONFIG_REGULATOR_MAX77843) += max77843.o
+obj-$(CONFIG_REGULATOR_MAX77849) += max77849.o
 obj-$(CONFIG_REGULATOR_MAX77888) += max77888.o
+obj-$(CONFIG_REGULATOR_SM5703) += sm5703.o
 obj-$(CONFIG_REGULATOR_MC13783) += mc13783-regulator.o
 obj-$(CONFIG_REGULATOR_MC13892) += mc13892-regulator.o
 obj-$(CONFIG_REGULATOR_MC13XXX_CORE) +=  mc13xxx-regulator-core.o
@@ -77,6 +78,6 @@ obj-$(CONFIG_REGULATOR_WM8994) += wm8994-regulator.o
 ifeq ($(CONFIG_COMPANION_USE),y)
 obj-$(CONFIG_REGULATOR_NCP6335B) += ncp6335b.o
 endif
-
+obj-$(CONFIG_REGULATOR_RT5033) += rt5033_regulator.o
 
 ccflags-$(CONFIG_REGULATOR_DEBUG) += -DDEBUG

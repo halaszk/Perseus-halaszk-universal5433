@@ -35,7 +35,7 @@
 #endif
 
 struct interface_port {
-	s32 (*init)(HANDLE handle, u16 param1, u16 param2);
+	s32 (*init)(HANDLE handle, unsigned long param);
 	s32 (*byteread)(HANDLE handle, u16 addr, u8  *data);
 	s32 (*wordread)(HANDLE handle, u16 addr, u16 *data);
 	s32 (*longread)(HANDLE handle, u16 addr, u32 *data);
@@ -97,7 +97,7 @@ static struct interface_port i2cif = {
 static struct interface_port *ifport;
 static u8 hostif_type;
 
-s32 bbm_hostif_select(HANDLE handle, u8 hostif, u32 param)
+s32 bbm_hostif_select(HANDLE handle, u8 hostif, unsigned long param)
 {
 	hostif_type = hostif;
 
@@ -121,7 +121,7 @@ s32 bbm_hostif_select(HANDLE handle, u8 hostif, u32 param)
 		return BBM_E_HOSTIF_SELECT;
 	}
 
-	if (ifport->init(handle, (param & 0xffff), ((param >> 16) & 0xffff)))
+	if (ifport->init(handle, param))
 		return BBM_E_HOSTIF_INIT;
 
 	return BBM_OK;

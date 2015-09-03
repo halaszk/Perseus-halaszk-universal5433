@@ -46,14 +46,14 @@ __stringify(CY_DRIVER_NAME)		    \
 "." __stringify(CY_DRIVER_MINOR)	    \
 "." __stringify(CY_DRIVER_REVCTRL)
 
-#define CY_DRIVER_DATE "20131202"	/* YYYYMMDD */
+#define CY_DRIVER_DATE "20150610"	/* YYYYMMDD */
 
 /* abs settings */
 #define CY_IGNORE_VALUE             0xFFFF
 
 /* FW VERSION */
-#define CY_HW_VERSION 0x02
-#define CY_FW_VERSION 0x0300
+#define CY_HW_VERSION 0x01
+#define CY_FW_VERSION 0x0f00
 
 enum cyttsp5_core_platform_flags {
 	CY_CORE_FLAG_NONE,
@@ -98,7 +98,7 @@ struct cyttsp5_loader_platform_data {
 #define CY_TOUCH_SETTINGS_MAX 32
 
 struct cyttsp5_core_platform_data {
-	unsigned irq_gpio;
+	int irq_gpio;
 	int rst_gpio;
 	int level_irq_udelay;
 	u16 hid_desc_register;

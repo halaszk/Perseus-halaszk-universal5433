@@ -58,7 +58,6 @@ struct s3c_fb_driverdata *get_display_drvdata(void);
 struct s3c_fb_platdata *get_display_platdata(void);
 struct mipi_dsim_config *get_display_dsi_drvdata(void);
 struct mipi_dsim_lcd_config *get_display_lcd_drvdata(void);
-struct display_gpio *get_display_dsi_reset_gpio(void);
 struct mic_config *get_display_mic_config(void);
 
 extern int s5p_mipi_dsi_disable(struct mipi_dsim_device *dsim);
@@ -73,7 +72,6 @@ static int init_display_operations(void)
 	DT_OPS.get_display_platdata = get_display_platdata;
 	DT_OPS.get_display_dsi_drvdata = get_display_dsi_drvdata;
 	DT_OPS.get_display_lcd_drvdata = get_display_lcd_drvdata;
-	DT_OPS.get_display_dsi_reset_gpio = get_display_dsi_reset_gpio;
 #ifdef CONFIG_DECON_MIC
 	DT_OPS.get_display_mic_config = get_display_mic_config;
 #endif
@@ -247,6 +245,7 @@ static void display_driver_shutdown(struct platform_device *pdev)
 	disp_pm_gate_lock(dispdrv, true);
 	disp_pm_add_refcount(get_display_driver());
 #endif
+	g_display_driver.decon_driver.sfb->blank_mode = FB_BLANK_POWERDOWN;
 	s5p_mipi_dsi_disable(g_display_driver.dsi_driver.dsim);
 }
 

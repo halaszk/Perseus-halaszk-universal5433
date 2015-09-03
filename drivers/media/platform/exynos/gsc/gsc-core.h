@@ -318,6 +318,8 @@ struct gsc_scaler {
 	u32	pre_vratio;
 	unsigned long main_hratio;
 	unsigned long main_vratio;
+	bool	main_hratio_dirty;
+	bool	main_vratio_dirty;
 	bool	is_scaled_down;
 };
 
@@ -390,10 +392,29 @@ struct gsc_output_device {
 	struct list_head	active_buf_q;
 	int			req_cnt;
 	unsigned int		pending_mask;
-	unsigned long long	q_time[50];
-	unsigned long long	dq_time[50];
-	unsigned long long	wq_time[50];
-	unsigned long long	isr_time[50];
+#define MAX_DEBUG_BUF_CNT		20
+	unsigned long long	q_time[MAX_DEBUG_BUF_CNT];
+	unsigned long long	dq_time[MAX_DEBUG_BUF_CNT];
+	unsigned long long	wq_time[MAX_DEBUG_BUF_CNT];
+	unsigned long long	isr_time[MAX_DEBUG_BUF_CNT];
+	unsigned long long	src_time[MAX_DEBUG_BUF_CNT];
+	unsigned long long	dst_time[MAX_DEBUG_BUF_CNT];
+
+	u32			q_cnt;
+	u32			dq_cnt;
+	u32			isr_cnt;
+	u32			wq_cnt;
+	u32			real_isr_cnt;
+	u32			src_cnt; /* src size setting */
+	u32			dst_cnt; /* dst size setting */
+	u32			src_w[MAX_DEBUG_BUF_CNT];
+	u32			src_h[MAX_DEBUG_BUF_CNT];
+	u32			src_x[MAX_DEBUG_BUF_CNT];
+	u32			src_y[MAX_DEBUG_BUF_CNT];
+	u32			dst_w[MAX_DEBUG_BUF_CNT];
+	u32			dst_h[MAX_DEBUG_BUF_CNT];
+	u32			dst_x[MAX_DEBUG_BUF_CNT];
+	u32			dst_y[MAX_DEBUG_BUF_CNT];
 };
 
 /**
@@ -408,6 +429,12 @@ struct gsc_m2m_device {
 	struct v4l2_m2m_dev	*m2m_dev;
 	struct gsc_ctx		*ctx;
 	int			refcnt;
+#if defined(CONFIG_VIDEO_EXYNOS_GSCALER_DEBUG)
+	u32			isr_cnt;
+	u32			run_cnt;
+	unsigned long long	isr_time[50];
+	unsigned long long	run_time[50];
+#endif /* CONFIG_VIDEO_EXYNOS_GSCALER_DEBUG */
 };
 
 /**
@@ -571,11 +598,6 @@ struct gsc_dev {
 	void __iomem			*sysreg_disp;
 	void __iomem			*sysreg_gscl;
 	struct timer_list		op_timer;
-	u32				q_cnt;
-	u32				dq_cnt;
-	u32				isr_cnt;
-	u32				wq_cnt;
-	u32				real_isr_cnt;
 };
 
 /**
@@ -859,6 +881,7 @@ void gsc_hw_set_mainscaler(struct gsc_ctx *ctx);
 void gsc_hw_set_input_rotation(struct gsc_ctx *ctx);
 void gsc_hw_set_global_alpha(struct gsc_ctx *ctx);
 void gsc_hw_set_sfr_update(struct gsc_ctx *ctx);
+void gsc_hw_wait_sfr_update(struct gsc_ctx *ctx);
 void gsc_hw_set_local_dst(struct gsc_dev *gsc, int out, bool on);
 void gsc_hw_set_mixer(int id);
 void gsc_hw_set_sysreg_writeback(struct gsc_dev *dev, bool on);

@@ -945,8 +945,7 @@ config ARCH_HAS_BARRIERS
 
 config STRICT_MEMORY_RWX
 	bool "restrict kernel memory permissions as much as possible"
-	depends on TIMA_RKP
-	default n
+	default y
 	help
 	  If this is set, kernel text will be made RX, kernel data and stack
 	  RW, rodata R (otherwise all of the kernel 1-to-1 mapping is

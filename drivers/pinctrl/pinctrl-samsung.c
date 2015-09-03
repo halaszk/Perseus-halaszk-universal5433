@@ -327,7 +327,15 @@ static void samsung_pin_dbg_show_by_type(struct samsung_pin_bank *bank,
 	mask = (1 << width) - 1;
 	shift = pin_offset * width;
 
+#if defined(ENABLE_SENSORS_FPRINT_SECURE)	\
+	&& defined(CONFIG_SOC_EXYNOS5433)
+	if (!strncmp(bank->name, CONFIG_SENSORS_FP_SPI_GPIO, 4))
+		data = 0;
+	else
+		data = readl(reg_base + cfg_reg);
+#else
 	data = readl(reg_base + cfg_reg);
+#endif
 
 	data >>= shift;
 	data &= mask;
@@ -444,6 +452,13 @@ static void samsung_pinmux_setup(struct pinctrl_dev *pctldev, unsigned selector,
 
 	pin_to_reg_bank(drvdata, grp->pins[0] - drvdata->ctrl->base,
 			&reg, &pin_offset, &bank);
+
+#if defined(ENABLE_SENSORS_FPRINT_SECURE)	\
+	&& defined(CONFIG_SOC_EXYNOS5433)
+	if (!strncmp(bank->name, CONFIG_SENSORS_FP_SPI_GPIO, 4))
+		return;
+#endif
+
 	type = bank->type;
 	mask = (1 << type->fld_width[PINCFG_TYPE_FUNC]) - 1;
 	shift = pin_offset * type->fld_width[PINCFG_TYPE_FUNC];
@@ -514,6 +529,13 @@ static int samsung_pinmux_gpio_set_direction(struct pinctrl_dev *pctldev,
 	unsigned long flags;
 
 	bank = gc_to_pin_bank(range->gc);
+
+#if defined(ENABLE_SENSORS_FPRINT_SECURE)	\
+	&& defined(CONFIG_SOC_EXYNOS5433)
+	if (!strncmp(bank->name, CONFIG_SENSORS_FP_SPI_GPIO, 4))
+		return 0;
+#endif
+
 	type = bank->type;
 	drvdata = pinctrl_dev_get_drvdata(pctldev);
 	reg_ext_base = bank->eint_ext_offset ?
@@ -582,6 +604,13 @@ static int samsung_pinconf_rw(struct pinctrl_dev *pctldev, unsigned int pin,
 	drvdata = pinctrl_dev_get_drvdata(pctldev);
 	pin_to_reg_bank(drvdata, pin - drvdata->ctrl->base, &reg_base,
 					&pin_offset, &bank);
+
+#if defined(ENABLE_SENSORS_FPRINT_SECURE)	\
+	&& defined(CONFIG_SOC_EXYNOS5433)
+	if (!strncmp(bank->name, CONFIG_SENSORS_FP_SPI_GPIO, 4))
+		return 0;
+#endif
+
 	type = bank->type;
 
 	if (cfg_type >= PINCFG_TYPE_NUM || !type->fld_width[cfg_type])
@@ -725,6 +754,12 @@ static void samsung_gpio_set(struct gpio_chip *gc, unsigned offset, int value)
 	void __iomem *reg_ext_base = (bank->eint_ext_offset) ?
 		bank->drvdata->virt_ext_base : bank->drvdata->virt_base;
 	u32 data;
+
+#if defined(ENABLE_SENSORS_FPRINT_SECURE)	\
+	&& defined(CONFIG_SOC_EXYNOS5433)
+	if (!strncmp(bank->name, CONFIG_SENSORS_FP_SPI_GPIO, 4))
+		return;
+#endif
 
 	reg = reg_ext_base + bank->pctl_offset;
 
@@ -1341,6 +1376,12 @@ static void samsung_pinctrl_save_regs(
 		if (!widths[PINCFG_TYPE_CON_PDN])
 			continue;
 
+#if defined(ENABLE_SENSORS_FPRINT_SECURE)	\
+	&& defined(CONFIG_SOC_EXYNOS5433)
+		if (!strncmp(bank->name, CONFIG_SENSORS_FP_SPI_GPIO, 4))
+			continue;
+#endif
+
 		for (type = 0; type < PINCFG_TYPE_NUM; type++)
 			if (widths[type])
 				bank->pm_save[type] = readl(reg + offs[type]);
@@ -1380,6 +1421,12 @@ static void samsung_pinctrl_restore_regs(
 		/* Registers without a powerdown config aren't lost */
 		if (!widths[PINCFG_TYPE_CON_PDN])
 			continue;
+
+#if defined(ENABLE_SENSORS_FPRINT_SECURE)	\
+	&& defined(CONFIG_SOC_EXYNOS5433)
+		if (!strncmp(bank->name, CONFIG_SENSORS_FP_SPI_GPIO, 4))
+			continue;
+#endif
 
 		if (widths[PINCFG_TYPE_FUNC] * bank->nr_pins > 32) {
 			/* Some banks have two config registers */
@@ -1433,6 +1480,12 @@ static void samsung_pinctrl_set_pdn_previos_state(
 
 		if (!widths[PINCFG_TYPE_CON_PDN])
 			continue;
+
+#if defined(ENABLE_SENSORS_FPRINT_SECURE)	\
+	&& defined(CONFIG_SOC_EXYNOS5433)
+		if (!strncmp(bank->name, CONFIG_SENSORS_FP_SPI_GPIO, 4))
+			continue;
+#endif
 
 		/* set previous state */
 #ifdef CONFIG_SOC_EXYNOS5422
@@ -1685,6 +1738,14 @@ static void gpiodvs_check_init_gpio(struct samsung_pinctrl_drv_data *drvdata,
 	pin_to_reg_bank(drvdata, pin - drvdata->ctrl->base,
 					&reg_base, &pin_offset, &bank);
 
+#if defined(ENABLE_SENSORS_FPRINT_SECURE)	\
+	&& defined(CONFIG_SOC_EXYNOS5433)
+	if (!strncmp(bank->name, CONFIG_SENSORS_FP_SPI_GPIO, 4)) {
+		init_gpio_idx++;
+		goto out;
+	}
+#endif
+
 	/* GPZ ports are AUD interface (I2S, UART, PCM, SB) that should not
 	 * access when AUD power is disabled
 	 */
@@ -1728,6 +1789,14 @@ static void gpiodvs_check_sleep_gpio(struct samsung_pinctrl_drv_data *drvdata,
 
 	pin_to_reg_bank(drvdata, pin - drvdata->ctrl->base,
 					&reg_base, &pin_offset, &bank);
+
+#if defined(ENABLE_SENSORS_FPRINT_SECURE)	\
+	&& defined(CONFIG_SOC_EXYNOS5433)
+	if (!strncmp(bank->name, CONFIG_SENSORS_FP_SPI_GPIO, 4)) {
+		sleep_gpio_idx++;
+		goto out;
+	}
+#endif
 
 	/* GPZ ports are AUD interface (I2S, UART, PCM, SB) that should not
 	 * access when AUD power is disabled

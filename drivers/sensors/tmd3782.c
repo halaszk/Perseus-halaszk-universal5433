@@ -88,6 +88,21 @@ enum {
 	OFF = 0,
 	ON = 1,
 };
+#if defined(CONFIG_MACH_A7LTE)
+#define Atime_ms		504 //50.4 ms
+#define DGF				1575
+#define R_Coef1			(80)
+#define G_Coef1			(1000)
+#define B_Coef1			(-380)
+#define CT_Coef1			(3541)
+#define CT_Offset1			(2035)
+#define IR_R_Coef1			(-1)
+#define IR_G_Coef1			(109)
+#define IR_B_Coef1			(-29)
+#define IR_C_Coef1			(57)
+#define IR_Coef1			(38)
+#define INTEGRATION_CYCLE		240
+#else
 #define Atime_ms		504 //50.4 ms
 #define DGF				642
 #define R_Coef1			(330)
@@ -101,6 +116,7 @@ enum {
 #define IR_C_Coef1			(57)
 #define IR_Coef1			(38)
 #define INTEGRATION_CYCLE		240
+#endif
 
 #define ADC_BUFFER_NUM	6
 #define PROX_AVG_COUNT	40
@@ -110,8 +126,14 @@ enum {
 
 #define OFFSET_ARRAY_LENGTH		10
 #define OFFSET_FILE_PATH	"/efs/prox_cal"
+
+#if defined(CONFIG_MACH_A7LTE)
+#define CAL_SKIP_ADC	204
+#define CAL_FAIL_ADC	480
+#else
 #define CAL_SKIP_ADC	325
 #define CAL_FAIL_ADC	440
+#endif
 
 #ifdef CONFIG_PROX_WINDOW_TYPE
 #define WINDOW_TYPE_FILE_PATH "/sys/class/sec/sec_touch_ic/window_type"
@@ -191,7 +213,7 @@ static int tmd3782_regulator_onoff(struct taos_data *data, int onoff)
 		regulator_disable(data->vdd_3p3);
 	}
 	regulator_put(data->vdd_3p3);
-	msleep(5);
+	usleep_range(5000, 5100);
 
 	return 0;
 
@@ -203,10 +225,20 @@ err_3p3:
 static int opt_i2c_write(struct taos_data *taos, u8 reg, u8 *val)
 {
 	int ret;
+	int retry = 3;
 
-	ret = i2c_smbus_write_byte_data(taos->i2c_client,
-		(CMD_REG | reg), *val);
+	do {
+		ret = i2c_smbus_write_byte_data(taos->i2c_client,
+			(CMD_REG | reg), *val);
 
+		if (ret < 0) {
+			pr_err("%s - i2c write error, ret = %d, retry=%d", __func__, ret, retry);
+			usleep_range(1000, 1100);
+		} else
+			return ret;
+	} while (retry--);
+
+	pr_err("%s - i2c write failed, ret = %d", __func__, ret);
 	return ret;
 }
 
@@ -299,6 +331,8 @@ static int taos_chip_on(struct taos_data *taos)
 	if (ret < 0) {
 		gprintk("opt_i2c_write to clr ctrl reg failed\n");
 	}
+
+	usleep_range(3000, 3100); // A minimum interval of 2.4ms must pass after PON is enabled.
 
 	temp_val = taos->pdata->als_time;
 	ret = opt_i2c_write(taos, (CMD_REG|ALS_TIME), &temp_val);
@@ -629,8 +663,11 @@ static ssize_t proximity_enable_store(struct device *dev,
 		ret = opt_i2c_write_command(taos, temp);
 		if (ret < 0)
 			gprintk("opt_i2c_write failed, err = %d\n", ret);
-
+#if defined(CONFIG_SENSORS_TMD3782_PROX_ABS)
+		input_report_abs(taos->proximity_input_dev, ABS_DISTANCE, 1);
+#else
 		input_report_rel(taos->proximity_input_dev, REL_MISC, 1+1);
+#endif
 		input_sync(taos->proximity_input_dev);
 
 		enable_irq(taos->irq);
@@ -1255,15 +1292,25 @@ static void taos_work_func_prox(struct work_struct *work)
 	if ((threshold_high ==  (taos->threshold_high)) &&
 		(adc_data >=  (taos->threshold_high))) {
 		proximity_value = STATE_CLOSE;
+#if defined(CONFIG_SENSORS_TMD3782_PROX_ABS)
+		input_report_abs(taos->proximity_input_dev,
+			ABS_DISTANCE, proximity_value);
+#else
 		input_report_rel(taos->proximity_input_dev,
 			REL_MISC, proximity_value+1);
+#endif
 		input_sync(taos->proximity_input_dev);
 		pr_info("[%s] prox value = %d\n", __func__, proximity_value);
 	} else if ((threshold_high == (0xFFFF)) &&
 	(adc_data <= (taos->threshold_low))) {
 		proximity_value = STATE_FAR;
+#if defined(CONFIG_SENSORS_TMD3782_PROX_ABS)
+		input_report_abs(taos->proximity_input_dev,
+			ABS_DISTANCE, proximity_value);
+#else
 		input_report_rel(taos->proximity_input_dev,
 			REL_MISC, proximity_value+1);
+#endif
 		input_sync(taos->proximity_input_dev);
 		pr_info("[%s] prox value = %d\n", __func__, proximity_value);
 	} else {
@@ -1428,6 +1475,24 @@ static int taos_parse_dt(struct device *dev,
 	struct device_node *np = dev->of_node;
 	pdata->als_int = of_get_named_gpio_flags(np, "taos,irq_gpio",
 						0, &pdata->als_int_flags);
+#if defined(CONFIG_MACH_A7LTE)
+	//set trim
+	pdata->prox_rawdata_trim=170;
+	// set threshold - prox_rawdata_trim value
+	pdata->prox_thresh_hi = 480,
+	pdata->prox_thresh_low = 340,
+	pdata->prox_th_hi_cal = 380,//530
+	pdata->prox_th_low_cal = 250,//400
+	//set offset- prox_rawdata_trim value
+	pdata->crosstalk_max_offset = 350,//500
+	pdata->thresholed_max_offset = 750,//900
+
+	// set parameters
+	pdata->als_time = 0xEB,
+	pdata->intr_filter = 0x33,
+	pdata->prox_pulsecnt = 0x06,
+	pdata->als_gain = 0x22,
+#else
 	//set trim
 	pdata->prox_rawdata_trim=150;
 	// set threshold - prox_rawdata_trim value
@@ -1444,7 +1509,7 @@ static int taos_parse_dt(struct device *dev,
 	pdata->intr_filter = 0x33,
 	pdata->prox_pulsecnt = 0x08,
 	pdata->als_gain = 0x22,
-
+#endif
 	printk(KERN_INFO "%s irq_gpio:%d\n", __func__, pdata->als_int);
 	return 0;
 }
@@ -1541,7 +1606,12 @@ sreboot:
 	}
 	input_set_drvdata(taos->proximity_input_dev, taos);
 	taos->proximity_input_dev->name = "proximity_sensor";
+#if defined(CONFIG_SENSORS_TMD3782_PROX_ABS)
+	input_set_capability(taos->proximity_input_dev, EV_ABS, ABS_DISTANCE);
+	input_set_abs_params(taos->proximity_input_dev, ABS_DISTANCE, 0, 1, 0, 0);
+#else
 	input_set_capability(taos->proximity_input_dev, EV_REL, REL_MISC);
+#endif
 
 	taos_dbgmsg("registering proximity input device\n");
 	ret = input_register_device(taos->proximity_input_dev);

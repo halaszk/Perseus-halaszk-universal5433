@@ -49,10 +49,10 @@ struct max77828_haptic_data {
 	struct work_struct work;
 	spinlock_t lock;
 	bool running;
-	bool resumed;
 };
 
 struct max77828_haptic_data *g_hap_data;
+static int prev_duty;
 
 static void max77828_haptic_i2c(struct max77828_haptic_data *hap_data, bool en)
 {
@@ -224,13 +224,7 @@ void vibtonz_en(bool en)
 
 		max77828_haptic_i2c(g_hap_data, true);
 
-		//must set pwm after resume. this may be workaround..
-		if(g_hap_data->resumed)
-		{
-			pwm_config(g_hap_data->pwm, g_hap_data->pdata->period/2, g_hap_data->pdata->period);
-			g_hap_data->resumed = false;
-		}
-
+		pwm_config(g_hap_data->pwm, prev_duty, g_hap_data->pdata->period);
 		pwm_enable(g_hap_data->pwm);
 		if (g_hap_data->pdata->motor_en)
 			g_hap_data->pdata->motor_en(true);
@@ -258,8 +252,6 @@ EXPORT_SYMBOL(vibtonz_en);
 
 void vibtonz_pwm(int nForce)
 {
-	/* add to avoid the glitch issue */
-	static int prev_duty;
 	int pwm_period = 0, pwm_duty = 0;
 
 	if (g_hap_data == NULL) {
@@ -387,6 +379,7 @@ static int max77828_haptic_probe(struct platform_device *pdev)
 	}
 
 	pwm_config(hap_data->pwm, pdata->period / 2, pdata->period);
+	prev_duty = pdata->period / 2;
 
 	vibetonz_clk_on(&pdev->dev, true);
 	if (pdata->init_hw)
@@ -408,8 +401,6 @@ static int max77828_haptic_probe(struct platform_device *pdev)
 	hap_data->tout_dev.name = "vibrator";
 	hap_data->tout_dev.get_time = haptic_get_time;
 	hap_data->tout_dev.enable = haptic_enable;
-
-	hap_data->resumed = false;
 
 #ifdef CONFIG_ANDROID_TIMED_OUTPUT
 	error = timed_output_dev_register(&hap_data->tout_dev);
@@ -459,7 +450,6 @@ static int max77828_haptic_suspend(struct platform_device *pdev,
 static int max77828_haptic_resume(struct platform_device *pdev)
 {
 	vibetonz_clk_on(&pdev->dev, true);
-	g_hap_data->resumed = true;
 	return 0;
 }
 

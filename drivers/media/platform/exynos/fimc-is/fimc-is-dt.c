@@ -21,6 +21,7 @@
 
 #include "fimc-is-core.h"
 #include "fimc-is-dt.h"
+#include "fimc-is-core.h"
 
 #ifdef CONFIG_OF
 int get_pin_lookup_state(struct device *dev,
@@ -245,6 +246,25 @@ static int parse_dvfs_data(struct exynos_platform_fimc_is *pdata, struct device_
 	return 0;
 }
 
+#ifdef CONFIG_CAMERA_SYSFS_V2
+static int parse_sysfs_caminfo(struct exynos_platform_fimc_is *pdata, struct device_node *np,
+	struct fimc_is_cam_info * cam_infos, int camera_num)
+{
+	u32 temp;
+	char *pprop;
+
+	DT_READ_U32(np, "isp", cam_infos[camera_num].isp);
+	DT_READ_U32(np, "cal_memory", cam_infos[camera_num].cal_memory);
+	DT_READ_U32(np, "read_version", cam_infos[camera_num].read_version);
+	DT_READ_U32(np, "core_voltage", cam_infos[camera_num].core_voltage);
+	DT_READ_U32(np, "upgrade", cam_infos[camera_num].upgrade);
+	DT_READ_U32(np, "companion", cam_infos[camera_num].companion);
+	DT_READ_U32(np, "ois", cam_infos[camera_num].ois);
+
+	return 0;
+}
+#endif
+
 static int parse_subip_info(struct exynos_platform_fimc_is *pdata, struct device_node *np)
 {
 	u32 temp;
@@ -392,6 +412,12 @@ struct exynos_platform_fimc_is *fimc_is_parse_dt(struct device *dev)
 	struct device_node *subip_info_np;
 	struct device_node *dvfs_np;
 	struct device_node *np = dev->of_node;
+#ifdef CONFIG_CAMERA_SYSFS_V2
+	struct device_node *camInfo_np;
+	struct fimc_is_cam_info *camera_infos;
+	char camInfo_string[15];
+	int camera_num;
+#endif
 #if defined CONFIG_COMPANION_USE || defined CONFIG_USE_VENDER_FEATURE
 	int retVal = 0;
 #endif
@@ -443,6 +469,11 @@ struct exynos_platform_fimc_is *fimc_is_parse_dt(struct device *dev)
 	if (!pdata->use_module_check) {
 		err("use_module_check not use(%d)", pdata->use_module_check);
 	}
+
+	pdata->skip_cal_loading = of_property_read_bool(np, "skip_cal_loading");
+	if (!pdata->skip_cal_loading) {
+		info("skip_cal_loading not use(%d)", pdata->skip_cal_loading);
+	}
 #endif
 	subip_info_np = of_find_node_by_name(np, "subip_info");
 	if (!subip_info_np) {
@@ -463,7 +494,38 @@ struct exynos_platform_fimc_is *fimc_is_parse_dt(struct device *dev)
 	}
 	parse_dvfs_data(pdata, dvfs_np);
 
+#ifdef CONFIG_CAMERA_SYSFS_V2
+	retVal = of_property_read_u32(np, "total_camera_num", &pdata->total_camera_num);
+	if (retVal) {
+		err("total_camera_num read is fail(%d)", retVal);
+		pdata->total_camera_num = 0;
+	}
+	camera_infos = kzalloc(sizeof(struct fimc_is_cam_info) * pdata->total_camera_num, GFP_KERNEL);
+	if (!camera_infos) {
+		printk(KERN_ERR "%s: no memory for fimc_is camera_infos\n", __func__);
+		return ERR_PTR(-ENOMEM);
+	}
+	pdata->cam_infos = camera_infos;
+
+	for (camera_num = 0; camera_num < pdata->total_camera_num; camera_num++) {
+		sprintf(camInfo_string, "%s%d", "camera_info", camera_num);
+
+		camInfo_np = of_find_node_by_name(np, camInfo_string);
+		if (!camInfo_np) {
+			printk(KERN_ERR "%s: can't find camInfo_string node\n", __func__);
+			ret = ERR_PTR(-ENOENT);
+			goto k_err;
+		}
+		parse_sysfs_caminfo(pdata, camInfo_np, camera_infos, camera_num);
+	}
+#endif
+
 	return pdata;
+
+#ifdef CONFIG_CAMERA_SYSFS_V2
+k_err:
+	kfree(camera_infos);
+#endif
 p_err:
 	kfree(pdata);
 	return ret;
@@ -547,6 +609,18 @@ int fimc_is_sensor_parse_dt(struct platform_device *pdev)
 		goto p_err;
 	}
 
+	ret = of_property_read_u32(dnode, "actuator_id", &pdata->actuator_id);
+	if (ret) {
+		pr_info("actuator_id is not exist.(%d)\n", ret);
+		pdata->actuator_id = ACTUATOR_NAME_NOTHING;
+	}
+
+	ret = of_property_read_u32(dnode, "flash_id", &pdata->flash_id);
+	if (ret) {
+		pr_info("flash_id is not exist.(%d)\n", ret);
+		pdata->flash_id = FLADRV_NAME_NOTHING;
+	}
+
 	DT_READ_U32(dnode, "flash_first_gpio", pdata->flash_first_gpio);
 	DT_READ_U32(dnode, "flash_second_gpio", pdata->flash_second_gpio);
 
@@ -570,6 +644,7 @@ int fimc_is_sensor_parse_dt(struct platform_device *pdev)
 		err("power_setpin failed(%d). id %d", ret, id);
 
 	pdev->id = id;
+	pdata->id = id;
 
 	pdata->pinctrl = devm_pinctrl_get(dev);
 	if (IS_ERR(pdata->pinctrl)) {

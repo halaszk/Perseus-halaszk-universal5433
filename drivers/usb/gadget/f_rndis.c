@@ -166,6 +166,40 @@ static struct usb_cdc_acm_descriptor rndis_acm_descriptor = {
 	.bmCapabilities =	0x00,
 };
 
+#if defined(CONFIG_USB_RNDIS_VZW_REQ)
+/* In VZW Models size of MTU is fixed using Devguru AVD Descriptor */
+
+struct usb_rndis_mtu_avd_descriptor {
+	__u8	bLength;
+	__u8    bDescriptorType;
+	__u8    bDescriptorSubType;
+
+	__u16   bDAU1_Type;
+	__u16   bDAU1_Length;
+	__u32   bDAU1_Value;
+
+	__u16   bDAU2_Type;
+	__u16   bDAU2_Length;
+	__u8    bDAU2_Value;
+} __attribute__ ((packed));
+
+static struct usb_rndis_mtu_avd_descriptor rndis_avd_descriptor = {
+	.bLength            =   0x10,
+	.bDescriptorType    =   0x24,
+	.bDescriptorSubType =   0x80,
+
+	/* First DAU = MTU Size */
+	.bDAU1_Type         =   0x000A,
+	.bDAU1_Length       =   0x0004,
+	.bDAU1_Value        =   0x00000594,     /* 1428Byte */
+
+	/* Second DAU = Rndis version */
+	.bDAU2_Type         =   0x000B,
+	.bDAU2_Length       =   0x0001,
+	.bDAU2_Value        =   0x01,           /* Rndis5.1 */
+};
+#endif
+
 static struct usb_cdc_union_desc rndis_union_desc = {
 	.bLength =		sizeof(rndis_union_desc),
 	.bDescriptorType =	USB_DT_CS_INTERFACE,
@@ -245,6 +279,9 @@ static struct usb_descriptor_header *eth_fs_function[] = {
 	(struct usb_descriptor_header *) &rndis_data_intf,
 	(struct usb_descriptor_header *) &fs_in_desc,
 	(struct usb_descriptor_header *) &fs_out_desc,
+#if defined(CONFIG_USB_RNDIS_VZW_REQ)
+	(struct usb_descriptor_header *) &rndis_avd_descriptor,
+#endif
 	NULL,
 };
 
@@ -293,6 +330,9 @@ static struct usb_descriptor_header *eth_hs_function[] = {
 	(struct usb_descriptor_header *) &rndis_data_intf,
 	(struct usb_descriptor_header *) &hs_in_desc,
 	(struct usb_descriptor_header *) &hs_out_desc,
+#if defined(CONFIG_USB_RNDIS_VZW_REQ)
+	(struct usb_descriptor_header *) &rndis_avd_descriptor,
+#endif
 	NULL,
 };
 
@@ -432,12 +472,38 @@ static struct sk_buff *rndis_add_header(struct gether *port,
 {
 	struct sk_buff *skb2;
 
-	skb2 = skb_realloc_headroom(skb, sizeof(struct rndis_packet_msg_type));
-	if (skb2)
-		rndis_add_hdr(skb2);
+#ifdef CONFIG_USB_RNDIS_MULTIPACKET
+	struct rndis_packet_msg_type *header = NULL;
+	struct f_rndis *rndis = func_to_rndis(&port->func);
 
-	dev_kfree_skb_any(skb);
-	return skb2;
+	if (rndis->port.multi_pkt_xfer) {
+		if (port->header) {
+			header = port->header;
+			memset(header, 0, sizeof(*header));
+			header->MessageType = cpu_to_le32(RNDIS_MSG_PACKET);
+			header->MessageLength = cpu_to_le32(skb->len +
+							sizeof(*header));
+			header->DataOffset = cpu_to_le32(36);
+			header->DataLength = cpu_to_le32(skb->len);
+			pr_debug("MessageLength:%d DataLength:%d\n",
+						header->MessageLength,
+						header->DataLength);
+			return skb;
+		} else {
+			pr_err("RNDIS header is NULL.\n");
+			return NULL;
+		}
+	} else
+#endif
+	{
+		skb2 = skb_realloc_headroom(skb,
+				sizeof(struct rndis_packet_msg_type));
+		if (skb2)
+			rndis_add_hdr(skb2);
+
+		dev_kfree_skb_any(skb);
+		return skb2;
+	}
 }
 
 static void rndis_response_available(void *_rndis)
@@ -451,6 +517,8 @@ static void rndis_response_available(void *_rndis)
 	if (atomic_inc_return(&rndis->notify_count) != 1)
 		return;
 
+	if (!rndis->notify->driver_data)
+		return;
 	/* Send RNDIS RESPONSE_AVAILABLE notification; a
 	 * USB_CDC_NOTIFY_RESPONSE_AVAILABLE "should" work too
 	 *
@@ -469,8 +537,13 @@ static void rndis_response_available(void *_rndis)
 static void rndis_response_complete(struct usb_ep *ep, struct usb_request *req)
 {
 	struct f_rndis			*rndis = req->context;
-	struct usb_composite_dev	*cdev = rndis->port.func.config->cdev;
+	struct usb_composite_dev	*cdev;
 	int				status = req->status;
+
+	if (!rndis->port.func.config || !rndis->port.func.config->cdev)
+		return;
+	else
+		cdev = rndis->port.func.config->cdev;
 
 	/* after TX:
 	 *  - USB_CDC_GET_ENCAPSULATED_RESPONSE (ep0/control)
@@ -512,8 +585,13 @@ static void rndis_command_complete(struct usb_ep *ep, struct usb_request *req)
 
 	int				status;
 #ifdef CONFIG_USB_RNDIS_MULTIPACKET
-	struct usb_composite_dev	*cdev = rndis->port.func.config->cdev;
+	struct usb_composite_dev	*cdev;
 	rndis_init_msg_type		*buf;
+
+	if (!rndis->port.func.config || !rndis->port.func.config->cdev)
+		return;
+	else
+		cdev = rndis->port.func.config->cdev;
 #endif
 
 	/* received RNDIS command from USB_CDC_SEND_ENCAPSULATED_COMMAND */

@@ -870,6 +870,7 @@ void dsim_reg_set_mdclk(u32 enbyteclk)
 	dsim_write_mask(DSIM_CONFIG, val, DSIM_CONFIG_MDCLK);
 }
 
+#if 0
 void dsim_reg_set_link_standby(void)
 {
 	dsim_reg_set_mdclk(1);
@@ -902,6 +903,43 @@ int dsim_reg_set_hs_clock(u32 en)
 
 	return 0;
 }
+#else
+int dsim_reg_set_hs_clock(u32 en)
+{
+	int ret;
+
+	if (en) {
+		dsim_reg_set_cmd_transfer_mode(0);
+		dsim_reg_set_data_transfer_mode(0);
+
+		/* 1. change mdclk source to byteclk */
+		dsim_reg_set_mdclk(1);
+
+		/* 2. do function rst */
+		dsim_reg_function_reset();
+
+		/* 3. do hsclk request */
+		dsim_reg_enable_hs_clock(1);
+
+		/* wait hs ready */
+		ret = dsim_reg_wait_hs_clk_ready();
+		if (ret)
+			return ret;
+
+		/* 4. set mdstandby */
+		dsim_reg_set_standby(1);
+
+		/* 5. change mdclk source to external clk */
+		dsim_reg_set_mdclk(0);
+	} else {
+		/* MD stand_by off */
+		dsim_reg_set_standby(0);
+		dsim_reg_enable_hs_clock(0);
+	}
+
+	return 0;
+}
+#endif
 
 void dsim_reg_set_int(u32 en)
 {

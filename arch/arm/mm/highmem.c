@@ -18,6 +18,8 @@
 #include <asm/tlbflush.h>
 #include "mm.h"
 
+extern int boot_mode_security;
+
 void *kmap(struct page *page)
 {
 	might_sleep();
@@ -140,7 +142,9 @@ struct page *kmap_atomic_to_page(const void *ptr)
 #ifdef CONFIG_TIMA_KMAP_OPT
 static int __init tima_init_kmap_atomic(void)
 {
-	tima_send_cmd(__fix_to_virt(FIX_KMAP_BEGIN), 0x10);
+	if (boot_mode_security) {
+		tima_send_cmd(__fix_to_virt(FIX_KMAP_BEGIN), 0x10);
+	}
 	return 1;
 }
 early_initcall(tima_init_kmap_atomic);

@@ -124,8 +124,16 @@ static const int phy_cmn_debug_info[] = {
 	0x1C*4, /* [3:1] o_vcm_boost_en[2:0] : 000 -> 101
 		   [0] o_vcm_short_en 1->0 */
 	0x21*4, /* [6] r_cmn_block_en */
-	0x26*4, /* Lock Read */
+	0x26*4, /* Lock Read
+		   [7] w_pll_lock
+		   [6] i_pll_lock */
+	0x27*4, /* AFC code monitoring
+		   [2:0] s_cmn_state */
 	0x31*4, /* [4:0] r_pd_mask_reg [4:0] */
+	0x35*4, /* AFC done check
+		   [4] r_afc_done_d3
+		   [3] r_res_tune_done_2d
+		   [2:0] s_cmn_state */
 	0x44*4, /* [5] o_afc_clk_div_en 1'b0
 		   [4] o_afc_vforce 1'b0
 		   [3:0] o_afc_code_start 4'b0111 -> 4'b0000 */
@@ -158,11 +166,21 @@ static const int phy_ovtm_debug_info[] = {
 		   [0] o_ser_lb_en */
 	0x0B*4, /* [3] o_protocol_lb
 		   [2:0] o_lb_pattern */
+	0x14*4, /* [7] i_align_state
+		   [6:5] i_align_val
+		   [4] i_prbs7_on_state
+		   [3] i_prbs7_fail_state
+		   [2:0] i_prbs7_retry_cnt[2:0] */
 	0x16*4, /* [5] o_ov_align_ctl_en
 		   [4:2] o_ov_align_ctl_cnt[2:0]
 		   [1] o_rx_filler_en
 		   [0] o_rx_align */
 	0x1A*4, /* [7] r_rcal_inv_code */
+	0x24*4, /* [4] r_verified_sq_det_okay
+		   [3] i_sq_det
+		   [2] r_hs_prepare
+		   [1] w_cmn_ready
+		   [0] w_rcal_reset */
 	0x29*4, /* [4] r_ov_pwm_burst_end_wa2
 		   [3] r_ov_pwm_gear_minus_1
 		   [2] r_ov_pwm_gear_plus_1

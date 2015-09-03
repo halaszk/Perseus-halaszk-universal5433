@@ -42,6 +42,8 @@
 
 #include "fault.h"
 
+extern int boot_mode_security;
+
 #ifdef CONFIG_MMU
 
 #ifdef CONFIG_KPROBES
@@ -258,7 +260,7 @@ __do_kernel_fault(struct mm_struct *mm, unsigned long addr, unsigned int fsr,
 	 * No handler, we'll have to terminate things with extreme prejudice.
 	 */
 #ifdef CONFIG_TIMA_RKP_30
-	if (addr >= 0xc0000000 && (fsr & FSR_WRITE)) {
+	if (boot_mode_security && addr >= 0xc0000000 && (fsr & FSR_WRITE)) {
 		if (rkp_fixup(addr, regs)) {
 			return;
 		}

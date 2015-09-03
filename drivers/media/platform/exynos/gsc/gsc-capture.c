@@ -551,7 +551,6 @@ static int gsc_capture_open(struct file *file)
 			return ret;
 	}
 
-	gsc->isr_cnt = 0;
 	gsc_dbg("pid: %d, state: 0x%lx", task_pid_nr(current), gsc->state);
 
 	return 0;

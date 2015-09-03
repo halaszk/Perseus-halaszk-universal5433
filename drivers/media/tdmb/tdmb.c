@@ -43,7 +43,6 @@
 
 #include <linux/workqueue.h>
 #include <linux/irq.h>
-#include <asm/mach/irq.h>
 #include <linux/interrupt.h>
 #include <linux/vmalloc.h>
 
@@ -53,15 +52,12 @@
 #include <linux/input.h>
 #include <linux/pm_qos.h>
 #include <linux/regulator/consumer.h>
+#include <linux/pinctrl/consumer.h>
 
 #include <linux/of_gpio.h>
 #if defined(CONFIG_TDMB_QUALCOMM)
-#include <mach/gpiomux.h>
 #include <linux/cpuidle.h>
 #include <soc/qcom/pm.h>
-#endif
-#if defined(CONFIG_TDMB_EXYNOS)
-#include <plat/gpio-cfg.h>
 #endif
 #if defined(CONFIG_TDMB_ANT_DET)
 static struct wake_lock tdmb_ant_wlock;
@@ -77,7 +73,7 @@ static struct wake_lock tdmb_wlock;
 #include "tdmb.h"
 #define TDMB_PRE_MALLOC 1
 
-#ifndef VM_RESERVED 	/* for kernel 3.10 */
+#ifndef VM_RESERVED	/* for kernel 3.10 */
 #define VM_RESERVED (VM_DONTEXPAND | VM_DONTDUMP)
 #endif
 
@@ -102,7 +98,6 @@ static struct tdmb_dt_platform_data *dt_pdata;
 static struct device  *dmb_device;
 
 static bool tdmb_pwr_on;
-
 #ifdef CONFIG_TDMB_VREG_SUPPORT
 static int tdmb_vreg_init(struct device *dev)
 {
@@ -145,57 +140,41 @@ static void tdmb_vreg_onoff(bool onoff)
 
 static void tdmb_set_config_poweron(void)
 {
-#if defined(CONFIG_TDMB_QUALCOMM)
-	gpio_tlmm_config(GPIO_CFG(dt_pdata->tdmb_en, GPIOMUX_FUNC_GPIO,
-		GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-		GPIO_CFG_ENABLE);
-	if (dt_pdata->tdmb_use_rst) {
-		gpio_tlmm_config(GPIO_CFG(dt_pdata->tdmb_rst, GPIOMUX_FUNC_GPIO,
-			GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-			GPIO_CFG_ENABLE);
+	int rc;
+	rc = gpio_request(dt_pdata->tdmb_en, "gpio_tdmb_en");
+	if (rc < 0) {
+		DPRINTK("%s: gpio %d request failed (%d)\n",
+			__func__, dt_pdata->tdmb_en, rc);
+		return;
 	}
 	if (dt_pdata->tdmb_use_irq) {
-		gpio_tlmm_config(GPIO_CFG(dt_pdata->tdmb_irq, GPIOMUX_FUNC_GPIO,
-			GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-			GPIO_CFG_ENABLE);
+		rc = gpio_request(dt_pdata->tdmb_irq, "gpio_tdmb_irq");
+		if (rc < 0) {
+			DPRINTK("%s: gpio %d request failed (%d)\n",
+				__func__, dt_pdata->tdmb_irq, rc);
+			gpio_free(dt_pdata->tdmb_en);
+			return;
+		}
 	}
-#elif defined(CONFIG_TDMB_SLSI)
-	if (dt_pdata->tdmb_use_irq) {
-		if (pinctrl_select_state(dt_pdata->tdmb_irq_pinctrl,
-								dt_pdata->irq_on))
-			DPRINTK("%s: Failed to configure tdmb_irq_on\n", __func__);
-	}
-#else
-	#error : select AP
-#endif
+	if (dt_pdata->pwr_on)
+		if (pinctrl_select_state(dt_pdata->tdmb_pinctrl, dt_pdata->pwr_on)) {
+			DPRINTK("%s: Failed to configure tdmb_on\n", __func__);
+			gpio_free(dt_pdata->tdmb_en);
+			if (dt_pdata->tdmb_use_irq)
+				gpio_free(dt_pdata->tdmb_irq);
+		}
+
 }
 
 static void tdmb_set_config_poweroff(void)
 {
-#if defined(CONFIG_TDMB_QUALCOMM)
-	gpio_tlmm_config(GPIO_CFG(dt_pdata->tdmb_en, GPIOMUX_FUNC_GPIO,
-		GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),
-		GPIO_CFG_ENABLE);
-	if (dt_pdata->tdmb_use_rst) {
-		gpio_tlmm_config(GPIO_CFG(dt_pdata->tdmb_rst, GPIOMUX_FUNC_GPIO,
-			GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),
-			GPIO_CFG_ENABLE);
-	}
-	if (dt_pdata->tdmb_use_irq) {
-		gpio_tlmm_config(GPIO_CFG(dt_pdata->tdmb_irq, GPIOMUX_FUNC_GPIO,
-			GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),
-			GPIO_CFG_ENABLE);
-	}
-#elif defined(CONFIG_TDMB_SLSI)
-	if (dt_pdata->tdmb_use_irq) {
-		if (pinctrl_select_state(dt_pdata->tdmb_irq_pinctrl,
-								dt_pdata->irq_off))
-			DPRINTK("%s: Failed to configure tdmb_irq_off\n", __func__);
-	}
-#else
-	#error : select AP
-#endif
+	if (dt_pdata->pwr_off)
+		if (pinctrl_select_state(dt_pdata->tdmb_pinctrl, dt_pdata->pwr_off))
+			DPRINTK("%s: Failed to configure tdmb_off\n", __func__);
 
+	gpio_free(dt_pdata->tdmb_en);
+	if (dt_pdata->tdmb_use_irq)
+		gpio_free(dt_pdata->tdmb_irq);
 }
 
 static void tdmb_gpio_on(void)
@@ -206,15 +185,15 @@ static void tdmb_gpio_on(void)
 #endif
 	tdmb_set_config_poweron();
 
-	gpio_set_value(dt_pdata->tdmb_en, 0);
+	gpio_direction_output(dt_pdata->tdmb_en, 0);
 	usleep_range(1000, 1000);
-	gpio_set_value(dt_pdata->tdmb_en, 1);
+	gpio_direction_output(dt_pdata->tdmb_en, 1);
 	usleep_range(25000, 25000);
 
 	if (dt_pdata->tdmb_use_rst) {
-		gpio_set_value(dt_pdata->tdmb_rst, 0);
+		gpio_direction_output(dt_pdata->tdmb_rst, 0);
 		usleep_range(2000, 2000);
-		gpio_set_value(dt_pdata->tdmb_rst, 1);
+		gpio_direction_output(dt_pdata->tdmb_rst, 1);
 		usleep_range(10000, 10000);
 	}
 }
@@ -225,17 +204,18 @@ static void tdmb_gpio_off(void)
 #ifdef CONFIG_TDMB_VREG_SUPPORT
 	tdmb_vreg_onoff(false);
 #endif
-	tdmb_set_config_poweroff();
+	gpio_direction_output(dt_pdata->tdmb_en, 0);
 
-	gpio_set_value(dt_pdata->tdmb_en, 0);
 	usleep_range(1000, 1000);
-	if (dt_pdata->tdmb_use_rst) {
-		gpio_set_value(dt_pdata->tdmb_rst, 0);
-	}
+	if (dt_pdata->tdmb_use_rst)
+		gpio_direction_output(dt_pdata->tdmb_rst, 0);
+
+	tdmb_set_config_poweroff();
 }
 
 static bool tdmb_power_on(void)
 {
+	int param = 0;
 	if (tdmb_create_databuffer(tdmbdrv_func->get_int_size()) == false) {
 		DPRINTK("tdmb_create_databuffer fail\n");
 		goto create_databuffer_fail;
@@ -244,7 +224,10 @@ static bool tdmb_power_on(void)
 		DPRINTK("tdmb_create_workqueue fail\n");
 		goto create_workqueue_fail;
 	}
-	if (tdmbdrv_func->power_on() == false) {
+#ifdef CONFIG_TDMB_XTAL_FREQ
+	param = dt_pdata->tdmb_xtal_freq;
+#endif
+	if (tdmbdrv_func->power_on(param) == false) {
 		DPRINTK("power_on fail\n");
 		goto power_on_fail;
 	}
@@ -385,9 +368,9 @@ static int tdmb_mmap(struct file *filp, struct vm_area_struct *vma)
 	tdmb_ts_size
 	= ((tdmb_ts_size / DMB_TS_SIZE) * DMB_TS_SIZE) - (30 * DMB_TS_SIZE);
 
-	DPRINTK("head : %x, tail : %x, buffer : %x, size : %x\n",
-			(unsigned int)tdmb_ts_head, (unsigned int)tdmb_ts_tail,
-			(unsigned int)tdmb_ts_buffer, tdmb_ts_size);
+	DPRINTK("head : %p, tail : %p, buffer : %p, size : %x\n",
+			tdmb_ts_head, tdmb_ts_tail,
+			tdmb_ts_buffer, tdmb_ts_size);
 
 	cmd_buffer = tdmb_ts_buffer + tdmb_ts_size + 8;
 	cmd_head = (unsigned int *)(cmd_buffer - 8);
@@ -398,9 +381,9 @@ static int tdmb_mmap(struct file *filp, struct vm_area_struct *vma)
 
 	cmd_size = 30 * DMB_TS_SIZE - 8; /* klaatu hard coding */
 
-	DPRINTK("cmd head : %x, tail : %x, buffer : %x, size : %x\n",
-			(unsigned int)cmd_head, (unsigned int)cmd_tail,
-			(unsigned int)cmd_buffer, cmd_size);
+	DPRINTK("cmd head : %p, tail : %p, buffer : %p, size : %x\n",
+			cmd_head, cmd_tail,
+			cmd_buffer, cmd_size);
 
 	return 0;
 }
@@ -439,7 +422,7 @@ static int _tdmb_cmd_update(
 		return false;
 	}
 
-	DPRINTK("%x head %d tail %d\n", (unsigned int)cmd_buffer, head, tail);
+	DPRINTK("%p head %d tail %d\n", cmd_buffer, head, tail);
 
 	if (head+data_size_tmp <= size) {
 		memcpy((cmd_buffer + head),
@@ -679,11 +662,38 @@ static long tdmb_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	return ret;
 }
 
+#ifdef CONFIG_COMPAT
+static long tdmb_compat_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+{
+	DPRINTK("call tdmb_compat_ioctl : 0x%x\n", cmd);
+	arg = (unsigned long) compat_ptr(arg);
+
+	switch (cmd) {
+	case IOCTL_TDMB_GET_DATA_BUFFSIZE:
+	case IOCTL_TDMB_GET_CMD_BUFFSIZE:
+	case IOCTL_TDMB_POWER_ON:
+	case IOCTL_TDMB_POWER_OFF:
+	case IOCTL_TDMB_SCAN_FREQ_ASYNC:
+	case IOCTL_TDMB_SCAN_FREQ_SYNC:
+	case IOCTL_TDMB_SCANSTOP:
+	case IOCTL_TDMB_ASSIGN_CH:
+	case IOCTL_TDMB_ASSIGN_CH_TEST:
+	case IOCTL_TDMB_GET_DM:
+	case IOCTL_TDMB_SET_AUTOSTART:
+		return tdmb_ioctl(filp, cmd, arg);
+	}
+	return -ENOIOCTLCMD;
+}
+#endif
+
 static const struct file_operations tdmb_ctl_fops = {
 	.owner          = THIS_MODULE,
 	.open           = tdmb_open,
 	.read           = tdmb_read,
 	.unlocked_ioctl  = tdmb_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl	= tdmb_compat_ioctl,
+#endif
 	.mmap           = tdmb_mmap,
 	.release	    = tdmb_release,
 	.llseek         = no_llseek,
@@ -931,30 +941,16 @@ static struct tdmb_dt_platform_data *get_tdmb_dt_pdata(struct device *dev)
 		goto err;
 	}
 	pdata->tdmb_en = of_get_named_gpio(dev->of_node, "tdmb_pwr_en", 0);
-	if (gpio_is_valid(pdata->tdmb_en)) {
-		int ret;
-		ret = gpio_request(pdata->tdmb_en, "tdmb_pwr_en");
-		if (ret) {
-			DPRINTK("Unable to request tdmb_pwr_en [%d]\n", pdata->tdmb_en);
-			goto alloc_err;
-		}
-		gpio_direction_output(pdata->tdmb_en, 0);
-	} else {
-		DPRINTK("Failed to get is valid tdmb_pwr_en\n");
+	if (!gpio_is_valid(pdata->tdmb_en)) {
+		DPRINTK("Failed to get is valid tdmb_en\n");
 		goto alloc_err;
 	}
 	pdata->tdmb_use_rst = of_property_read_bool(dev->of_node, "tdmb_use_rst");
 	if (pdata->tdmb_use_rst) {
 		pdata->tdmb_rst = of_get_named_gpio(dev->of_node, "tdmb_rst", 0);
-		if (gpio_is_valid(pdata->tdmb_rst)) {
-			int ret;
-			ret = gpio_request(pdata->tdmb_rst, "tdmb_rst");
-			if (ret) {
-				DPRINTK("Unable to request tdmb_rst [%d]\n", pdata->tdmb_rst);
-				goto alloc_err;
-			}
-		} else {
-			DPRINTK("%s : without tdmb_rst\n", __func__);
+		if (!gpio_is_valid(pdata->tdmb_rst)) {
+			DPRINTK("Failed to get is valid tdmb_rst\n");
+			goto alloc_err;
 		}
 	} else {
 		DPRINTK("%s : without tdmb_use_rst\n", __func__);
@@ -962,30 +958,47 @@ static struct tdmb_dt_platform_data *get_tdmb_dt_pdata(struct device *dev)
 	pdata->tdmb_use_irq = of_property_read_bool(dev->of_node, "tdmb_use_irq");
 	if (pdata->tdmb_use_irq) {
 		pdata->tdmb_irq = of_get_named_gpio(dev->of_node, "tdmb_irq", 0);
-		if (gpio_is_valid(pdata->tdmb_irq)) {
-			int ret;
-			ret = gpio_request(pdata->tdmb_irq, "tdmb_irq");
-			if (ret) {
-				DPRINTK("Unable to request tdmb_int [%d]\n", pdata->tdmb_irq);
-				goto alloc_err;
-			}
-		} else {
-			DPRINTK("%s : without tdmb_irq\n", __func__);
+		if (!gpio_is_valid(pdata->tdmb_irq)) {
+			DPRINTK("Failed to get is valid tdmb_irq\n");
+			goto alloc_err;
 		}
 	} else {
 		DPRINTK("%s : without tdmb_use_irq\n", __func__);
 	}
+#ifdef CONFIG_TDMB_XTAL_FREQ
+	if (of_property_read_u32(dev->of_node, "tdmb_xtal_freq",
+							&pdata->tdmb_xtal_freq)) {
+		DPRINTK("Failed to get tdmb_xtal_freq\n");
+		goto alloc_err;
+	}
+#endif
+	pdata->tdmb_pinctrl = devm_pinctrl_get(dev);
+	if (IS_ERR(pdata->tdmb_pinctrl)) {
+		DPRINTK("devm_pinctrl_get is fail");
+		goto alloc_err;
+	}
+	pdata->pwr_on = pinctrl_lookup_state(pdata->tdmb_pinctrl, "tdmb_on");
+	if(IS_ERR(pdata->pwr_on)) {
+		DPRINTK("%s : could not get pins tdmb_pwr_on state (%li)\n",
+			__func__, PTR_ERR(pdata->pwr_on));
+		pdata->pwr_on = 0;
+		/* goto err_pinctrl_lookup_state; */
+	}
+	pdata->pwr_off = pinctrl_lookup_state(pdata->tdmb_pinctrl, "tdmb_off");
+	if(IS_ERR(pdata->pwr_off)) {
+		DPRINTK("%s : could not get pins tdmb_pwr_off state (%li)\n",
+			__func__, PTR_ERR(pdata->pwr_off));
+		pdata->pwr_off = 0;
+		/* goto err_pinctrl_lookup_state; */
+	}
+
+	if (!pdata->pwr_off || !pdata->pwr_on)
+		devm_pinctrl_put(pdata->tdmb_pinctrl);
+
 #ifdef CONFIG_TDMB_ANT_DET
 	pdata->tdmb_ant_irq = of_get_named_gpio(dev->of_node, "tdmb_ant_irq", 0);
-	if (gpio_is_valid(pdata->tdmb_ant_irq)) {
-		int ret;
-		ret = gpio_request(pdata->tdmb_ant_irq, "tdmb_ant_irq");
-		if (ret) {
-			DPRINTK("Unable to request tdmb_ant_irq [%d]\n", pdata->tdmb_ant_irq);
-			goto alloc_err;
-		}
-	} else {
-		DPRINTK("%s : can not find the tdmb_ant_irq\n", __func__);
+	if (!gpio_is_valid(pdata->tdmb_ant_irq)) {
+			DPRINTK("Failed to get is valid tdmb_ant_irq\n");
 		goto alloc_err;
 	}
 #endif
@@ -996,33 +1009,10 @@ static struct tdmb_dt_platform_data *get_tdmb_dt_pdata(struct device *dev)
 		goto alloc_err;
 	}
 #endif
-#if defined(CONFIG_TDMB_SLSI)
-	if(pdata->tdmb_use_irq) {
-		pdata->tdmb_irq_pinctrl = devm_pinctrl_get(dev);
-		if (IS_ERR(pdata->tdmb_irq_pinctrl))
-			goto alloc_err;
-
-		pdata->irq_on = pinctrl_lookup_state(pdata->tdmb_irq_pinctrl, "tdmb_irq_on");
-		if(IS_ERR(pdata->irq_on)) {
-			DPRINTK("%s : could not get pins tdmb_irq_on state (%li)\n",
-				__func__, PTR_ERR(pdata->irq_on));
-			goto err_pinctrl_lookup_state;
-		}
-
-		pdata->irq_off = pinctrl_lookup_state(pdata->tdmb_irq_pinctrl, "tdmb_irq_off");
-		if(IS_ERR(pdata->irq_off)) {
-			DPRINTK("%s : could not get pins tdmb_irq_off state (%li)\n",
-				__func__, PTR_ERR(pdata->irq_off));
-			goto err_pinctrl_lookup_state;
-		}
-	}
-#endif
 	return pdata;
 
-#if defined(CONFIG_TDMB_SLSI)
-err_pinctrl_lookup_state:
-	devm_pinctrl_put(pdata->tdmb_irq_pinctrl);
-#endif
+/* err_pinctrl_lookup_state: */
+/*	devm_pinctrl_put(pdata->tdmb_pinctrl); */
 alloc_err:
 	devm_kfree(dev, pdata);
 err:
@@ -1045,6 +1035,9 @@ static int tdmb_probe(struct platform_device *pdev)
 		pr_err("%s : tdmb_dt_pdata is NULL.\n", __func__);
 		return -ENODEV;
 	}
+	if (dt_pdata->pwr_off)
+		if (pinctrl_select_state(dt_pdata->tdmb_pinctrl, dt_pdata->pwr_off))
+			DPRINTK("%s: Failed to configure tdmb_gpio_init\n", __func__);
 
 	dmb_device = &pdev->dev;
 
@@ -1162,14 +1155,14 @@ static struct platform_driver tdmb_driver = {
 static int __init tdmb_init(void)
 {
 	int ret;
-
+/*
 #ifdef CONFIG_SAMSUNG_LPM_MODE
 	if (poweroff_charging) {
 		pr_info("%s : LPM Charging Mode! return 0\n", __func__);
 		return 0;
 	}
 #endif
-
+*/
 	DPRINTK("<klaatu TDMB> module init\n");
 	ret = platform_driver_register(&tdmb_driver);
 	if (ret)

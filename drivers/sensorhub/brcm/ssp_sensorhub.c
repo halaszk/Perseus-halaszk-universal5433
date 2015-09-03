@@ -253,14 +253,17 @@ static long ssp_sensorhub_ioctl(struct file *file, unsigned int cmd,
 			struct ssp_sensorhub_data, sensorhub_device);
 	void __user *argp = (void __user *)arg;
 	int retries = MAX_DATA_COPY_TRY;
-	int length = hub_data->big_events.library_length;
+	int length = 0;
 	int ret = 0;
 
 	switch (cmd) {
 	case IOCTL_READ_BIG_CONTEXT_DATA:
+		mutex_lock(&hub_data->big_events_lock);
+		length = hub_data->big_events.library_length;
 		if (unlikely(!hub_data->big_events.library_data
 			|| !hub_data->big_events.library_length)) {
 			sensorhub_info("no big library data");
+			mutex_unlock(&hub_data->big_events_lock);
 			return 0;
 		}
 
@@ -273,6 +276,7 @@ static long ssp_sensorhub_ioctl(struct file *file, unsigned int cmd,
 		}
 		if (unlikely(ret)) {
 			sensorhub_err("read big library data err(%d)", ret);
+			mutex_unlock(&hub_data->big_events_lock);
 			return -ret;
 		}
 
@@ -282,8 +286,10 @@ static long ssp_sensorhub_ioctl(struct file *file, unsigned int cmd,
 
 		hub_data->is_big_event = false;
 		kfree(hub_data->big_events.library_data);
+		hub_data->big_events.library_data = NULL;
 		hub_data->big_events.library_length = 0;
 		complete(&hub_data->big_read_done);
+		mutex_unlock(&hub_data->big_events_lock);
 		break;
 
 	default:
@@ -457,16 +463,21 @@ void ssp_read_big_library_task(struct work_struct *work)
 	struct ssp_big *big = container_of(work, struct ssp_big, work);
 	struct ssp_sensorhub_data *hub_data = big->data->hub_data;
 	struct ssp_msg *msg;
-	int buf_len, residue = big->length, ret = 0, index = 0, pos = 0;
+	int buf_len, residue, ret = 0, index = 0, pos = 0;
 
+	mutex_lock(&hub_data->big_events_lock);
+	if (hub_data->big_events.library_data)
+		kfree(hub_data->big_events.library_data);
+
+	residue = big->length;
 	hub_data->big_events.library_length = big->length;
-	hub_data->big_events.library_data = kzalloc(big->length, GFP_KERNEL);
+	hub_data->big_events.library_data = kzalloc(big->length, GFP_ATOMIC);
 
 	while (residue > 0) {
 		buf_len = residue > DATA_PACKET_SIZE
 			? DATA_PACKET_SIZE : residue;
 
-		msg = kzalloc(sizeof(*msg), GFP_KERNEL);
+		msg = kzalloc(sizeof(*msg), GFP_ATOMIC);
 		msg->cmd = MSG2SSP_AP_GET_BIG_DATA;
 		msg->length = buf_len;
 		msg->options = AP2HUB_READ | (index++ << SSP_INDEX);
@@ -489,6 +500,7 @@ void ssp_read_big_library_task(struct work_struct *work)
 	hub_data->is_big_event = true;
 	wake_up(&hub_data->sensorhub_wq);
 	kfree(big);
+	mutex_unlock(&hub_data->big_events_lock);
 }
 
 void ssp_send_big_library_task(struct work_struct *work)
@@ -619,6 +631,7 @@ int ssp_sensorhub_initialize(struct ssp_data *ssp_data)
 	init_completion(&hub_data->big_read_done);
 	init_completion(&hub_data->big_write_done);
 	spin_lock_init(&hub_data->sensorhub_lock);
+	mutex_init(&hub_data->big_events_lock);
 
 	/* allocate sensorhub input device */
 	hub_data->sensorhub_input_dev = input_allocate_device();
@@ -701,6 +714,7 @@ void ssp_sensorhub_remove(struct ssp_data *ssp_data)
 	kfifo_free(&hub_data->fifo);
 	misc_deregister(&hub_data->sensorhub_device);
 	input_unregister_device(hub_data->sensorhub_input_dev);
+	mutex_destroy(&hub_data->big_events_lock);
 	complete_all(&hub_data->big_write_done);
 	complete_all(&hub_data->big_read_done);
 	complete_all(&hub_data->read_done);

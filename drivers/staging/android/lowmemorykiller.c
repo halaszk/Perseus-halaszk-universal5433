@@ -40,6 +40,7 @@
 #include <linux/swap.h>
 #include <linux/rcupdate.h>
 #include <linux/notifier.h>
+#include <linux/delay.h>
 #ifdef CONFIG_ANDROID_LOW_MEMORY_KILLER_DO_NOT_KILL_PROCESS
 #include <linux/string.h>
 #endif
@@ -68,7 +69,7 @@ static uint32_t oom_count = 0;
 #endif
 
 #ifdef MULTIPLE_OOM_KILLER
-#define OOM_DEPTH 4
+#define OOM_DEPTH 7
 #endif
 
 static uint32_t lowmem_debug_level = 1;
@@ -472,6 +473,11 @@ void tune_lmk_param(int *other_free, int *other_file, struct shrink_control *sc)
 	}
 }
 
+#if defined(CONFIG_ZSWAP)
+extern atomic_t zswap_pool_pages;
+extern atomic_t zswap_stored_pages;
+#endif
+
 static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 {
 	struct task_struct *tsk;
@@ -489,6 +495,7 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 	int other_free = global_page_state(NR_FREE_PAGES);
 	int other_file = global_page_state(NR_FILE_PAGES) -
 						global_page_state(NR_SHMEM);
+	struct reclaim_state *reclaim_state = current->reclaim_state;
 
 #ifdef CONFIG_ZSWAP
 	/* to prevent other_file underflow and then be negative */
@@ -538,6 +545,7 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 		selected_oom_score_adj[proc_type] = min_score_adj;
 
 	rcu_read_lock();
+
 	for_each_process(tsk) {
 		struct task_struct *p;
 		short oom_score_adj;
@@ -548,6 +556,8 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 		if (time_before_eq(jiffies, lowmem_deathpending_timeout)) {
 			if (test_task_flag(tsk, TIF_MEMDIE)) {
 				rcu_read_unlock();
+	        /* give the system time to free up the memory */
+        	msleep_interruptible(20);
 				return 0;
 			}
 		}
@@ -562,6 +572,15 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 			continue;
 		}
 		tasksize = get_mm_rss(p->mm);
+#if defined(CONFIG_ZSWAP)
+		if (atomic_read(&zswap_stored_pages)) {
+			lowmem_print(3, "shown tasksize : %d\n", tasksize);
+			tasksize += atomic_read(&zswap_pool_pages) * get_mm_counter(p->mm, MM_SWAPENTS)
+				/ atomic_read(&zswap_stored_pages);
+			lowmem_print(3, "real tasksize : %d\n", tasksize);
+		}
+#endif
+
 		task_unlock(p);
 		if (tasksize <= 0)
 			continue;
@@ -791,10 +810,17 @@ static int android_oom_handler(struct notifier_block *nb,
 		send_sig(SIGKILL, selected, 0);
 		set_tsk_thread_flag(selected, TIF_MEMDIE);
 		rem -= selected_tasksize;
+		rcu_read_unlock();
 		*freed += (unsigned long)selected_tasksize;
 #ifdef OOM_COUNT_READ
 		oom_count++;
 #endif
+		/* give the system time to free up the memory */
+		msleep_interruptible(20);
+		if(reclaim_state)
+		 reclaim_state->reclaimed_slab += selected_tasksize;
+		} else {
+		rcu_read_unlock();
 	}
 #endif
 	read_unlock(&tasklist_lock);

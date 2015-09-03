@@ -1,3 +1,5 @@
+#include "../codecs/florida.h"
+#include "../codecs/clearwater.h"
 
 /* To support PBA function test */
 static struct class *jack_class;
@@ -93,6 +95,26 @@ static ssize_t earjack_select_jack_store(struct device *dev,
 	return size;
 }
 
+static ssize_t earjack_mic_adc_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct arizona_extcon_info *info = dev_get_drvdata(dev);
+	int adc;
+
+	adc = arizona_extcon_take_manual_mic_reading(info);
+
+	return sprintf(buf, "%d\n", adc);
+}
+
+static ssize_t earjack_mic_adc_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t size)
+{
+
+	pr_info("%s : operate nothing\n", __func__);
+
+	return size;
+}
+
 static DEVICE_ATTR(select_jack, S_IRUGO | S_IWUSR | S_IWGRP,
 		   earjack_select_jack_show, earjack_select_jack_store);
 
@@ -102,6 +124,8 @@ static DEVICE_ATTR(key_state, S_IRUGO | S_IWUSR | S_IWGRP,
 static DEVICE_ATTR(state, S_IRUGO | S_IWUSR | S_IWGRP,
 		   earjack_state_show, earjack_state_store);
 
+static DEVICE_ATTR(mic_adc, S_IRUGO | S_IWUSR | S_IWGRP,
+		   earjack_mic_adc_show, earjack_mic_adc_store);
 
 static void create_jack_devices(struct arizona_extcon_info *info)
 {
@@ -124,4 +148,8 @@ static void create_jack_devices(struct arizona_extcon_info *info)
 	if (device_create_file(jack_dev, &dev_attr_state) < 0)
 		pr_err("Failed to create device file (%s)!\n",
 			dev_attr_state.attr.name);
+
+	if (device_create_file(jack_dev, &dev_attr_mic_adc) < 0)
+		pr_err("Failed to create device file (%s)!\n",
+			dev_attr_mic_adc.attr.name);
 }

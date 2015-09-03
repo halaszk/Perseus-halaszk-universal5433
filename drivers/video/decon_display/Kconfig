@@ -92,6 +92,14 @@ config DECON_LCD_S6E3FA2
 	depends on DECON_LCD && DECON_MIPI_DSI
 	tristate "S6E8FA2 AMOLED driver"
 
+config DECON_LCD_S6TNMR7
+	depends on DECON_LCD && DECON_MIPI_DSI
+	tristate "s6tnmr7 AMOLED driver"
+
+config DECON_LCD_S6E3HA1
+	depends on DECON_LCD && DECON_MIPI_DSI
+	tristate "s6e3ha1 AMOLED driver"
+
 config DECON_LCD_PARALLEL_RGB
 	depends on DECON_LCD && !DECON_MIPI_DSI
 	tristate "LCD_480w_PARALLEL_RGB 800x 480"
@@ -99,6 +107,11 @@ config DECON_LCD_PARALLEL_RGB
 config DECON_MDNIE_LITE
 	depends on DECON_LCD && DECON_MIPI_DSI
 	tristate "Support MDNIE LITE"
+	default n
+
+config DECON_MDNIE_LITE_CHAGALL
+	depends on DECON_LCD && DECON_MIPI_DSI
+	tristate "Support MDNIE LITE CHAGALL"
 	default n
 
 config LCD_HMT

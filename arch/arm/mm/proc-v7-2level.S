@@ -72,18 +72,25 @@ ENTRY(cpu_v7_switch_mm)
 #ifndef CONFIG_TIMA_RKP
 	mcr	p15, 0, r0, c2, c0, 0		@ set TTB 0
 #else
-        stmfd   sp!, {r0-r4}
-       /* r2 : mcr_val */
-        mov     r2,  r0
-       /* r0: command */
-        ldr     r0, =0x83803000
-        rkp_call     #1
-       /* Restore r0 and r2 */
-	
-        ldmfd   sp!, {r0-r4}
+	ldr	r1, =boot_mode_security
+	ldr	r1, [r1]
+	cmp	r1, #0
+	bne	5f
+	mcr	p15, 0, r0, c2, c0, 0		@ set TTB 0
+	b	6f
+5:
+	stmfd   sp!, {r0-r4}
+	/* r2 : mcr_val */
+	mov     r2,  r0
+	/* r0: command */
+	ldr     r0, =0x83803000
+	rkp_call     #1
+	/* Restore r0 and r2 */
+	ldmfd   sp!, {r0-r4}
 	/* Invalidate all  TLB */
 	mcr    p15, 0, r0, c8, c3, 0  /*if the L2 monitoring 2 is enable, then we need to flush the TLB right here for HA3G otherwise, it is not necessary*/ 
 	dsb
+6:
 #endif
 	isb
 #endif
@@ -94,6 +101,11 @@ ENDPROC(cpu_v7_switch_mm)
 #ifdef CONFIG_TIMA_IOMMU_OPT
 ENTRY(cpu_v7_tima_iommu_opt)
 	stmfd   sp!,{r0-r4}
+	ldr	r1, =boot_mode_security
+	ldr	r1, [r1]
+	cmp	r1, #1
+	bne	7f
+
 	mov		r3, r2
 	/* Second parameter is the end addr, move it to r2 */
 	mov		r2, r1
@@ -107,6 +119,7 @@ ENTRY(cpu_v7_tima_iommu_opt)
 	mcr     p15, 0, r0, c8, c3, 0
 	dsb
 	isb
+7:
 	pop     {r0-r4}
 	mov		pc, lr
 ENDPROC(cpu_v7_tima_iommu_opt)

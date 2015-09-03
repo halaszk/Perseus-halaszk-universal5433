@@ -7,6 +7,13 @@ config VIDEO_EXYNOS_GSCALER
 	help
 	  This is a v4l2 driver for exynos G-Scaler device.
 
+config VIDEO_EXYNOS_GSCALER_DEBUG
+	bool "Exynos G-Scaler driver debugging"
+	depends on VIDEO_EXYNOS_GSCALER
+	default n
+	help
+	  This is debugging feature for exynos G-Scaler device driver.
+
 if VIDEO_EXYNOS_GSCALER && VIDEOBUF2_CMA_PHYS
 comment "Reserved memory configurations"
 config VIDEO_SAMSUNG_MEMSIZE_GSC0

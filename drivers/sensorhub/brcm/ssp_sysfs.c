@@ -265,6 +265,7 @@ static ssize_t set_sensors_enable(struct device *dev,
 	if (uNewEnable == atomic_read(&data->aSensorEnable))
 		return size;
 
+	mutex_lock(&data->enable_mutex);
 	for (uChangedSensor = 0; uChangedSensor < SENSOR_MAX; uChangedSensor++) {
 		if ((atomic_read(&data->aSensorEnable) & (1 << uChangedSensor))
 			!= (uNewEnable & (1 << uChangedSensor))) {
@@ -302,6 +303,7 @@ static ssize_t set_sensors_enable(struct device *dev,
 		}
 	}
 	atomic_set(&data->aSensorEnable, uNewEnable);
+	mutex_unlock(&data->enable_mutex);
 
 	return size;
 }

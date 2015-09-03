@@ -225,6 +225,8 @@ struct max86900_device_data
 	atomic_t uv_is_enable;
 	atomic_t enhanced_uv_mode;
 	atomic_t is_suspend;
+	atomic_t hrm_need_reenable;
+	atomic_t isEnable_led;
 	u8 led_current;
 	u8 led_current1;
 	u8 led_current2;
@@ -237,7 +239,6 @@ struct max86900_device_data
 	u8 look_mode_red;
 	u8 eol_test_is_enable;
 	u8 uv_eol_test_is_enable;
-	u8 isEnable_led;
 	u8 part_type;
 	u8 default_current;
 	u8 default_current1;
