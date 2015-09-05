@@ -45,6 +45,8 @@
 #include <mach/regs-pmu.h>
 #endif
 
+extern void lazyplug_enter_lazy(bool enter);
+
 #include "s5p_mfc_common.h"
 #include "s5p_mfc_intr.h"
 #include "s5p_mfc_inst.h"
@@ -2213,6 +2215,8 @@ static int s5p_mfc_open(struct file *file)
 		}
 	}
 
+	lazyplug_enter_lazy(true);
+
 	mfc_info_ctx("MFC open completed [%d:%d] dev = %p, ctx = %p\n",
 			dev->num_drm_inst, dev->num_inst, dev, ctx);
 	mutex_unlock(&dev->mfc_mutex);
@@ -2309,6 +2313,8 @@ static int s5p_mfc_release(struct file *file)
 
 	mfc_info_ctx("MFC driver release is called [%d:%d], is_drm(%d)\n",
 			dev->num_drm_inst, dev->num_inst, ctx->is_drm);
+
+	lazyplug_enter_lazy(false);
 
 	if (need_to_wait_frame_start(ctx)) {
 		ctx->state = MFCINST_ABORT;
