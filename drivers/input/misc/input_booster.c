@@ -716,7 +716,7 @@ void change_booster_level_for_tsp(unsigned char level)
 	struct input_booster *data = NULL;
 
 	if (!g_data) {
-		pr_err("%s: booster is not loaded\n", __func__);
+		pr_err("%s: booster is not loaded for TSP\n", __func__);
 		return;
 	}
 
@@ -744,7 +744,7 @@ void change_booster_level_for_pen(unsigned char level)
 	struct input_booster *data = NULL;
 
 	if (!g_data) {
-		pr_err("%s: booster is not loaded\n", __func__);
+		pr_err("%s: booster is not loaded PEN\n", __func__);
 		return;
 	}
 
