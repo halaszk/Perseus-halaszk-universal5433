@@ -44,10 +44,11 @@
 #include<linux/of_gpio.h>
 #endif /* CONFIG_DTS */
 
-#if !defined(CONFIG_WIFI_CONTROL_FUNC)
-#if     (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 58))
+#ifndef WLAN_PLAT_NODFS_FLAG
 #define WLAN_PLAT_NODFS_FLAG    0x01
 #endif
+
+#if !defined(CONFIG_WIFI_CONTROL_FUNC)
 struct wifi_platform_data {
 	int (*set_power)(int val);
 	int (*set_reset)(int val);
