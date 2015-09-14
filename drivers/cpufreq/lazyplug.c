@@ -335,6 +335,9 @@ static void lazyplug_work_fn(struct work_struct *work)
 	if (lazyplug_active) {
 		nr_run_stat = calculate_thread_stats();
 		update_per_cpu_stat();
+#ifdef CONFIG_EXYNOS5_DYNAMIC_CPU_HOTPLUG
+	exynos_dm_hotplug_disable();
+#endif
 #ifdef DEBUG_LAZYPLUG
 		pr_info("nr_run_stat: %u\n", nr_run_stat);
 #endif
