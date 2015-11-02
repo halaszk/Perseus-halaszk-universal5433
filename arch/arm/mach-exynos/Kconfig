@@ -243,6 +243,16 @@ config EXYNOS5_DYNAMIC_CPU_HOTPLUG
 	help
 		Enable Dynamic CPU Hotplug
 
+config EXYNOS5_DYNAMIC_CPU_HOTPLUG_SLEEP_PREPARE
+        int "Activate number of cores when sleep"
+        depends on EXYNOS5_DYNAMIC_CPU_HOTPLUG
+        default 1
+        help
+          When gose to sleep, activate some cores for performace
+          during sleep/wakeup sequence.
+          This config set the number of activate cores.
+          defaut value is "4" to activate all cores in cluster0.
+
 config HOTPLUG_THREAD_STOP
 	bool "support to hotplug thread stop when LCD is on"
 	depends on EXYNOS5_DYNAMIC_CPU_HOTPLUG
