@@ -126,6 +126,7 @@ static struct workqueue_struct *force_hotplug_wq;
 #ifdef CONFIG_HOTPLUG_THREAD_STOP
 static struct workqueue_struct *thread_manage_wq;
 #endif
+static struct workqueue_struct *unblank_wq;
 
 static int dm_hotplug_disable = 0;
 
@@ -533,6 +534,31 @@ static void thread_manage_work(struct work_struct *work)
 static DECLARE_WORK(manage_work, thread_manage_work);
 #endif
 
+static void unblank_work_fn(struct work_struct *work)
+{
+	if (lcd_is_on)
+		return;
+
+	lcd_is_on = true;
+	pr_info("LCD is on\n");
+
+#ifdef CONFIG_HOTPLUG_THREAD_STOP
+	if (thread_manage_wq) {
+		if (work_pending(&manage_work))
+			flush_work(&manage_work);
+		thread_start = false;
+		queue_work(thread_manage_wq, &manage_work);
+	}
+#endif
+}
+static DECLARE_WORK(unblank_work, unblank_work_fn);
+
+void force_unblank(void)
+{
+	if (unblank_wq)
+		queue_work(unblank_wq, &unblank_work);
+}
+
 static int fb_state_change(struct notifier_block *nb,
 		unsigned long val, void *data)
 {
@@ -573,17 +599,9 @@ static int fb_state_change(struct notifier_block *nb,
 		 * This line of code release max limit when LCD is
 		 * turned on.
 		 */
-		lcd_is_on = true;
-		pr_info("LCD is on\n");
+		if (unblank_wq)
+			queue_work(unblank_wq, &unblank_work);
 
-#ifdef CONFIG_HOTPLUG_THREAD_STOP
-		if (thread_manage_wq) {
-			if (work_pending(&manage_work))
-				flush_work(&manage_work);
-			thread_start = false;
-			queue_work(thread_manage_wq, &manage_work);
-		}
-#endif
 		break;
 	default:
 		break;
@@ -1410,6 +1428,12 @@ static int __init dm_cpu_hotplug_init(void)
 	}
 #endif
 
+	unblank_wq = create_singlethread_workqueue("dm-unblank");
+	if (!unblank_wq) {
+		ret = -ENOMEM;
+		goto err_unblank_wq;
+	}
+
 	register_pm_notifier(&exynos_dm_hotplug_nb);
 	register_reboot_notifier(&exynos_dm_hotplug_reboot_nb);
 
@@ -1425,6 +1449,8 @@ static int __init dm_cpu_hotplug_init(void)
 #endif
 
 	return ret;
+err_unblank_wq:
+	destroy_workqueue(unblank_wq);
 #ifdef CONFIG_HOTPLUG_THREAD_STOP
 err_thread_wq:
 	destroy_workqueue(force_hotplug_wq);
