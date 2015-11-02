@@ -28,6 +28,13 @@
 #include <mach/cpufreq.h>
 #include <linux/suspend.h>
 
+//#define DM_HOTPLUG_DEBUG
+#ifdef DM_HOTPLUG_DEBUG
+#define dm_dbg(__dev, format, args...) pr_info(__dev, format, ##args)
+#else
+#define dm_dbg(__dev, format, args...) ((void)0)
+#endif
+
 #if defined(CONFIG_SOC_EXYNOS5430)
 #define NORMALMIN_FREQ	1000000
 #else
@@ -88,6 +95,7 @@ static unsigned int egl_min_freq;
 static unsigned int kfc_max_freq;
 #endif
 int disable_dm_hotplug_before_suspend = 0;
+int nr_sleep_prepare_cpus = CONFIG_EXYNOS5_DYNAMIC_CPU_HOTPLUG_SLEEP_PREPARE;
 
 enum hotplug_cmd {
 	CMD_NORMAL,
@@ -97,6 +105,7 @@ enum hotplug_cmd {
 	CMD_LITTLE_IN,
 	CMD_LITTLE_ONE_IN,
 	CMD_LITTLE_ONE_OUT,
+	CMD_SLEEP_PREPARE,
 };
 
 static int on_run(void *data);
@@ -505,6 +514,10 @@ static void thread_manage_work(struct work_struct *work)
 		}
 
 		wake_up_process(dm_hotplug_task);
+		
+				if (!dynamic_hotplug(CMD_LOW_POWER))
+			prev_cmd = CMD_LOW_POWER;
+			
 	} else {
 		if (dm_hotplug_task) {
 			kthread_stop(dm_hotplug_task);
@@ -512,6 +525,7 @@ static void thread_manage_work(struct work_struct *work)
 			if (!dynamic_hotplug(CMD_NORMAL))
 				prev_cmd = CMD_NORMAL;
 		}
+		dm_hotplug_disable = 1;
 	}
 	mutex_unlock(&thread_manage_lock);
 }
@@ -544,6 +558,7 @@ static int fb_state_change(struct notifier_block *nb,
 		pr_info("LCD is off\n");
 
 #ifdef CONFIG_HOTPLUG_THREAD_STOP
+		dm_hotplug_disable = 0;
 		if (thread_manage_wq) {
 			if (work_pending(&manage_work))
 				flush_work(&manage_work);
@@ -585,7 +600,36 @@ static int __ref __cpu_hotplug(bool out_flag, enum hotplug_cmd cmd)
 {
 	int i = 0;
 	int ret = 0;
-	int hotplug_out_limit = 0;
+#ifdef DM_HOTPLUG_DEBUG
+	char cmddesc[25];
+
+	switch (cmd) {
+	case CMD_LOW_POWER:
+		strcpy(cmddesc, "CMD_LOW_POWER");
+		break;
+	case CMD_LITTLE_ONE_OUT:
+		strcpy(cmddesc, "CMD_LITTLE_ONE_OUT");
+		break;
+	case CMD_BIG_OUT:
+		strcpy(cmddesc, "CMD_BIG_OUT");
+		break;
+	case CMD_SLEEP_PREPARE:
+		strcpy(cmddesc, "CMD_SLEEP_PREPARE");
+		break;
+	case CMD_LITTLE_ONE_IN:
+		strcpy(cmddesc, "CMD_LITTLE_ONE_IN");
+		break;
+	case CMD_BIG_IN:
+		strcpy(cmddesc, "CMD_BIG_IN");
+		break;
+	case CMD_LITTLE_IN:
+		strcpy(cmddesc, "CMD_LITTLE_IN");
+		break;
+	case CMD_NORMAL:
+		strcpy(cmddesc, "CMD_NORMAL");
+		break;
+	}
+#endif
 
 	if (exynos_dm_hotplug_disabled())
 		return 0;
@@ -594,8 +638,28 @@ static int __ref __cpu_hotplug(bool out_flag, enum hotplug_cmd cmd)
 	if (out_flag) {
 		if (do_disable_hotplug)
 			goto blk_out;
+			
+				if (cmd == CMD_SLEEP_PREPARE) {
+			dm_dbg("%s: 1, %s\n", __func__, cmddesc);
+			for (i = max_num_cpu - 1; i >= NR_CA7; i--) {
+                                if (cpu_online(i)) {
+                                        ret = cpu_down(i);
+                                        if (ret)
+                                                goto blk_out;
+                                }
+			}
+			dm_dbg("%s: 2, %s\n", __func__, cmddesc);
+			for (i = 1; i < nr_sleep_prepare_cpus; i++) {
+				if (!cpu_online(i)) {
+					ret = cpu_up(i);
+					if (ret)
+						goto blk_out;
+				}
+			}
+		}
 
-		if (cmd == CMD_BIG_OUT && !in_low_power_mode) {
+		else if (cmd == CMD_BIG_OUT && !in_low_power_mode) {
+			dm_dbg("%s: 3, %s\n", __func__, cmddesc);
 			for (i = max_num_cpu - 1; i >= NR_CA7; i--) {
 				if (cpu_online(i)) {
 					ret = cpu_down(i);
@@ -608,6 +672,7 @@ static int __ref __cpu_hotplug(bool out_flag, enum hotplug_cmd cmd)
 				if (!in_low_power_mode)
 					goto blk_out;
 
+				dm_dbg("%s: 4, %s\n", __func__, cmddesc);
 				for (i = NR_CA7 - 2; i > 0; i--) {
 					if (cpu_online(i)) {
 						ret = cpu_down(i);
@@ -616,10 +681,9 @@ static int __ref __cpu_hotplug(bool out_flag, enum hotplug_cmd cmd)
 					}
 				}
 			} else {
-				if (little_hotplug_in)
-					hotplug_out_limit = NR_CA7 - 2;
+				dm_dbg("%s: 5, %s\n", __func__, cmddesc);
 
-				for (i = max_num_cpu - 1; i > hotplug_out_limit; i--) {
+				for (i = max_num_cpu - 1; i > 0; i--) {
 					if (cpu_online(i)) {
 						ret = cpu_down(i);
 						if (ret)
@@ -636,6 +700,7 @@ static int __ref __cpu_hotplug(bool out_flag, enum hotplug_cmd cmd)
 			if (in_low_power_mode)
 				goto blk_out;
 
+			dm_dbg("%s: 6, %s\n", __func__, cmddesc);
 			for (i = NR_CA7; i < max_num_cpu; i++) {
 				if (!cpu_online(i)) {
 					ret = cpu_up(i);
@@ -645,24 +710,45 @@ static int __ref __cpu_hotplug(bool out_flag, enum hotplug_cmd cmd)
 			}
 		} else {
 			if (cmd == CMD_LITTLE_ONE_IN) {
-				for (i = 1; i < NR_CA7 - 1; i++) {
-					if (!cpu_online(i)) {
-						ret = cpu_up(i);
+				if (!lcd_is_on) {
+					dm_dbg("%s: 7, %s\n", __func__, cmddesc);
+					if (!cpu_online(1)) {
+						ret = cpu_up(1);
 						if (ret)
 							goto blk_out;
+					}
+				} else {
+					dm_dbg("%s: 8, %s\n", __func__, cmddesc);
+					for (i = 1; i < NR_CA7 - 1; i++) {
+						if (!cpu_online(i)) {
+							ret = cpu_up(i);
+							if (ret)
+								goto blk_out;
+						}
 					}
 				}
 			} else if ((big_hotpluged && !do_disable_hotplug) ||
 				(cmd == CMD_LITTLE_IN)) {
-				for (i = 1; i < NR_CA7; i++) {
-					if (!cpu_online(i)) {
-						ret = cpu_up(i);
+			if (!lcd_is_on) {
+					dm_dbg("%s: 9, %s\n", __func__, cmddesc);
+					if (!cpu_online(1)) {
+						ret = cpu_up(1);
 						if (ret)
 							goto blk_out;
+					}
+				} else {
+					dm_dbg("%s: 10, %s\n", __func__, cmddesc);
+					for (i = 1; i < NR_CA7; i++) {
+						if (!cpu_online(i)) {
+							ret = cpu_up(i);
+							if (ret)
+								goto blk_out;
+						}
 					}
 				}
 			} else {
 				if (lcd_is_on) {
+					dm_dbg("%s: 11, %s\n", __func__, cmddesc);
 					for (i = NR_CA7; i < max_num_cpu; i++) {
 						if (do_hotplug_out)
 							goto blk_out;
@@ -676,7 +762,8 @@ static int __ref __cpu_hotplug(bool out_flag, enum hotplug_cmd cmd)
 								goto blk_out;
 						}
 					}
-
+	
+					dm_dbg("%s: 12, %s\n", __func__, cmddesc);
 					for (i = 1; i < NR_CA7; i++) {
 						if (!cpu_online(i)) {
 							ret = cpu_up(i);
@@ -685,6 +772,7 @@ static int __ref __cpu_hotplug(bool out_flag, enum hotplug_cmd cmd)
 						}
 					}
 				} else {
+					dm_dbg("%s: 13, %s\n", __func__, cmddesc);
 					for (i = 1; i < max_num_cpu; i++) {
 						if (do_hotplug_out && i >= NR_CA7)
 							goto blk_out;
@@ -704,6 +792,7 @@ static int __ref __cpu_hotplug(bool out_flag, enum hotplug_cmd cmd)
 		if (do_disable_hotplug)
 			goto blk_out;
 
+		dm_dbg("%s: 14, %s\n", __func__, cmddesc);
 		for (i = max_num_cpu - 1; i > 0; i--) {
 			if (cpu_online(i)) {
 				ret = cpu_down(i);
@@ -715,6 +804,7 @@ static int __ref __cpu_hotplug(bool out_flag, enum hotplug_cmd cmd)
 		if (in_suspend_prepared)
 			goto blk_out;
 
+		dm_dbg("%s: 15, %s\n", __func__, cmddesc);
 		for (i = 1; i < max_num_cpu; i++) {
 			if (!cpu_online(i)) {
 				ret = cpu_up(i);
@@ -743,6 +833,7 @@ static int dynamic_hotplug(enum hotplug_cmd cmd)
 		break;
 	case CMD_LITTLE_ONE_OUT:
 	case CMD_BIG_OUT:
+	case CMD_SLEEP_PREPARE:
 		ret = __cpu_hotplug(true, cmd);
 		break;
 	case CMD_LITTLE_ONE_IN:
@@ -881,7 +972,7 @@ static DECLARE_WORK(hotplug_in_work, event_hotplug_in_work);
 
 void event_hotplug_in(void)
 {
-	if (hotplug_wq)
+	if (hotplug_wq && lcd_is_on)
 		queue_work(hotplug_wq, &hotplug_in_work);
 }
 #endif
@@ -893,8 +984,15 @@ static int exynos_dm_hotplug_notifier(struct notifier_block *notifier,
 	case PM_SUSPEND_PREPARE:
 		mutex_lock(&thread_lock);
 		in_suspend_prepared = true;
+		if(nr_sleep_prepare_cpus > 1) {
+			pr_info("%s, %d : dynamic_hotplug CMD_SLEEP_PREPARE\n", __func__, __LINE__);
+			if (!dynamic_hotplug(CMD_SLEEP_PREPARE))
+				prev_cmd = CMD_LOW_POWER;
+		}
+		else {
 		if (!dynamic_hotplug(CMD_LOW_POWER))
 			prev_cmd = CMD_LOW_POWER;
+		}
 		exynos_dm_hotplug_disable();
 		if (dm_hotplug_task) {
 			kthread_stop(dm_hotplug_task);
@@ -1031,7 +1129,7 @@ static enum hotplug_cmd diagnose_condition(void)
 #if defined(CONFIG_ARM_EXYNOS_MP_CPUFREQ)
 	ret = CMD_LITTLE_IN;
 
-	if (cur_load_freq >= kfc_max_freq)
+	if ((cur_load_freq >= kfc_max_freq) && lcd_is_on)
 		ret = CMD_NORMAL;
 
 	if ((cur_load_freq > normal_min_freq) ||
