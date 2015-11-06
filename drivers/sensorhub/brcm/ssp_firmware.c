@@ -15,9 +15,9 @@
 #include "ssp.h"
 
 #if defined(CONFIG_SENSORHUB_S333)
-#define SSP_FIRMWARE_REVISION_BCM   15061500
+#define SSP_FIRMWARE_REVISION_BCM	15082800
 #else
-#define SSP_FIRMWARE_REVISION_BCM	15051200
+#define SSP_FIRMWARE_REVISION_BCM	15082800
 #endif
 
 unsigned int get_module_rev(struct ssp_data *data)
