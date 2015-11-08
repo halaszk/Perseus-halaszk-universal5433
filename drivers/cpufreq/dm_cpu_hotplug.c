@@ -130,6 +130,8 @@ static struct workqueue_struct *unblank_wq;
 
 static int dm_hotplug_disable = 0;
 
+static bool dualcore_blank = true;
+
 static int exynos_dm_hotplug_disabled(void)
 {
 	return dm_hotplug_disable;
@@ -182,12 +184,18 @@ static ssize_t store_enable_dm_hotplug(struct kobject *kobj, struct attribute *a
 	if (!sscanf(buf, "%d", &enable_input))
 		return -EINVAL;
 
-	if (enable_input > 1 || enable_input < 0) {
+	if (enable_input > 3 || enable_input < 0) {
 		pr_err("%s: invalid value (%d)\n", __func__, enable_input);
 		return -EINVAL;
 	}
 
-	if (enable_input) {
+	if (enable_input == 3) {
+		pr_info("%s: disabling dualcore mode on screen-off\n", __func__);
+		dualcore_blank = false;
+	} else if (enable_input == 2) {
+		pr_info("%s: enabling dualcore mode on screen-off\n", __func__);
+		dualcore_blank = true;
+	} else if (enable_input == 1) {
 		do_enable_hotplug = true;
 		if (exynos_dm_hotplug_disabled())
 			exynos_dm_hotplug_enable();
@@ -728,7 +736,7 @@ static int __ref __cpu_hotplug(bool out_flag, enum hotplug_cmd cmd)
 			}
 		} else {
 			if (cmd == CMD_LITTLE_ONE_IN) {
-				if (!lcd_is_on) {
+				if (!lcd_is_on && dualcore_blank) {
 					dm_dbg("%s: 7, %s\n", __func__, cmddesc);
 					if (!cpu_online(1)) {
 						ret = cpu_up(1);
@@ -747,7 +755,7 @@ static int __ref __cpu_hotplug(bool out_flag, enum hotplug_cmd cmd)
 				}
 			} else if ((big_hotpluged && !do_disable_hotplug) ||
 				(cmd == CMD_LITTLE_IN)) {
-			if (!lcd_is_on) {
+			if (!lcd_is_on && dualcore_blank) {
 					dm_dbg("%s: 9, %s\n", __func__, cmddesc);
 					if (!cpu_online(1)) {
 						ret = cpu_up(1);
