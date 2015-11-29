@@ -543,10 +543,8 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 #endif
 
 	si_meminfo(&si);
-	si_swapinfo(&si);
 
 	other_free += other_file;
-	other_free += si.freeswap;
 
 	tune_lmk_param(&other_free, &other_file, sc);
 
