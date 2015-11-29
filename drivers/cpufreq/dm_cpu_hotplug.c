@@ -116,8 +116,6 @@ static void calc_load(void);
 static enum hotplug_cmd prev_cmd = CMD_NORMAL;
 static enum hotplug_cmd exe_cmd;
 static unsigned int delay = POLLING_MSEC;
-static unsigned int out_delay = POLLING_MSEC;
-static unsigned int in_delay = POLLING_MSEC;
 
 #if defined(CONFIG_SCHED_HMP)
 static struct workqueue_struct *hotplug_wq;
@@ -313,35 +311,26 @@ static ssize_t store_stay_threshold(struct kobject *kobj, struct attribute *attr
 static ssize_t show_dm_hotplug_delay(struct kobject *kobj,
 				struct attribute *attr, char *buf)
 {
-	return snprintf(buf, PAGE_SIZE, "hotplug delay (out : %umsec, in : %umsec, cur : %umsec)\n",
-				out_delay, in_delay, delay);
+		return snprintf(buf, PAGE_SIZE, "%u\n", delay);
 }
 
 static ssize_t store_dm_hotplug_delay(struct kobject *kobj, struct attribute *attr,
 					const char *buf, size_t count)
 {
-	int input_out_delay, input_in_delay;
+	int input_delay;
 
-	if (!sscanf(buf, "%d %d", &input_out_delay, &input_in_delay))
+	if (!sscanf(buf, "%8d", &input_delay))
 		return -EINVAL;
 
-	if (input_out_delay < 0 || input_in_delay < 0) {
-		pr_err("%s: invalid value (%d, %d)\n",
-			__func__, input_out_delay, input_in_delay);
+	if (input_delay < 0) {
+		pr_err("%s: invalid value (%d)\n", __func__, input_delay);
 		return -EINVAL;
 	}
 
-	out_delay = (unsigned int)input_out_delay;
-	in_delay = (unsigned int)input_in_delay;
-
-	if (in_low_power_mode)
-		delay = in_delay;
-	else
-		delay = out_delay;
+	delay = (unsigned int)input_delay;
 
 	return count;
 }
-
 
 static ssize_t show_cpucore_table(struct kobject *kobj,
 			     struct attribute *attr, char *buf)
@@ -855,7 +844,6 @@ static int dynamic_hotplug(enum hotplug_cmd cmd)
 	case CMD_LOW_POWER:
 		ret = __cpu_hotplug(true, cmd);
 		in_low_power_mode = true;
-		delay = in_delay;
 		break;
 	case CMD_LITTLE_ONE_OUT:
 	case CMD_BIG_OUT:
@@ -870,7 +858,6 @@ static int dynamic_hotplug(enum hotplug_cmd cmd)
 	case CMD_NORMAL:
 		ret = __cpu_hotplug(false, cmd);
 		in_low_power_mode = false;
-		delay = out_delay;
 		break;
 	}
 
