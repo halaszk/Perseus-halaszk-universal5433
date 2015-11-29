@@ -30,6 +30,7 @@
 #include <linux/of_gpio.h>
 #include <linux/of_irq.h>
 #include <linux/spinlock.h>
+#include <mach/cpufreq.h>
 
 #include <linux/sec_sysfs.h>
 #include <linux/sec_debug.h>
@@ -465,6 +466,12 @@ static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 	}
 
 	input_sync(input);
+
+	if (((button->code == KEY_POWER) || (button->code == KEY_HOMEPAGE))
+	    && !!state) {
+		event_hotplug_in();
+	}
+
 #ifdef CONFIG_INPUT_BOOSTER
 	if (button->code == KEY_HOMEPAGE)
 		input_booster_send_event(BOOSTER_DEVICE_KEY, !!state);
