@@ -40,7 +40,8 @@
 #else
 #define NORMALMIN_FREQ	500000
 #endif
-#define POLLING_MSEC	100
+#define POLLING_MSEC_DISP_ON	1000
+#define POLLING_MSEC_DISP_OFF	100
 #define DEFAULT_LOW_STAY_THRSHD	0
 
 #define MIN_NUM_ONLINE_CPU	1
@@ -115,7 +116,7 @@ static void calc_load(void);
 
 static enum hotplug_cmd prev_cmd = CMD_NORMAL;
 static enum hotplug_cmd exe_cmd;
-static unsigned int delay = POLLING_MSEC;
+static unsigned int delay = POLLING_MSEC_DISP_ON;
 
 #if defined(CONFIG_SCHED_HMP)
 static struct workqueue_struct *hotplug_wq;
@@ -538,6 +539,7 @@ static void unblank_work_fn(struct work_struct *work)
 
 	lcd_is_on = true;
 	pr_info("LCD is on\n");
+	delay = POLLING_MSEC_DISP_ON;
 
 #ifdef CONFIG_HOTPLUG_THREAD_STOP
 	if (thread_manage_wq) {
@@ -579,6 +581,7 @@ static int fb_state_change(struct notifier_block *nb,
 	case FB_BLANK_POWERDOWN:
 		lcd_is_on = false;
 		pr_info("LCD is off\n");
+		delay = POLLING_MSEC_DISP_OFF;
 
 #ifdef CONFIG_HOTPLUG_THREAD_STOP
 		dm_hotplug_disable = 0;
