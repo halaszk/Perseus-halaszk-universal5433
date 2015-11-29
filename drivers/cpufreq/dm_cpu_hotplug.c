@@ -699,7 +699,7 @@ static int __ref __cpu_hotplug(bool out_flag, enum hotplug_cmd cmd)
 					goto blk_out;
 
 				dm_dbg("%s: 4, %s\n", __func__, cmddesc);
-				for (i = NR_CA7 - 2; i > 0; i--) {
+				for (i = NR_CA7 - 3; i > 0; i--) {
 					if (cpu_online(i)) {
 						ret = cpu_down(i);
 						if (ret)
@@ -745,7 +745,7 @@ static int __ref __cpu_hotplug(bool out_flag, enum hotplug_cmd cmd)
 					}
 				} else {
 					dm_dbg("%s: 8, %s\n", __func__, cmddesc);
-					for (i = 1; i < NR_CA7 - 1; i++) {
+					for (i = 1; i < NR_CA7 - 2; i++) {
 						if (!cpu_online(i)) {
 							ret = cpu_up(i);
 							if (ret)
