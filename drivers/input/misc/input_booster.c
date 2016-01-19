@@ -362,7 +362,7 @@ DECLARE_DVFS_WORK_FUNC(SET, TOUCH)
 
 	mutex_lock(&dvfs->lock);
 
-	input_booster_sysfs_freqs(dvfs);
+	//input_booster_sysfs_freqs(dvfs);
 
 	if ((!dvfs->level)&&(!dvfs->lock_status)) {
 		dev_err(data->dev, "%s : Skip to set booster due to level 0\n", __func__);
