@@ -63,6 +63,11 @@ static struct cpumask mp_cluster_cpus[CA_END];
 #define CA15_POLICY_CORE 	((exynos_boot_cluster == CA15) ? 0 : 4)
 #define CS_POLICY_CORE		0
 
+#if defined(CONFIG_SOC_EXYNOS5433)
+#define CPU_HOTPLUG_IN_TEMP	95
+#define CPU_HOTPLUG_OUT_TEMP	105
+#endif
+
 #if defined(CONFIG_SOC_EXYNOS5430)
 #define CPU_HOTPLUG_IN_TEMP	95
 #define CPU_HOTPLUG_OUT_TEMP	105
@@ -160,6 +165,32 @@ static int mif_thermal_level_ch0, mif_thermal_level_ch1;
 static struct pm_qos_request exynos_mif_thermal_big_max_qos;
 static struct pm_qos_request exynos_mif_thermal_little_max_qos;
 #endif
+
+static unsigned int COLD_TEMP = 19;
+static unsigned int HOT_NORMAL_TEMP = 95;
+static unsigned int HOT_CRITICAL_TEMP = 110;
+
+static unsigned int MIF_TH_TEMP1 = 85;
+static unsigned int MIF_TH_TEMP2 = 95;
+
+static unsigned int GPU_TH_TEMP1 = 75;
+static unsigned int GPU_TH_TEMP2 = 80;
+static unsigned int GPU_TH_TEMP3 = 85;
+static unsigned int GPU_TH_TEMP4 = 90;
+static unsigned int GPU_TH_TEMP5 = 95;
+
+module_param_named(tmu_cpu_cold, COLD_TEMP, uint, S_IWUSR | S_IRUGO);
+module_param_named(tmu_cpu_normal, HOT_NORMAL_TEMP, uint, S_IWUSR | S_IRUGO);
+module_param_named(tmu_cpu_critical, HOT_CRITICAL_TEMP, uint, S_IWUSR | S_IRUGO);
+
+module_param_named(tmu_mif_normal, MIF_TH_TEMP1, uint, S_IWUSR | S_IRUGO);
+module_param_named(tmu_mif_hot, MIF_TH_TEMP2, uint, S_IWUSR | S_IRUGO);
+
+module_param_named(tmu_gpu_temp1, GPU_TH_TEMP1, uint, S_IWUSR | S_IRUGO);
+module_param_named(tmu_gpu_temp2, GPU_TH_TEMP2, uint, S_IWUSR | S_IRUGO);
+module_param_named(tmu_gpu_temp3, GPU_TH_TEMP3, uint, S_IWUSR | S_IRUGO);
+module_param_named(tmu_gpu_temp4, GPU_TH_TEMP4, uint, S_IWUSR | S_IRUGO);
+module_param_named(tmu_gpu_temp5, GPU_TH_TEMP5, uint, S_IWUSR | S_IRUGO);
 
 #ifdef CONFIG_ARM_EXYNOS_MP_CPUFREQ
 static void __init init_mp_cpumask_set(void)
@@ -679,10 +710,10 @@ static void exynos_report_trigger(void)
 		else
 			th_zone->therm_dev->passive_delay = PASSIVE_INTERVAL;
 	}
-	mutex_unlock(&th_zone->therm_dev->lock);
 
 	snprintf(data, sizeof(data), "%u", i);
 	kobject_uevent_env(&th_zone->therm_dev->device.kobj, KOBJ_CHANGE, envp);
+	mutex_unlock(&th_zone->therm_dev->lock);
 }
 
 /* Register with the in-kernel thermal management */
@@ -1598,6 +1629,85 @@ static struct exynos_tmu_platform_data exynos5_tmu_data = {
 
 #if defined(CONFIG_SOC_EXYNOS5433)
 static struct exynos_tmu_platform_data exynos5433_tmu_data = {
+	.threshold_falling = 2,
+	.trigger_levels[0] = 80,
+	.trigger_levels[1] = 85,
+	.trigger_levels[2] = 90,
+	.trigger_levels[3] = 95,
+	.trigger_levels[4] = 100,
+	.trigger_levels[5] = 105,
+	.trigger_levels[6] = 105,
+	.trigger_levels[7] = 115,
+	.trigger_level0_en = 1,
+	.trigger_level1_en = 1,
+	.trigger_level2_en = 1,
+	.trigger_level3_en = 1,
+	.trigger_level4_en = 1,
+	.trigger_level5_en = 1,
+	.trigger_level6_en = 1,
+	.trigger_level7_en = 1,
+	.gain = 8,
+	.reference_voltage = 16,
+	.noise_cancel_mode = 4,
+	.cal_type = TYPE_ONE_POINT_TRIMMING,
+	.efuse_value = 75,
+	.freq_tab[0] = {
+		.freq_clip_max = 2100 * 1000,
+		.freq_clip_max_kfc = 1800 * 1000,
+		.temp_level = 80,
+#ifdef CONFIG_ARM_EXYNOS_MP_CPUFREQ
+		.mask_val = &mp_cluster_cpus[CA15],
+		.mask_val_kfc = &mp_cluster_cpus[CA7],
+#endif
+	},
+	.freq_tab[1] = {
+		.freq_clip_max = 1700 * 1000,
+		.freq_clip_max_kfc = 1800 * 1000,
+		.temp_level = 85,
+#ifdef CONFIG_ARM_EXYNOS_MP_CPUFREQ
+		.mask_val = &mp_cluster_cpus[CA15],
+		.mask_val_kfc = &mp_cluster_cpus[CA7],
+#endif
+	},
+	.freq_tab[2] = {
+		.freq_clip_max = 1500 * 1000,
+		.freq_clip_max_kfc = 1800 * 1000,
+		.temp_level = 90,
+#ifdef CONFIG_ARM_EXYNOS_MP_CPUFREQ
+		.mask_val = &mp_cluster_cpus[CA15],
+		.mask_val_kfc = &mp_cluster_cpus[CA7],
+#endif
+	},
+	.freq_tab[3] = {
+		.freq_clip_max = 1300 * 1000,
+		.freq_clip_max_kfc = 1600 * 1000,
+		.temp_level = 95,
+#ifdef CONFIG_ARM_EXYNOS_MP_CPUFREQ
+		.mask_val = &mp_cluster_cpus[CA15],
+		.mask_val_kfc = &mp_cluster_cpus[CA7],
+#endif
+	},
+	.freq_tab[4] = {
+		.freq_clip_max = 800 * 1000,
+		.freq_clip_max_kfc = 1100 * 1000,
+		.temp_level = 100,
+#ifdef CONFIG_ARM_EXYNOS_MP_CPUFREQ
+		.mask_val = &mp_cluster_cpus[CA15],
+		.mask_val_kfc = &mp_cluster_cpus[CA7],
+#endif
+	},
+	.freq_tab[5] = {
+		.freq_clip_max = 800 * 1000,
+		.freq_clip_max_kfc = 500 * 1000,
+		.temp_level = 105,
+#ifdef CONFIG_ARM_EXYNOS_MP_CPUFREQ
+		.mask_val = &mp_cluster_cpus[CA15],
+		.mask_val_kfc = &mp_cluster_cpus[CA7],
+#endif
+	},
+	.size[THERMAL_TRIP_ACTIVE] = 1,
+	.size[THERMAL_TRIP_PASSIVE] = 5,
+	.freq_tab_count = 6,
 	.type = SOC_ARCH_EXYNOS543X,
 };
 #define EXYNOS5433_TMU_DRV_DATA (&exynos5433_tmu_data)
@@ -1822,7 +1932,7 @@ static void exynos_tmu_regdump(struct platform_device *pdev, int id)
 	mutex_unlock(&data->lock);
 }
 
-#if defined(CONFIG_SOC_EXYNOS5433)
+/*#if defined(CONFIG_SOC_EXYNOS5433)
 static int parse_trigger_data(struct device_node *np, struct exynos_tmu_platform_data *pdata, int i)
 {
 	int ret = 0;
@@ -1945,7 +2055,7 @@ static int exynos_tmu_parse_dt(struct device_node *np, struct exynos_tmu_platfor
 
 	return ret;
 }
-#endif
+#endif*/
 
 #ifdef CONFIG_ARM_EXYNOS_MP_CPUFREQ
 static int exynos5_tmu_cpufreq_notifier(struct notifier_block *notifier, unsigned long event, void *v)
@@ -2012,7 +2122,7 @@ static int exynos_tmu_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
-#if defined(CONFIG_SOC_EXYNOS5433)
+/*#if defined(CONFIG_SOC_EXYNOS5433)
 	ret = exynos_tmu_parse_dt(pdev->dev.of_node, pdata);
 	if (ret) {
 		dev_err(&pdev->dev, "Failed to load platform data from device tree.\n");
@@ -2021,7 +2131,10 @@ static int exynos_tmu_probe(struct platform_device *pdev)
 #else
 	pdata->hotplug_in_threshold = CPU_HOTPLUG_IN_TEMP;
 	pdata->hotplug_out_threshold = CPU_HOTPLUG_OUT_TEMP;
-#endif
+#endif*/
+	
+	pdata->hotplug_in_threshold = CPU_HOTPLUG_IN_TEMP;
+	pdata->hotplug_out_threshold = CPU_HOTPLUG_OUT_TEMP;
 
 #if defined(CONFIG_SOC_EXYNOS5430)
 	exynos5430_get_egl_speed_option(&spd_option_flag, &spd_sel);
@@ -2030,8 +2143,8 @@ static int exynos_tmu_probe(struct platform_device *pdev)
 #endif
 #if defined(CONFIG_SOC_EXYNOS5433)
 	if (cal_get_table_ver() == 0) {
-		pdata->freq_tab[0].freq_clip_max = 1100 * 1000;
-		pdata->freq_tab[1].freq_clip_max = 1000 * 1000;
+		pdata->freq_tab[0].freq_clip_max = 1200 * 1000;
+		pdata->freq_tab[1].freq_clip_max = 1100 * 1000;
 		pdata->freq_tab[2].freq_clip_max = 900 * 1000;
 	}
 #endif
