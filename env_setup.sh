@@ -57,7 +57,8 @@ export TMPFILE=`mktemp -t`;
 
 # system compiler
 #export CROSS_COMPILE=/home/dev/KERNEL/arm-eabi-4.9.x/bin/arm-linux-gnueabihf-
-export CROSS_COMPILE=/home/dev/KERNEL/arm-cortex-linux-gnueabi-linaro_4.9/bin/arm-cortex-linux-gnueabi-
+#export CROSS_COMPILE=/home/dev/KERNEL/arm-cortex-linux-gnueabi-linaro_4.9/bin/arm-cortex-linux-gnueabi-
+export CROSS_COMPILE=/home/dev/KERNEL/arm-cortex-linux-gnueabi-linaro_5.2/bin/arm-cortex-linux-gnueabi-
 
 #CPU Core
 export NUMBEROFCPUS=`grep 'processor' /proc/cpuinfo | wc -l`;
