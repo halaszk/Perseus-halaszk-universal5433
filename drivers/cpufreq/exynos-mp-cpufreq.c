@@ -61,6 +61,16 @@
 #define POWER_COEFF_7P		13 /* percore  param */
 #endif
 
+static unsigned int KFC_MIN_FREQ = 400000;
+static unsigned int KFC_MAX_FREQ = 1300000;
+static unsigned int CPU_MIN_FREQ = 700000;
+static unsigned int CPU_MAX_FREQ = 1900000;
+module_param_named(kfc_min_freq, KFC_MIN_FREQ, uint, S_IWUSR | S_IRUGO);
+module_param_named(kfc_max_freq, KFC_MAX_FREQ, uint, S_IWUSR | S_IRUGO);
+module_param_named(cpu_min_freq, CPU_MIN_FREQ, uint, S_IWUSR | S_IRUGO);
+module_param_named(cpu_max_freq, CPU_MAX_FREQ, uint, S_IWUSR | S_IRUGO);
+ 
+
 #define VOLT_RANGE_STEP		25000
 
 #ifdef CONFIG_SMP
@@ -1148,13 +1158,8 @@ static int exynos_cpufreq_cpu_init(struct cpufreq_policy *policy)
 	ret = cpufreq_frequency_table_cpuinfo(policy, exynos_info[cur]->freq_table);
 	
 	if (!ret) {
-		if (cur == CA7) {
-			policy->min = 400000;
-			policy->max = 1300000;
-		} else {
-			policy->min = 700000;
-			policy->max = 1900000;
-		}
+        policy->min = cur == CA15 ? CPU_MIN_FREQ : KFC_MIN_FREQ;
+        policy->max = cur == CA15 ? CPU_MAX_FREQ : KFC_MAX_FREQ;
 	}
 
 	return ret;
@@ -1536,7 +1541,7 @@ static ssize_t store_cpu_min_freq(struct kobject *kobj, struct attribute *attr,
 	if (input > 0)
 		input = min(input, (int)freq_max[CA15]);
 
-	if (pm_qos_request_active(&min_cpu_qos_real))
+	if (pm_qos_request_active(&min_cpu_qos))
 		pm_qos_update_request(&min_cpu_qos_real, input);
 
 	return count;
@@ -1553,7 +1558,7 @@ static ssize_t store_cpu_max_freq(struct kobject *kobj, struct attribute *attr,
 	if (input > 0)
 		input = max(input, (int)freq_min[CA15]);
 
-	if (pm_qos_request_active(&max_cpu_qos_real))
+	if (pm_qos_request_active(&max_cpu_qos))
 		pm_qos_update_request(&max_cpu_qos_real, input);
 
 	return count;
@@ -1629,7 +1634,7 @@ static ssize_t store_kfc_min_freq(struct kobject *kobj, struct attribute *attr,
 	if (input > 0)
 		input = min(input, (int)freq_max[CA7]);
 
-	if (pm_qos_request_active(&min_kfc_qos_real))
+	if (pm_qos_request_active(&min_kfc_qos))
 		pm_qos_update_request(&min_kfc_qos_real, input);
 
 	return count;
@@ -1646,7 +1651,7 @@ static ssize_t store_kfc_max_freq(struct kobject *kobj, struct attribute *attr,
 	if (input > 0)
 		input = max(input, (int)freq_min[CA7]);
 
-	if (pm_qos_request_active(&max_kfc_qos_real))
+	if (pm_qos_request_active(&max_kfc_qos))
 		pm_qos_update_request(&max_kfc_qos_real, input);
 
 	return count;
