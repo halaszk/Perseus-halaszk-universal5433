@@ -425,13 +425,17 @@ static struct snd_soc_dai_link xyref_dai[] = {
 
 static int xyref_suspend_post(struct snd_soc_card *card)
 {
+#ifdef CONFIG_SND_SOC_ES515_POWERSAVE
 	xyref_enable_mclk(false);
+#endif
 	return 0;
 }
 
 static int xyref_resume_pre(struct snd_soc_card *card)
 {
+#ifdef CONFIG_SND_SOC_ES515_POWERSAVE
 	xyref_enable_mclk(true);
+#endif
 	return 0;
 }
 
@@ -456,6 +460,9 @@ static int xyref_audio_probe(struct platform_device *pdev)
 	bool spdif_avail = true;
 #endif
 	card->dev = &pdev->dev;
+
+	/* CLKOUT(XXTI) for eS515 MCLK */
+	xyref_enable_mclk(true);
 
 	for (n = 0; np && n < ARRAY_SIZE(xyref_dai); n++) {
 		if (!xyref_dai[n].cpu_dai_name) {

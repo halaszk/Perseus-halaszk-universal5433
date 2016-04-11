@@ -1028,20 +1028,19 @@ static ssize_t max86900_hrm_flush_store(struct device *dev,
 	struct device_attribute *attr, const char *buf, size_t size)
 {
 	struct max86900_device_data *data = dev_get_drvdata(dev);
+	int ret = 0;
 	u8 handle = 0;
 
-	if (sysfs_streq(buf, "16")) /* ID_SAM_HRM */
-		handle = 16;
-	else if (sysfs_streq(buf, "17")) /* ID_AOSP_HRM */
-		handle = 17;
-	else if (sysfs_streq(buf, "18")) /* ID_HRM_RAW */
-		handle = 18;
-	else {
-		pr_info("%s: invalid value %d\n", __func__, *buf);
-		return -EINVAL;
+	ret = kstrtou8(buf, 10, &handle);
+	if (ret < 0) {
+		pr_err("%s - kstrtou8 failed.(%d)\n", __func__, ret);
+		return ret;
 	}
+	pr_info("%s - handle = %d\n", __func__, handle);
 
 	input_report_rel(data->hrm_input_dev, REL_MISC, handle);
+	input_sync(data->hrm_input_dev);
+
 	return size;
 }
 
@@ -1269,6 +1268,7 @@ int max86900_probe(struct i2c_client *client, const struct i2c_device_id *id )
 	input_set_capability(data->hrm_input_dev, EV_REL, REL_X);
 	input_set_capability(data->hrm_input_dev, EV_REL, REL_Y);
 	input_set_capability(data->hrm_input_dev, EV_REL, REL_Z);
+	input_set_capability(data->hrm_input_dev, EV_REL, REL_MISC);
 
 	err = input_register_device(data->hrm_input_dev);
 	if (err < 0) {

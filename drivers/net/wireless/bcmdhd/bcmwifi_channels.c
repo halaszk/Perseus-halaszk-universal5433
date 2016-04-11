@@ -762,6 +762,13 @@ wf_chspec_ctlchan(chanspec_t chspec)
 	}
 }
 
+/* given a chanspec, return the bandwidth string */
+char *
+wf_chspec_to_bw_str(chanspec_t chspec)
+{
+	return (char *)wf_chspec_bw_str[(CHSPEC_BW(chspec) >> WL_CHANSPEC_BW_SHIFT)];
+}
+
 /*
  * This function returns the chanspec of the control channel of a given chanspec
  */

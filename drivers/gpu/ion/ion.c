@@ -1081,11 +1081,19 @@ static struct sg_table *ion_map_dma_buf(struct dma_buf_attachment *attachment,
 	return buffer->sg_table;
 }
 
+extern void exynos_ion_sync_sg_for_cpu(struct device *dev, size_t size,
+					struct sg_table *sgt,
+					enum dma_data_direction dir);
 static void ion_unmap_dma_buf(struct dma_buf_attachment *attachment,
 			      struct sg_table *table,
 			      enum dma_data_direction direction)
 {
+	struct dma_buf *dmabuf = attachment->dmabuf;
+	struct ion_buffer *buffer = dmabuf->priv;
 	ion_buffer_task_remove_lock(attachment->dmabuf->priv, attachment->dev);
+	if (ion_buffer_sync_force(buffer) && (buffer->size == 2080768))
+		exynos_ion_sync_sg_for_cpu(attachment->dev, buffer->size,
+					   buffer->sg_table, DMA_FROM_DEVICE);
 }
 
 struct ion_vma_list {

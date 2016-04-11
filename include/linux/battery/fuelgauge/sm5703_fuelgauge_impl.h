@@ -28,6 +28,9 @@
 #define SM5703_REG_CURRENT                   0x08
 #define SM5703_REG_TEMPERATURE               0x09
 #define SM5703_REG_FG_OP_STATUS              0x10
+#define SM5703_REG_PARAM_RUN_UPDATE          0x14
+#define SM5703_REG_IOCV_MAN                  0x2E
+#define SM5703_REG_END_V_IDX                 0x2F
 
 #define SM5703_REG_V_ALARM                   0x0C
 #define SM5703_REG_T_ALARM                   0x0D
@@ -75,18 +78,35 @@
 //start reg addr for table
 #define SM5703_REG_TABLE_START     0xA0
 
+#define SM5703_REG_IOCV_B_L_MIN		0x30
+#define SM5703_REG_IOCV_B_L_MAX		0x37
+#define SM5703_REG_IOCV_B_S_MIN		0x40
+#define SM5703_REG_IOCV_B_S_MAX		0x43
+
+#define SM5703_REG_MISC     		0x90
+
+#define SM5703_FG_PARAM_UNLOCK_CODE     0x3700
+#define SM5703_FG_PARAM_LOCK_CODE     0x0000
+#define SM5703_FG_TABLE_LEN    0xF//real table length -1
+
+
+#define SW_RESET_CODE     	  	0x0008
 #define RS_MAN_CNTL         0x0800
 
 // control register value
 #define ENABLE_MIX_MODE         0x8000
 #define ENABLE_TEMP_MEASURE     0x4000
 #define ENABLE_TOPOFF_SOC       0x2000
+#define ENABLE_MANUAL_OCV       0x0400
+#define ENABLE_RS_MAN_MODE      0x0800
+
 #define ENABLE_SOC_ALARM        0x0008
 #define ENABLE_T_H_ALARM        0x0004
 #define ENABLE_T_L_ALARM        0x0002
 #define ENABLE_V_ALARM          0x0001
 
-
+#define CNTL_REG_DEFAULT_VALUE  0x2008
+#define INIT_CHECK_MASK         0x00FF
 #define DISABLE_RE_INIT         0x0007
 
 

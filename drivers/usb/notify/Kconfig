@@ -25,3 +25,9 @@ config USB_NOTIFIER
 	  Added platform driver to call usb notify.
 	  The usb_notifier.c can be fixed for each models.
 
+ config USB_EXTERNAL_NOTIFY
+	boolean "USB external notify"
+	depends on USB_NOTIFY_LAYER
+	help
+	  Added usb external notify.
+          The usb external notify broadcast special situation to muic and charger.

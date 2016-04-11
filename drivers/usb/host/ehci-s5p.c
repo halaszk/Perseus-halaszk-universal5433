@@ -470,6 +470,7 @@ static int s5p_ehci_probe(struct platform_device *pdev)
 		s5p_ehci->phy = phy;
 		s5p_ehci->otg = phy->otg;
 	}
+
 	err = of_property_read_u32_index((&pdev->dev)->of_node, "l2-retention", 0, &s5p_ehci->retention);
 	if (err)
 		dev_err(&pdev->dev, " can not find l2-retention value\n");

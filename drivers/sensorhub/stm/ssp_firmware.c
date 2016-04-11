@@ -15,7 +15,7 @@
 #include "ssp.h"
 #include <linux/sched.h>
 
-#define SSP_FIRMWARE_REVISION_STM	15041500
+#define SSP_FIRMWARE_REVISION_STM	15102300
 
 #define BOOT_SPI_HZ	4800000
 #define NORM_SPI_HZ	4800000

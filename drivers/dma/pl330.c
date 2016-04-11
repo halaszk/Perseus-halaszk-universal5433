@@ -299,9 +299,15 @@ enum pl330_reqtype {
 				if (timeout_flag) pr_err("%s Timeout error!!!!", __func__);	\
 			} while (0)
 
+#if defined(CONFIG_PL330TEST_LOG)
+#define DBG_PRINT(x...)		exynos_ss_printk(x);
+#else
+#define DBG_PRINT(x...)		do {} while (0)
+#endif
+
 #ifdef PL330_DEBUG_MCGEN
 static unsigned cmd_line;
-#define PL330_DBGCMD_DUMP(off, x...)	do { \
+#define PL330_DBGCMD_DUMP(x...)	do { \
 						printk("%x:", cmd_line); \
 						printk(x); \
 						cmd_line += off; \
@@ -1900,9 +1906,8 @@ static int pl330_update(const struct pl330_info *pi)
 		int i = 0;
 		while (i < pi->pcfg.num_chan) {
 			if (val & (1 << i)) {
-				dev_info(pi->dev,
-					"Reset Channel-%d\t CS-%x FTC-%x\n",
-						i, readl(regs + CS(i)),
+				DBG_PRINT("[%s] Reset Channel-%d\t CS-%x FTC-%x\n",
+						__func__, i, readl(regs + CS(i)),
 						readl(regs + FTC(i)));
 				_stop(&pl330->channels[i]);
 			}
@@ -1934,8 +1939,11 @@ static int pl330_update(const struct pl330_info *pi)
 
 			id = pl330->events[ev];
 
-			if (id == -1)
+			if (id == -1) {
+				DBG_PRINT("[%s] pl330_update id:%d\n",
+							__func__, id);
 				continue;
+			}
 
 			thrd = &pl330->channels[id];
 
@@ -2498,11 +2506,14 @@ static inline void handle_cyclic_desc_list(struct list_head *list)
 		desc->status = PREP;
 		pch = desc->pchan;
 		callback = desc->txd.callback;
+
+		DBG_PRINT("[%s] before callback\n", __func__);
 		if (callback && !pch->on_trigger)
 			callback(desc->txd.callback_param);
 
 		if (pch->on_trigger)
 			pch->on_trigger = 0;
+		DBG_PRINT("[%s] after callback\n", __func__);
 	}
 
 	/* pch will be unset if list was empty */
@@ -3176,10 +3187,18 @@ pl330_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
 
 static irqreturn_t pl330_irq_handler(int irq, void *data)
 {
-	if (pl330_update(data))
+#if defined(CONFIG_PL330TEST_LOG)
+	struct pl330_info *pi = data;
+#endif
+
+	DBG_PRINT("[%s] devname:%s\n", __func__, dev_name(pi->dev));
+	if (pl330_update(data)) {
+		DBG_PRINT("[%s] irq_handler exit\n", __func__);
 		return IRQ_HANDLED;
-	else
+	} else {
+		DBG_PRINT("[%s] IRQ_NONE\n", __func__);
 		return IRQ_NONE;
+	}
 }
 
 int pl330_dma_getposition(struct dma_chan *chan,

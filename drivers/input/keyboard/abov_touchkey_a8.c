@@ -84,7 +84,7 @@ static struct device *sec_touchkey;
 #define FW_CHECKSUM_L 0x5A
 
 #define ABOV_DUAL_DETECTION_CMD_FW_VER	0x0a
-#define CRC_CHECK_WITHBOOTING
+//#define CRC_CHECK_WITHBOOTING
 
 #ifdef CONFIG_SEC_FACTORY
 #define LED_TWINKLE_BOOTING
@@ -1200,10 +1200,12 @@ int abov_key_led_control(struct abov_touchkey_platform_data *pdata, bool on)
 				pr_info("[TKEY] %s: led on fail\n", __func__);
 		}
 	} else {
-		if (regulator_is_enabled(pdata->avdd_vreg))
-			regulator_disable(pdata->avdd_vreg);
-		else
-			regulator_force_disable(pdata->avdd_vreg);
+		if (pdata->avdd_vreg) {
+			if (regulator_is_enabled(pdata->avdd_vreg))
+				regulator_disable(pdata->avdd_vreg);
+			else
+				regulator_force_disable(pdata->avdd_vreg);
+		}
 	}
 
 	abov_keyled_enabled = on;
@@ -1304,6 +1306,8 @@ static int abov_parse_dt(struct device *dev,
 		dev_err(dev, "unable to get regulator_led\n");
 		return -ENODEV;
 	}
+
+	pdata->boot_on_ldo = of_property_read_bool(np, "abov,boot-on-ldo");
 
 	dev_info(dev, "%s: regulator_ic:%s, regulator_led:%s, gpio_int:%d, gpio_scl:%d, gpio_sda:%d, gpio_seperated:%d\n",
 			__func__, pdata->regulator_ic, pdata->regulator_led, pdata->gpio_int, pdata->gpio_scl,
@@ -1408,7 +1412,8 @@ static int abov_tk_probe(struct i2c_client *client,
 	info->irq = -1;
 	mutex_init(&info->lock);
 
-	msleep(ABOV_BOOT_DELAY);
+	if(!info->pdata->boot_on_ldo)
+		msleep(ABOV_BOOT_DELAY);
 
 	info->enabled = true;
 
@@ -1501,6 +1506,8 @@ err_reg_input_dev:
 	mutex_destroy(&info->lock);
 	if (info->pdata->keyled)
 		info->pdata->keyled(info->pdata, 0);
+	if (info->pdata->power)
+		info->pdata->power(info->pdata, false);	
 pwr_config:
 err_config:
 	input_free_device(input_dev);
@@ -1708,7 +1715,7 @@ static void __exit touchkey_exit(void)
 	i2c_del_driver(&abov_tk_driver);
 }
 
-late_initcall(touchkey_init);
+module_init(touchkey_init);
 module_exit(touchkey_exit);
 
 /* Module information */

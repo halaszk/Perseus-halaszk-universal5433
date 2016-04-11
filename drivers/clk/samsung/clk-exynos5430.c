@@ -3174,7 +3174,7 @@ struct samsung_pll_rate_table pll_disp_rate_table[] = {
 	{ 278000000U,	3,	278,	3,	0},
 	{ 250000000U,	3,	250,	3,	0},
 	{ 142000000U,	3,	142,	3,	0},
-	{  67000000U,	3,	67,	3,	0},
+	{  67000000U,	3,	 67,	3,	0},
 };
 
 #define EXYNOS5430_PRINT_CMU(name) \

@@ -52,6 +52,8 @@
 #include <linux/spinlock.h>
 #include <linux/list.h>
 
+#define SIZE_MAX (~(size_t)0)
+
 /*
  * Concatenation Helper and string operation helper
  *

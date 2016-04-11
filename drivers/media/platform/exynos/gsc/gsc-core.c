@@ -1180,6 +1180,7 @@ static irqreturn_t gsc_irq_handler(int irq, void *priv)
 	struct gsc_dev *gsc = priv;
 	int gsc_irq;
 
+	gsc->pending_isr_time = sched_clock();
 	if (test_bit(ST_OUTPUT_OPEN, &gsc->state)) {
 		gsc->out.isr_time[gsc->out.real_isr_cnt % MAX_DEBUG_BUF_CNT] = sched_clock();
 		gsc->out.real_isr_cnt++;

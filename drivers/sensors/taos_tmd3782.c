@@ -52,6 +52,10 @@
  *  input device framework and control via sysfs attributes.
  */
 
+#define STANDARD_I2C
+#ifdef STANDARD_I2C
+#define I2C_M_WR	0 /* for i2c Write */
+#endif
 extern unsigned int system_rev;
 
 /* taos debug */
@@ -306,44 +310,196 @@ static void sensor_power_on_vdd(struct taos_data *info, int onoff)
 }
 
 
-static int opt_i2c_write(struct taos_data *taos, u8 reg, u8 *val)
+static int taos_i2c_write(struct taos_data *taos, u8 reg, u8 *val)
 {
 	int ret;
+#ifdef STANDARD_I2C
+	struct i2c_msg msg;
+	unsigned char w_buf[2];
+	int retry = 3;
 
+	w_buf[0] = reg;
+	w_buf[1] = *val;
+
+	msg.addr = taos->i2c_client->addr;
+	msg.flags = I2C_M_WR;
+	msg.len = 2;
+	msg.buf = (char *)w_buf;
+
+	do{
+		ret = i2c_transfer(taos->i2c_client->adapter, &msg, 1);
+		if(ret < 0) pr_err("[SENSOR]:%s : i2cstd error 0x%02x %d\n", __func__, reg, ret);
+	}while(ret < 0 && retry--);
+#else
 	ret = i2c_smbus_write_byte_data(taos->i2c_client,
 		(CMD_REG | reg), *val);
-
+	if(ret < 0) pr_err("[SENSOR]:%s : error %d\n", __func__, ret);
+#endif
 	return ret;
 }
 
-static int opt_i2c_read(struct taos_data *taos, u8 reg , u8 *val)
+#if 0//def STANDARD_I2C
+static int opt_i2c_write_verify(struct taos_data *taos, u8 reg, u8 *val)
 {
 	int ret;
+	struct i2c_msg msg, v_msg[2];
+	unsigned char w_buf[2], verify;
+	int retry = 3, verify_retry = 2;
 
+	w_buf[0] = reg;
+	w_buf[1] = *val;
+
+	msg.addr = taos->i2c_client->addr;
+	msg.flags = I2C_M_WR | I2C_M_IGNORE_NAK;
+	msg.len = 2;
+	msg.buf = (char *)w_buf;
+
+	MAKE_CERTAIN:
+
+	do{
+	ret = i2c_transfer(taos->i2c_client->adapter, &msg, 1);
+	if(ret < 0) pr_err("[SENSOR]: taos %s : i2cstd error %d\n", __func__, ret);
+	}while(ret < 0 && retry--);
+
+	if (ret < 0) {
+		return ret;
+	}
+
+	//verify
+	v_msg[0].addr = taos->i2c_client->addr;
+	v_msg[0].flags = I2C_M_WR| I2C_M_IGNORE_NAK;
+	v_msg[0].len = 1;
+	v_msg[0].buf = &reg;
+
+	v_msg[1].addr = taos->i2c_client->addr;
+	v_msg[1].flags = I2C_M_RD;
+	v_msg[1].len = 1;
+	v_msg[1].buf = &verify;
+
+	do{
+	ret = i2c_transfer(taos->i2c_client->adapter, v_msg, 2);
+	if(ret < 0) pr_err("[SENSOR]: taos %s : i2cstd error %d\n", __func__, ret);
+	}while(ret < 0 && retry--);
+
+	if(verify != *val)
+	{
+		pr_err("[SENSOR]: taos %s : error w:%d -> r:%d\n", __func__, *val, verify);
+		if(--verify_retry < 0)
+			return ret;
+		goto MAKE_CERTAIN;
+	}
+	return ret;
+}
+#endif
+
+
+#ifdef STANDARD_I2C
+static int taos_i2c_read_word(struct taos_data *taos, u8 reg , u16 *val)
+{
+	int ret;
+	struct i2c_msg msg[2];
+	unsigned char reg_addr  = (CMD_REG | reg);
+	unsigned char data[2] = {0,};
+	int retry = 3;
+
+	msg[0].addr = taos->i2c_client->addr;
+	msg[0].flags = I2C_M_WR;
+	msg[0].len = 1;
+	msg[0].buf = &reg_addr;
+
+	msg[1].addr = taos->i2c_client->addr;
+	msg[1].flags = I2C_M_RD;
+	msg[1].len = 2;
+	msg[1].buf = data;
+
+	do{
+	ret = i2c_transfer(taos->i2c_client->adapter, msg, 2);
+	if(ret < 0) pr_err("[SENSOR]:%s : i2cstd error 0x%02x %d\n", __func__, reg, ret);
+	}while(ret < 0 && retry--);
+
+	if (ret < 0) {
+		pr_err("[SENSOR]: taos %s : 0x%02x, i2cstd error %d\n", __func__, taos->i2c_client->addr, ret);
+		*val = 0;
+		return ret;
+	}
+	*val = ((data[1] << 8) | data[0]);
+
+	return ret;
+}
+#endif
+
+
+static int taos_i2c_read(struct taos_data *taos, u8 reg , u8 *val)
+{
+	int ret;
+#ifdef STANDARD_I2C
+	struct i2c_msg msg[2];
+	int retry = 3;
+
+	msg[0].addr = taos->i2c_client->addr;
+	msg[0].flags = I2C_M_WR;
+	msg[0].len = 1;
+	msg[0].buf = &reg;
+
+	msg[1].addr = taos->i2c_client->addr;
+	msg[1].flags = I2C_M_RD;
+	msg[1].len = 1;
+	msg[1].buf = val;
+
+	do{
+	ret = i2c_transfer(taos->i2c_client->adapter, msg, 2);
+	if(ret < 0) pr_err("[SENSOR]:%s : i2cstd error 0x%02x %d\n", __func__, reg, ret);
+	}while(ret < 0 && retry--);
+
+	if (ret < 0) {
+		pr_err("[SENSOR]: taos %s : 0x%02x, i2cstd error %d\n", __func__, taos->i2c_client->addr, ret);
+		return ret;
+	}
+#else
 	i2c_smbus_write_byte(taos->i2c_client, (CMD_REG | reg));
 	ret = i2c_smbus_read_byte(taos->i2c_client);
 	*val = ret;
-
+#endif
 	return ret;
 }
 
-static int opt_i2c_write_command(struct taos_data *taos, u8 val)
+static int taos_i2c_write_command(struct taos_data *taos, u8 val)
 {
 	int ret;
+#ifdef STANDARD_I2C
+	struct i2c_msg msg;
+	int retry = 3;
 
+	msg.addr = taos->i2c_client->addr;
+	msg.flags = I2C_M_WR;
+	msg.len = 1;
+	msg.buf = (char *)&val;
+
+	do{
+	ret = i2c_transfer(taos->i2c_client->adapter, &msg, 1);
+	}while(ret < 0 && retry--);
+
+	if (ret < 0) {
+		pr_err("[SENSOR]:%s : i2cstd error 0x%02x %d\n", __func__, val, ret);
+		return ret;
+	}
+#else
 	ret = i2c_smbus_write_byte(taos->i2c_client, val);
 	gprintk("[TAOS Command] val=[0x%x] - ret=[0x%x]\n", val, ret);
-
+#endif
 	return ret;
 }
 
 static int proximity_get_adc(struct taos_data *taos)
 {
-	int adc = 0;
-
+	u16 adc = 0;
+#ifdef STANDARD_I2C
+	int ret = 0;
+	ret = taos_i2c_read_word(taos,PRX_LO, &adc);
+#else
 	adc = i2c_smbus_read_word_data(taos->i2c_client,
 			CMD_REG | PRX_LO);
-
+#endif
 	if (adc < taos->pdata->prox_rawdata_trim)
 		return TAOS_PROX_MIN;
 	if (adc > TAOS_PROX_MAX)
@@ -355,9 +511,13 @@ static int proximity_get_adc(struct taos_data *taos)
 static int taos_proximity_get_threshold(struct taos_data *taos, u8 buf)
 {
 	u16 threshold;
+#ifdef STANDARD_I2C
+	int ret = 0;
+	ret = taos_i2c_read_word(taos,buf, &threshold);
+#else
 	threshold = i2c_smbus_read_word_data(taos->i2c_client,
 			(CMD_REG | buf));
-
+#endif
 	if ((threshold == 0xFFFF) || (threshold == 0))
 		return (int)threshold;
 
@@ -386,12 +546,11 @@ static void taos_thresh_set(struct taos_data *taos)
 	}
 
 	for (i = 0; i < 4; i++) {
-		ret = opt_i2c_write(taos,
+		ret = taos_i2c_write(taos,
 			(CMD_REG|(PRX_MINTHRESHLO + i)),
 			&prox_int_thresh[i]);
-		if (ret < 0)
-			gprintk("opt_i2c_write failed, err = %d\n", ret);
 	}
+
 }
 
 static int taos_chip_on(struct taos_data *taos)
@@ -405,44 +564,44 @@ static int taos_chip_on(struct taos_data *taos)
 #endif
 
 	temp_val = CNTL_PWRON;
-	ret = opt_i2c_write(taos, (CMD_REG|CNTRL), &temp_val);
+	ret = taos_i2c_write(taos, (CMD_REG|CNTRL), &temp_val);
 	if (ret < 0)
 		gprintk("opt_i2c_write to clr ctrl reg failed\n");
 
 	usleep_range(3000, 3100); // A minimum interval of 2.4ms must pass after PON is enabled.
 
 	temp_val = taos->pdata->als_time;
-	ret = opt_i2c_write(taos, (CMD_REG|ALS_TIME), &temp_val);
+	ret = taos_i2c_write(taos, (CMD_REG|ALS_TIME), &temp_val);
 	if (ret < 0)
 		gprintk("opt_i2c_write to als time reg failed\n");
 
 	temp_val = 0xff;
-	ret = opt_i2c_write(taos, (CMD_REG|WAIT_TIME), &temp_val);
+	ret = taos_i2c_write(taos, (CMD_REG|WAIT_TIME), &temp_val);
 	if (ret < 0)
 		gprintk("opt_i2c_write to wait time reg failed\n");
 
 	temp_val = taos->pdata->intr_filter;
-	ret = opt_i2c_write(taos, (CMD_REG|INTERRUPT), &temp_val);
+	ret = taos_i2c_write(taos, (CMD_REG|INTERRUPT), &temp_val);
 	if (ret < 0)
 		gprintk("opt_i2c_write to interrupt reg failed\n");
 
 	temp_val = 0x0;
-	ret = opt_i2c_write(taos, (CMD_REG|PRX_CFG), &temp_val);
+	ret = taos_i2c_write(taos, (CMD_REG|PRX_CFG), &temp_val);
 	if (ret < 0)
 		gprintk("opt_i2c_write to prox cfg reg failed\n");
 
 	temp_val = taos->pdata->prox_pulsecnt;
-	ret = opt_i2c_write(taos, (CMD_REG|PRX_COUNT), &temp_val);
+	ret = taos_i2c_write(taos, (CMD_REG|PRX_COUNT), &temp_val);
 	if (ret < 0)
 		gprintk("opt_i2c_write to prox cnt reg failed\n");
 
 	temp_val = taos->pdata->als_gain;
-	ret = opt_i2c_write(taos, (CMD_REG|GAIN), &temp_val);
+	ret = taos_i2c_write(taos, (CMD_REG|GAIN), &temp_val);
 	if (ret < 0)
 		gprintk("opt_i2c_write to prox gain reg failed\n");
 
 	reg_cntrl = CNTL_INTPROXPON_ENBL;
-	ret = opt_i2c_write(taos, (CMD_REG|CNTRL), &reg_cntrl);
+	ret = taos_i2c_write(taos, (CMD_REG|CNTRL), &reg_cntrl);
 	if (ret < 0)
 		gprintk("opt_i2c_write to ctrl reg failed\n");
 
@@ -455,7 +614,7 @@ static int taos_chip_off(struct taos_data *taos)
 	u8 reg_cntrl;
 
 	reg_cntrl = CNTL_REG_CLEAR;
-	ret = opt_i2c_write(taos, (CMD_REG | CNTRL), &reg_cntrl);
+	ret = taos_i2c_write(taos, (CMD_REG | CNTRL), &reg_cntrl);
 	if (ret < 0) {
 		gprintk("opt_i2c_write to ctrl reg failed\n");
 		return ret;
@@ -484,16 +643,30 @@ static int taos_get_cct(struct taos_data *taos)
 static int taos_get_lux(struct taos_data *taos)
 {
 	s32 rp1, gp1, bp1;
-	s32 clrdata = 0;
-	s32 reddata = 0;
-	s32 grndata = 0;
-	s32 bludata = 0;
+	u16 clrdata = 0;
+	u16 reddata = 0;
+	u16 grndata = 0;
+	u16 bludata = 0;
 	s32 calculated_lux = 0;
 	u8 reg_gain = 0x0;
 	u16 temp_gain = 0x0;
 	int gain = 1;
 	int ret = 0;
 
+#ifdef STANDARD_I2C
+	ret = taos_i2c_read_word(taos, (GAIN), &temp_gain);
+	if(ret < 0) return taos->lux;
+	reg_gain = temp_gain & 0xff;
+
+	ret = taos_i2c_read_word(taos,(CLR_CHAN0LO), &clrdata);
+	if(ret < 0) return taos->lux;
+	ret = taos_i2c_read_word(taos,(RED_CHAN1LO), &reddata);
+	if(ret < 0) return taos->lux;
+	ret = taos_i2c_read_word(taos,(GRN_CHAN1LO), &grndata);
+	if(ret < 0) return taos->lux;
+	ret = taos_i2c_read_word(taos,(BLU_CHAN1LO), &bludata);
+	if(ret < 0) return taos->lux;
+#else
 	temp_gain = i2c_smbus_read_word_data(taos->i2c_client,
 		(CMD_REG | GAIN));
 	reg_gain = temp_gain & 0xff;
@@ -506,7 +679,7 @@ static int taos_get_lux(struct taos_data *taos)
 		(CMD_REG | GRN_CHAN1LO));
 	bludata = i2c_smbus_read_word_data(taos->i2c_client,
 		(CMD_REG | BLU_CHAN1LO));
-
+#endif
 	taos->clrdata = clrdata;
 	taos->reddata = reddata;
 	taos->grndata = grndata;
@@ -532,15 +705,13 @@ static int taos_get_lux(struct taos_data *taos)
 
 	if (gain == 1 && clrdata < 25) {
 		reg_gain = 0x22;
-		ret = opt_i2c_write(taos, (CMD_REG | GAIN), &reg_gain);
-		if (ret < 0)
-			gprintk("opt_i2c_write failed, err = %d\n", ret);
+		ret = taos_i2c_write(taos, (CMD_REG | GAIN), &reg_gain);
+		pr_info("[%s] gain:1 clrdata:%d\n", __func__, clrdata);
 		return taos->lux;
 	} else if (gain == 16 && clrdata > 15000) {
 		reg_gain = 0x20;
-		ret = opt_i2c_write(taos, (CMD_REG | GAIN), &reg_gain);
-		if (ret < 0)
-			gprintk("opt_i2c_write failed, err = %d\n", ret);
+		ret = taos_i2c_write(taos, (CMD_REG | GAIN), &reg_gain);
+		pr_info("[%s] gain:16 clrdata:%d\n", __func__, clrdata);
 		return taos->lux;
 	}
 
@@ -598,8 +769,8 @@ static void taos_light_enable(struct taos_data *taos)
 static void taos_light_disable(struct taos_data *taos)
 {
 	taos_dbgmsg("cancelling poll timer\n");
-	cancel_work_sync(&taos->work_light);
 	hrtimer_cancel(&taos->timer);
+	cancel_work_sync(&taos->work_light);
 }
 
 static ssize_t poll_delay_show(struct device *dev,
@@ -738,7 +909,7 @@ static ssize_t proximity_enable_store(struct device *dev,
 
 		/* interrupt clearing */
 		temp = (CMD_REG|CMD_SPL_FN|CMD_PROXALS_INTCLR);
-		ret = opt_i2c_write_command(taos, temp);
+		ret = taos_i2c_write_command(taos, temp);
 		if (ret < 0)
 			gprintk("opt_i2c_write failed, err = %d\n", ret);
 
@@ -802,7 +973,7 @@ static int proximity_open_window_type(struct taos_data *data)
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
 
-	wintype_filp = filp_open(WINDOW_TYPE_FILE_PATH, O_RDONLY, 0666);
+	wintype_filp = filp_open(WINDOW_TYPE_FILE_PATH, O_RDONLY, 0);
 	if(IS_ERR(wintype_filp)) {
 		pr_err("%s: no window_type file\n", __func__);
 		err = PTR_ERR(wintype_filp);
@@ -842,7 +1013,7 @@ static int proximity_open_offset(struct taos_data *data)
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
 
-	offset_filp = filp_open(OFFSET_FILE_PATH, O_RDONLY, 0666);
+	offset_filp = filp_open(OFFSET_FILE_PATH, O_RDONLY, 0);
 	if (IS_ERR(offset_filp)) {
 		pr_err("%s: no offset file\n", __func__);
 		err = PTR_ERR(offset_filp);
@@ -957,7 +1128,7 @@ static int proximity_store_offset(struct device *dev, bool do_calib)
 	set_fs(KERNEL_DS);
 
 	offset_filp = filp_open(OFFSET_FILE_PATH,
-			O_CREAT | O_TRUNC | O_WRONLY, 0666);
+			O_CREAT | O_TRUNC | O_WRONLY, 0660);
 	if (IS_ERR(offset_filp)) {
 		pr_err("%s: Can't open prox_offset file\n", __func__);
 		set_fs(old_fs);
@@ -1353,8 +1524,9 @@ static void taos_work_func_light(struct work_struct *work)
 {
 	struct taos_data *taos = container_of(work, struct taos_data,
 					      work_light);
-	int adc = taos_get_lux(taos);
-	int cct = taos_get_cct(taos);
+	int adc, cct ;
+	adc = taos_get_lux(taos);
+	cct = taos_get_cct(taos);
 
 	input_report_rel(taos->light_input_dev, REL_MISC, adc + 1);
 	input_report_rel(taos->light_input_dev, REL_WHEEL, cct);
@@ -1378,7 +1550,7 @@ static void taos_work_func_prox(struct work_struct *work)
 
 	while (chipid != 0x69 && i < 10) {
 		msleep(20);
-		ret = opt_i2c_read(taos, CHIPID, &chipid);
+		ret = taos_i2c_read(taos, CHIPID, &chipid);
 		i++;
 	}
 	if (ret < 0)
@@ -1392,8 +1564,8 @@ static void taos_work_func_prox(struct work_struct *work)
 	threshold_high = taos_proximity_get_threshold(taos, PRX_MAXTHRESHLO);
 	threshold_low = taos_proximity_get_threshold(taos, PRX_MINTHRESHLO);
 
-	pr_err("%s: hi = %d, low = %d, adc_data = %d\n", __func__,
-		taos->threshold_high, taos->threshold_low, adc_data);
+	pr_info(" %s: prev[%d, %d] now[%d, %d] adc:%d\n", __func__,
+		taos->threshold_high, taos->threshold_low, threshold_high, threshold_low, adc_data);
 
 	if ((threshold_high ==  (taos->threshold_high)) &&
 		(adc_data >=  (taos->threshold_high))) {
@@ -1415,13 +1587,18 @@ static void taos_work_func_prox(struct work_struct *work)
 		goto exit;
 	}
 	taos->proximity_value = proximity_value;
+
 	taos_thresh_set(taos);
+	exit:
 	/* reset Interrupt pin */
 	/* to active Interrupt, TMD2771x Interuupt pin shoud be reset. */
-exit:
+#ifdef STANDARD_I2C
+		taos_i2c_write_command(taos, (CMD_REG|CMD_SPL_FN|CMD_PROXALS_INTCLR));
+		pr_info("[%s] waiting prox_int clr...\n", __func__);
+#else
 	i2c_smbus_write_byte(taos->i2c_client,
 	(CMD_REG|CMD_SPL_FN|CMD_PROXALS_INTCLR));
-
+#endif
 	/* enable INT */
 	enable_irq(taos->irq);
 }
@@ -1625,7 +1802,7 @@ static int taos_i2c_probe(struct i2c_client *client,
 	struct input_dev *input_dev;
 	struct taos_data *taos;
 	struct taos_platform_data *pdata = NULL;
-
+	u8 chipid;
 
 	pr_info("%s: taos_i2c_probe Start\n", __func__);
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
@@ -1679,9 +1856,9 @@ static int taos_i2c_probe(struct i2c_client *client,
 	tmd3782_leden_gpio_onoff(taos, 1);
 
 	/* ID Check */
-	ret = i2c_smbus_read_byte_data(client, CMD_REG | CHIPID);
-	if (ret != CHIP_ID) {
-		pr_err("%s: i2c read error [%X]\n", __func__, ret);
+	ret = taos_i2c_read(taos, CMD_REG | CHIPID, &chipid);
+	if (chipid != CHIP_ID) {
+		pr_err("%s: i2c read error [%X]\n", __func__, chipid);
 		goto err_chip_id_or_i2c_error;
 	}
 

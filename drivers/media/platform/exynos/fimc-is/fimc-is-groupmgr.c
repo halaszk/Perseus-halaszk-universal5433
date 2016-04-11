@@ -333,14 +333,24 @@ static void fimc_is_group_3a0_cancel(struct fimc_is_framemgr *framemgr,
 	struct fimc_is_video_ctx *vctx,
 	u32 instance)
 {
+	struct fimc_is_device_ischain *device;
+
 	BUG_ON(!vctx);
 	BUG_ON(!framemgr);
 	BUG_ON(!frame);
 	BUG_ON(!queue);
 
-	pr_err("[3A0:D:%d:%d] GRP0 CANCEL(%d, %d)\n", instance,
-		V4L2_TYPE_IS_OUTPUT(queue->vbq->type),
-		frame->fcount, frame->index);
+	device = vctx->device;
+	if (test_bit(FIMC_IS_SENSOR_BACK_START, &device->state)
+		|| test_bit(FIMC_IS_SENSOR_FRONT_START, &device->state)) {
+		pr_err("[3A0:D:%d:%d] GRP0 CANCEL(%d, %d)\n", instance,
+			V4L2_TYPE_IS_OUTPUT(queue->vbq->type),
+			frame->fcount, frame->index);
+	} else {
+		warn("[3A0:D:%d:%d] GRP0 CANCEL(%d, %d)\n", instance,
+			V4L2_TYPE_IS_OUTPUT(queue->vbq->type),
+			frame->fcount, frame->index);
+	}
 
 	fimc_is_frame_trans_req_to_com(framemgr, frame);
 	queue_done(vctx, queue, frame->index, VB2_BUF_STATE_ERROR);
@@ -504,6 +514,23 @@ static void fimc_is_group_set_torch(struct fimc_is_group *group,
 	struct fimc_is_frame *ldr_frame)
 {
 	struct fimc_is_device_ischain *device = group->device;
+
+#ifdef CONFIG_SKIP_TORCH_SET_FRONT
+	struct fimc_is_device_sensor *sensor;
+	struct fimc_is_module_enum *module;
+	int ret = 0;
+
+	sensor = device->sensor;
+	ret = fimc_is_sensor_g_module(sensor, &module);
+	if (ret) {
+		err("fimc_is_sensor_g_module is fail(%d)", ret);
+		return;
+	}
+
+	if (module->position == SENSOR_POSITION_FRONT) {
+		return;
+	}
+#endif
 
 	if (group->prev)
 		return;
@@ -989,7 +1016,7 @@ int fimc_is_group_init(struct fimc_is_groupmgr *groupmgr,
 	BUG_ON(group->id >= GROUP_ID_MAX);
 
 	if (test_bit(FIMC_IS_GROUP_INIT, &group->state)) {
-		merr("already initialized", group);
+		mwarn("already initialized", group);
 		/* HACK */
 		/* ret = -EINVAL; */
 		goto p_err;
@@ -1753,8 +1780,10 @@ int fimc_is_group_start(struct fimc_is_groupmgr *groupmgr,
 				group->fcount = ldr_frame->fcount;
 			} else {
 				spin_unlock_irq(&gframemgr->frame_slock);
-				err("grp%d shot mismatch(%d, %d)", group->id,
-					ldr_frame->fcount, group->fcount);
+				if (test_bit(FIMC_IS_SENSOR_BACK_START, &device->state)
+					|| test_bit(FIMC_IS_SENSOR_FRONT_START, &device->state))
+					err("grp%d shot mismatch(%d, %d)", group->id,
+						ldr_frame->fcount, group->fcount);
 				group->fcount--;
 				ret = -EINVAL;
 				goto p_err;

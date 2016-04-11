@@ -65,6 +65,7 @@
 			wlf,hpdet-moisture-imp = <2000>;
 			wlf,hpdet-channel = <1>;
 			wlf,hpdet-ext-res = <11>;
+			wlf,hs-mic = <3>;
 			wlf,hpdet-short-circuit-imp = <3>;
 			wlf,micd-ranges = <
 				116 226

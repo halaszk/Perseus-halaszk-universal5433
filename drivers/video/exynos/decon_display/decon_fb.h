@@ -431,6 +431,7 @@ struct s3c_fb {
 	struct notifier_block	pcd_reboot_noti;
 #endif
 	bool	protected_content;
+	int	num_of_window;
 };
 
 struct s3c_fb_rect {

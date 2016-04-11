@@ -1307,11 +1307,12 @@ static int dw_mci_exynos_execute_tuning(struct dw_mci *host, u32 opcode)
 			/*
 			 * Get at middle clock sample values.
 			 */
-			if (priv->ctrl_flag & DW_MMC_EXYNOS_BYPASS_FOR_ALL_PASS)
-				bypass = (all_pass_count >= (priv->drv_str_num - 1)) ? true : false;
-
 			if (sample_good == abnormal_result)
 				all_pass_count++;
+
+			if (priv->ctrl_flag & DW_MMC_EXYNOS_BYPASS_FOR_ALL_PASS)
+				bypass = (all_pass_count >= (priv->drv_str_num)) ? true : false;
+
 			if (bypass) {
 				dev_info(host->dev, "Bypassed for all pass at %d times\n", priv->drv_str_num);
 				if (en_fine_tuning) {

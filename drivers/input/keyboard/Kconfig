@@ -665,6 +665,12 @@ config KEYBOARD_KLIMTVE
 	help
 	  Say Y here to disable the flip mode and inform charger for touchkey
 
+config KEYBOARD_FORCE_REPORT_PRESS_EVENT
+	bool "force to report key press event"
+	default n
+	help
+	  Say Y here to report key press event when key press event was missed.
+
 source "drivers/input/keyboard/cypress/Kconfig"
 source "drivers/input/keyboard/cypress_20055/Kconfig"
 source "drivers/input/keyboard/cypress_20075/Kconfig"

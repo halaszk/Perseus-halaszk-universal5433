@@ -28,6 +28,12 @@
 #define SMC_CMD_L2X0INVALL	(-24)
 #define SMC_CMD_L2X0DEBUG	(-25)
 
+#define SMC_MEM_PROT_SET        0x81000005
+
+/* Parameter for smc */
+#define SMC_PROTECTION_ENABLE   1
+#define SMC_PROTECTION_DISABLE  0
+
 /* For Accessing CP15/SFR (General) */
 #define SMC_CMD_REG		(-101)
 

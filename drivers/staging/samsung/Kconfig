@@ -322,6 +322,14 @@ config SEC_SLOW_MODE
 	help
 	  fast cpu can help slow cpu when only slow cpu load is busy
 
+config SEC_DEBUG_TRYLOCK_RQLOCK_AND_SKIP
+	bool "sec try rq lock and skip"
+	depends on SCHED_DEBUG
+	default n
+	help
+	  this feature makes skip to acquire runqueue's lock
+	  when runqueue's lock is already contended by someone else.
+
 comment "Samsung TN Power Management Options"
 menuconfig SEC_PM
 	bool "Samsung TN Power Management"

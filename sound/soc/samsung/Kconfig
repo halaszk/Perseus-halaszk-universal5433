@@ -371,7 +371,7 @@ config SND_SOC_ES515_I2S_MASTER
 	  Say Y if you want to add support for SoC audio on the XYREF.
 
 config SND_SOC_SAMSUNG_UNIVERSAL5430_DUMMY
-	tristate "SoC I2S Audio support on UNIVERSAL5430"
+	tristate "SoC I2S Audio support on UNIVERSAL5430 for DUMMY"
 	depends on SND_SOC_SAMSUNG
 	select SND_SAMSUNG_I2S
 	select SND_SAMSUNG_AUDSS
@@ -379,6 +379,25 @@ config SND_SOC_SAMSUNG_UNIVERSAL5430_DUMMY
 	select SND_SOC_DUMMY_CODEC
 	help
 	  Say Y if you want to add support for SoC audio on the UNIVERSAL5430.
+
+config SND_SOC_SAMSUNG_UNIVERSAL5433_DUMMY
+	tristate "SoC I2S Audio support on UNIVERSAL5433 for DUMMY"
+	depends on SND_SOC_SAMSUNG
+	select SND_SAMSUNG_I2S
+	select SND_SAMSUNG_AUDSS
+	select SND_SAMSUNG_IOMMU
+	select SND_SOC_DUMMY_CODEC
+	help
+	  Say Y if you want to add support for SoC audio on the UNIVERSAL5433.
+
+config SND_SOC_SAMSUNG_UNIVERSAL5422_DUMMY
+	tristate "SoC I2S Audio support on UNIVERSAL5422 Dummy"
+	depends on SND_SOC_SAMSUNG
+	select SND_SAMSUNG_I2S
+	select SND_SAMSUNG_AUDSS
+	select SND_SOC_DUMMY_CODEC
+	help
+	  Say Y if you want to add support for SoC audio on the UNIVERSAL5422.
 
 config SND_SOC_SAMSUNG_SMDK5422_WM8994
 	tristate "SoC I2S Audio support for wm8994 on SMDK5422"

@@ -87,7 +87,7 @@ obj-$(CONFIG_MACH_UNIVERSAL5433)	+= mach-universal5433.o
 
 obj-$(CONFIG_VIDEO_EXYNOS_FIMC_IS)    += setup-fimc-is.o
 obj-$(CONFIG_VIDEO_EXYNOS_FIMC_IS)    += setup-fimc-is-sensor.o
-obj-$(CONFIG_VIDEO_EXYNOS_FIMC_IS)    += setup-fimc-is-companion.o
+obj-$(CONFIG_COMPANION_USE)		+= setup-fimc-is-companion.o
 
 # device support
 

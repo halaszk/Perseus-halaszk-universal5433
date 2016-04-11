@@ -36,9 +36,13 @@
 
 #include "platform.h"
 
+#define MID_CPUFREQ	1700000
+
 int mc_switch_core(uint32_t core_num);
 void mc_set_schedule_policy(int core);
+uint32_t mc_active_core(void);
 
+unsigned int current_core;
 struct timer_work {
 	struct kthread_work work;
 };
@@ -126,6 +130,9 @@ int secos_booster_start(enum secos_boost_policy policy)
 {
 	int ret = 0;
 	int freq;
+	int i;
+
+	current_core = mc_active_core();
 
 	/* migrate to big Core */
 	if ((policy != MAX_PERFORMANCE) && (policy != MID_PERFORMANCE)
@@ -139,22 +146,27 @@ int secos_booster_start(enum secos_boost_policy policy)
 	if (policy == MAX_PERFORMANCE)
 		freq = max_cpu_freq;
 	else if (policy == MID_PERFORMANCE)
-		freq = max_cpu_freq;
+		freq = MID_CPUFREQ;
 	else
 		freq = 0;
 	pm_qos_update_request(&secos_booster_qos, freq); /* KHz */
 
-	if (!cpu_online(DEFAULT_BIG_CORE)) {
-		pr_debug("%s: %d core is offline\n", __func__, DEFAULT_BIG_CORE);
-		udelay(100);
-		if (!cpu_online(DEFAULT_BIG_CORE)) {
-			pr_debug("%s: %d core is offline\n", __func__, DEFAULT_BIG_CORE);
-			pm_qos_update_request(&secos_booster_qos, 0);
-			ret = -EPERM;
-			goto error;
-		}
-		pr_debug("%s: %d core is online\n", __func__, DEFAULT_BIG_CORE);
+	pr_info("%s vfsspi test\n", __func__);
+	for (i = 0; i < SECOS_BOOST_RETRY_MAX; i++) {
+		if (!cpu_online(DEFAULT_BIG_CORE))
+			msleep(SECOS_BOOST_RETRY_MS);
+		else
+			break;
 	}
+	if ( i == SECOS_BOOST_RETRY_MAX ) {
+		pr_err("%s: %d core is offline\n", __func__, DEFAULT_BIG_CORE);
+		pm_qos_update_request(&secos_booster_qos, 0);
+		ret = -EPERM;
+		goto error;
+	}
+	pr_debug("%s: %d core is online\n", __func__, DEFAULT_BIG_CORE);
+	pr_info("%s: %d core is online(retry : %d)\n", __func__, DEFAULT_BIG_CORE, i);
+
 	ret = mc_switch_core(DEFAULT_BIG_CORE);
 	if (ret) {
 		pr_err("%s: mc switch failed : err:%d\n", __func__, ret);
@@ -177,11 +189,12 @@ error:
 int secos_booster_stop(void)
 {
 	int ret = 0;
-
+	
+	hrtimer_cancel(&timer);
 	pr_debug("%s: mc switch to little core \n", __func__);
-	mc_set_schedule_policy(DEFAULT_LITTLE_CORE);
 
-	ret = mc_switch_core(DEFAULT_LITTLE_CORE);
+	mc_set_schedule_policy(DEFAULT_LITTLE_CORE);
+	ret = mc_switch_core(current_core);
 	if (ret)
 		pr_err("%s: mc switch core failed. err:%d\n", __func__, ret);
 

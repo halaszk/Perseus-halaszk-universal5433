@@ -39,7 +39,7 @@
 #include <linux/i2c/twl.h>
 #include <linux/wait.h>
 #include <linux/spi/spi.h>
-#include <asm-generic/uaccess.h>
+#include <asm/uaccess.h>
 #include <linux/irq.h>
 
 #include <asm-generic/siginfo.h>

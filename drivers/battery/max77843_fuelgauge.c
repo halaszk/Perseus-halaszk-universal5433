@@ -1312,6 +1312,16 @@ static int max77843_fg_calculate_dynamic_scale(
 		fuelgauge->capacity_old = 100;
 	}
 
+	if (fuelgauge->capacity_max <
+		fuelgauge->pdata->capacity_max -
+		fuelgauge->pdata->capacity_max_margin) {
+		fuelgauge->capacity_max =
+			fuelgauge->pdata->capacity_max -
+			fuelgauge->pdata->capacity_max_margin;
+		pr_debug("%s: capacity_max (%d)", __func__,
+			 fuelgauge->capacity_max);
+	}
+
 	pr_info("%s: %d is used for capacity_max, capacity(%d)\n",
 		__func__, fuelgauge->capacity_max, capacity);
 
@@ -1869,7 +1879,8 @@ static int __devinit max77843_fuelgauge_probe(struct platform_device *pdev)
 
 	reg_data = max77843_read_word(fuelgauge->i2c, 0xD0);
 
-	if (reg_data >= 900 && reg_data <= 1000 && reg_data != fuelgauge->capacity_max) {
+	if ((reg_data >= (fuelgauge->pdata->capacity_max - fuelgauge->pdata->capacity_max_margin )) &&
+	    reg_data <= 1000 && reg_data != fuelgauge->capacity_max) {
 		pr_info("%s : Capacity Max Update (%d) -> (%d)\n",
 			__func__, fuelgauge->capacity_max, reg_data);
 		fuelgauge->capacity_max = reg_data;

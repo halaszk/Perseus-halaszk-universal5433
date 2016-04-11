@@ -89,7 +89,7 @@ struct cdc_ncm_ctx {
 
 int cdc_ncm_bind(struct if_usb_devdata *devdata,
 		struct usb_interface *intf, struct usb_link_device *usb_ld);
-void cdc_ncm_unbind(struct if_usb_devdata *devdata, struct usb_interface *intf);
+void cdc_ncm_unbind2(struct if_usb_devdata *devdata, struct usb_interface *intf);
 struct sk_buff *cdc_ncm_tx_fixup(struct if_usb_devdata *devdata,
 		struct sk_buff *skb, gfp_t flags);
 int cdc_ncm_rx_fixup(struct if_usb_devdata *devdata, struct sk_buff *skb_in);

@@ -60,12 +60,8 @@ void pktlog_queue_skb(struct pktlog_data *pktlog, unsigned char dir,
 {
 	struct sk_buff *pkt;
 
-	mif_err("+++\n");
-
 	if (!pktlog || !pktlog->qmax)
 		return;
-
-	mif_err("aaa\n");
 
 	pkt = skb_clone(skb, in_interrupt() ? GFP_ATOMIC : GFP_KERNEL);
 	if (!pkt) {
@@ -75,11 +71,7 @@ void pktlog_queue_skb(struct pktlog_data *pktlog, unsigned char dir,
 	pkt->tstamp = timespec_to_ktime(current_kernel_time());
 	pktpriv(pkt)->dir = dir;
 
-	mif_err("bbb\n");
-
 	skb_queue_tail(&pktlog->logq, pkt);
-
-	mif_err("ccc\n");
 
 	if (pktlog->logq.qlen > pktlog->qmax) {
 		struct sk_buff *drop = skb_dequeue(&pktlog->logq);
@@ -89,8 +81,6 @@ void pktlog_queue_skb(struct pktlog_data *pktlog, unsigned char dir,
 			pktlog->logq.qlen);
 	}
 	wake_up(&pktlog->wq);
-
-	mif_err("---\n");
 }
 
 static int pktlog_open(struct inode *inode, struct file *filp)
@@ -125,6 +115,7 @@ static int pktlog_release(struct inode *inode, struct file *filp)
 	return 0;
 }
 
+#if 0
 static unsigned int pktlog_poll(struct file *filp, struct poll_table_struct *wait)
 {
 	struct pktlog_data *pktlog = filp->private_data;
@@ -139,6 +130,7 @@ static unsigned int pktlog_poll(struct file *filp, struct poll_table_struct *wai
 
 	return POLLIN;
 }
+#endif
 
 static ssize_t pktlog_read(struct file *filp, char *buf, size_t count,
 			loff_t *fpos)
@@ -169,10 +161,21 @@ static ssize_t pktlog_read(struct file *filp, char *buf, size_t count,
 		p += sizeof(struct pcap_file_header);
 	}
 
+retry:
 	pkt = skb_dequeue(&pktlog->logq);
 	if (unlikely(!pkt)) {
-		printk_ratelimited(KERN_ERR "%s: no log pakcets\n", __func__);
-		return 0;
+		printk_ratelimited(KERN_ERR "%s: end of packets (size: %u)\n",
+				__func__, cplen);
+		if (cplen) {
+			mif_debug("return %d size data\n", cplen);
+			return cplen;
+		}
+
+		ret = wait_event_interruptible(pktlog->wq, pktlog->logq.qlen);
+		if (ret)
+			return -EINVAL;
+		else
+			goto retry;
 	}
 
 	tv = ktime_to_timeval(pkt->tstamp);
@@ -181,7 +184,7 @@ static ssize_t pktlog_read(struct file *filp, char *buf, size_t count,
 	hdr->pcap.len = cook_hdr_len + pkt->len;
 	hdr->pcap.caplen = min(hdr->pcap.len, pktlog->snaplen);
 
-	hdr->sd.dir = pktpriv(pkt)->dir;
+	/*hdr->sd.dir = pktpriv(pkt)->dir;*/
 
 	ret = copy_to_user(p, hdr, sizeof(struct pktdump_hdr));
 	if (ret < 0) {
@@ -189,9 +192,10 @@ static ssize_t pktlog_read(struct file *filp, char *buf, size_t count,
 			__func__);
 		goto exit;
 	}
-	cplen += sizeof(struct pktdump_hdr);
 
+	cplen += sizeof(struct pktdump_hdr);
 	p += sizeof(struct pktdump_hdr);
+
 	payload_len = min(pkt->len, pktlog->snaplen - cook_hdr_len);
 	ret = copy_to_user(p, pkt->data, payload_len);
 	if (ret < 0) {
@@ -199,7 +203,13 @@ static ssize_t pktlog_read(struct file *filp, char *buf, size_t count,
 			__func__);
 		goto exit;
 	}
+
 	cplen += payload_len;
+	p += payload_len;
+
+	dev_kfree_skb_any(pkt);
+
+	goto retry;
 
 exit:
 
@@ -242,7 +252,8 @@ static ssize_t show_qmax(struct device *dev,
 	struct pktlog_data *pktlog = dev_get_drvdata(dev);
 	char *p = buf;
 
-	p += sprintf(buf, "packet log queue max : %u\n", pktlog->qmax);
+	p += sprintf(buf, "packet log queue cur/max : %u/%u\n",
+			pktlog->logq.qlen, pktlog->qmax);
 
 	return p - buf;
 }
@@ -269,7 +280,7 @@ static const struct file_operations pktlog_fops = {
 	.owner = THIS_MODULE,
 	.open = pktlog_open,
 	.release = pktlog_release,
-	.poll = pktlog_poll,
+	/*.poll = pktlog_poll,*/
 	.read = pktlog_read,
 };
 
@@ -283,7 +294,7 @@ static void init_pcap_fileheader(struct pktlog_data *pktlog)
 	hdr->thiszone = 0;
 	hdr->sigflag = 0;
 	hdr->snaplen = pktlog->snaplen;
-	hdr->linktype = WTAP_ENCAP_USER0;
+	hdr->linktype = DLT_RAW;
 }
 
 struct pktlog_data *create_pktlog(char *name)
@@ -306,7 +317,7 @@ struct pktlog_data *create_pktlog(char *name)
 	init_waitqueue_head(&pktlog->wq);
 	skb_queue_head_init(&pktlog->logq);
 	pktlog->qmax = 0;
-	pktlog->snaplen = 256;
+	pktlog->snaplen = SZ_128;
 	atomic_set(&pktlog->opened, 0);
 
 	ret = misc_register(&pktlog->misc);

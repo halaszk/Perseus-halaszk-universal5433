@@ -17,7 +17,7 @@
 	compatible = "samsung,XYREF5430", "samsung,exynos5430";
 
 	chosen {
-		bootargs = "console=ttySAC2,115200 vmalloc=512M ess_setup=0x26000000 noexec=on";
+		bootargs = "console=ttySAC2,115200 vmalloc=512M ess_setup=0x26000000 noexec=on androidboot.hardware=xyref5430";
 	};
 
 	fixed-rate-clocks {
@@ -42,8 +42,6 @@
 		only_once_tune;
 		extra_tuning;
 		supports-highspeed;
-		supports-hs200-1-8v-mode;
-		supports-ddr200-1-8v-mode;
 		enable-cache-control;
 		qos_int_level = <138000>;
 		use-enable-shift;
@@ -669,7 +667,6 @@
 		status = "disabled";
 	};
 
-
 	/*disp_driver {*/
 	decon_fb: decon_fb {
 		lcd_info = <&s6e3fa0>;
@@ -1007,8 +1004,8 @@
 			modem-name = "ss300";
 			modems {
 				ss300 {
-					/* initial-gear is HS-G2 */
-					init-gear = <2 2 1>;
+					/* initial-gear is HS-G1 */
+					init-gear = <2 1 1>;
 					/* use shared reference clock for MPHY */
 					shd-refclk = <1>;
 				};
@@ -1174,7 +1171,6 @@
 			       "mfc_sh",
 			       "g2d_wfd",
 			       "video",
-			       "mfc_input",
 			       "sectbl",
 			       "mfc_fw",
 			       "mfc_nfw",

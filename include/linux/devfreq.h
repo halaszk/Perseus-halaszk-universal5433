@@ -245,6 +245,7 @@ struct devfreq_simple_exynos_data {
 	unsigned long above_freq;
 	unsigned long below_freq;
 	int pm_qos_class;
+	int pm_qos_class_max;
 	unsigned long cal_qos_max;
 	bool en_monitoring;
 	struct devfreq_notifier_block nb;

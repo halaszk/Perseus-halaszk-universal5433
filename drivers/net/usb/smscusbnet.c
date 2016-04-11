@@ -278,10 +278,8 @@ static int init_status (struct usbnet *dev, struct usb_interface *intf)
 	if (!dev->driver_info->status)
 		return 0;
 
-	
     dev->device_id = DEV_SMSC9500;
     dev->tx_hold_on_completion = tx_hold_on_completion;
-	
 
 	pipe = usb_rcvintpipe (dev->udev,
 			dev->status->desc.bEndpointAddress
@@ -351,7 +349,6 @@ void smscusbnet_skb_return (struct usbnet *dev, struct sk_buff *skb)
 {
 	int	status;
 	u16 vlan_tag = *((u16 *)&skb->cb[0]);
-	
 
 	skb->dev = dev->net;
 	skb->protocol = eth_type_trans (skb, dev->net);
@@ -365,9 +362,8 @@ void smscusbnet_skb_return (struct usbnet *dev, struct sk_buff *skb)
 		status = netif_rx (skb);
 	}else{//Vlan tag acceleration
 #if (LINUX_VERSION_CODE <= KERNEL_VERSION(3,0,31))
-		 	status = vlan_hwaccel_rx(skb, dev->vlgrp, vlan_tag);   
+		status = vlan_hwaccel_rx(skb, dev->vlgrp, vlan_tag);
 #else
-		    
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0))
 			__vlan_hwaccel_put_tag(skb, vlan_tag);
 #else
@@ -395,7 +391,7 @@ void smscusbnet_skb_return (struct usbnet *dev, struct sk_buff *skb)
  *-------------------------------------------------------------------------*/
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,29))
-static 
+static
 #endif
 int smscusbnet_change_mtu (struct net_device *net, int new_mtu)
 {
@@ -426,7 +422,7 @@ int smscusbnet_change_mtu (struct net_device *net, int new_mtu)
 
 /*-------------------------------------------------------------------------*/
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,29))
-static 
+static
 #endif
 struct net_device_stats *smscusbnet_get_stats (struct net_device *net)
 {
@@ -490,7 +486,7 @@ void smscusbnet_linkpolling(unsigned long ptr)
 
 	struct usbnet * dev= (struct usbnet *) ptr;
 
-	if (dev==NULL) return;	
+	if (dev==NULL) return;
 	smscusbnet_defer_myevent(dev, EVENT_LINK_RESET);
 
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,18)) && defined(CONFIG_PM)
@@ -876,7 +872,7 @@ static void  smscusbnet_bh (unsigned long param)
 		    case tx_done:
 			usb_free_urb (entry->urb);
 			dev_kfree_skb (skb);
-			
+
 			spin_lock_irqsave (&dev->txq.lock, flags);
 			if(!dev->txq.qlen)
 				smscusbnet_bundle_skb_ximt(dev, &dev->tx_pending_q);
@@ -956,14 +952,12 @@ int smscusbnet_stop (struct net_device *net)
 	struct usbnet		*dev = netdev_priv(net);
 	int			temp;
 
-	
 	DECLARE_WAIT_QUEUE_HEAD (unlink_wakeup);
 	DECLARE_WAITQUEUE (wait, current);
 
 	netif_stop_queue (net);
 	if (netif_msg_ifdown (dev))
 		devinfo (dev, "stop stats: rx/tx %ld/%ld, errs %ld/%ld",
-		
 		dev->stats.rx_packets, dev->stats.tx_packets,
 		dev->stats.rx_errors, dev->stats.tx_errors
 		);
@@ -1001,7 +995,7 @@ int smscusbnet_stop (struct net_device *net)
 	dev->StopLinkPolling=TRUE;
 	tasklet_kill (&dev->bh);
     netif_carrier_off(dev->net);
-	
+
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,18))
     //if thera is in suspend0 status already, resume it first. So we can set suspend2 in Smsc9500_suspend();
     down(&dev->pm_mutex);
@@ -1031,7 +1025,7 @@ int smscusbnet_stop (struct net_device *net)
 // precondition: never called in_interrupt
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,29))
-static 
+static
 #endif
 int smscusbnet_open (struct net_device *net)
 {
@@ -1039,7 +1033,6 @@ int smscusbnet_open (struct net_device *net)
 	int			retval = 0;
 	struct driver_info	*info = dev->driver_info;
 
-	
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,18))
     down(&dev->pm_mutex);
     dev->pmLock = TRUE;
@@ -1063,7 +1056,6 @@ int smscusbnet_open (struct net_device *net)
 	}
 
     dev->intr_urb_delay_submit = FALSE;
-	
 
 	// insist peer be connected
 	if (info->check_connect && (retval = info->check_connect (dev)) < 0) {
@@ -1268,24 +1260,22 @@ static void myevent(struct work_struct *work)
     if (test_bit (EVENT_IDLE_CHECK, &dev->flags)) {
         clear_bit (EVENT_IDLE_CHECK, &dev->flags);
         //autosuspend_disabled should be enabled by shell cmd "echo auto > /sys/bus/usb/devices/X-XX/power/level"
-        if(dev->dynamicSuspend 
+        if(dev->dynamicSuspend
 #if ((LINUX_VERSION_CODE > KERNEL_VERSION(2,6,21)) && (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,35)))
 		&& !dev->udev->autosuspend_disabled
 #endif
 			){
-			if((dev->idleCount >= PM_IDLE_DELAY) && 
+			if((dev->idleCount >= PM_IDLE_DELAY) &&
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,31))
 				(atomic_read(&dev->uintf->pm_usage_cnt) > 0)){
 #else
 				(dev->uintf->pm_usage_cnt > 0)){
 #endif
-				
 				if(dev->chipDependFeatures[FEATURE_SUSPEND3]){
 					dev->suspendFlag |= AUTOSUSPEND_DYNAMIC_S3;
 				}else{
 					dev->suspendFlag |= AUTOSUSPEND_DYNAMIC;
 				}
-				
 				suspendDevice(dev);
 			}
 			if(dev->idleCount < PM_IDLE_DELAY)dev->idleCount++;
@@ -1293,18 +1283,18 @@ static void myevent(struct work_struct *work)
     }
 #endif //(LINUX_VERSION_CODE > KERNEL_VERSION(2,6,18)) && defined(CONFIG_PM)
     if (test_bit (EVENT_LINK_DOWN_DETACH, &dev->flags)) {
-    	clear_bit (EVENT_LINK_DOWN_DETACH, &dev->flags);
+		clear_bit (EVENT_LINK_DOWN_DETACH, &dev->flags);
 		if(dev->netDetach){
-        	dev->suspendFlag |= AUTOSUSPEND_DETACH;
+			dev->suspendFlag |= AUTOSUSPEND_DETACH;
 		}
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,18)) && defined(CONFIG_PM)
-		else if(dev->linkDownSuspend 
+		else if(dev->linkDownSuspend
 #if ((LINUX_VERSION_CODE > KERNEL_VERSION(2,6,21)) && (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,35)))
 		&& !dev->udev->autosuspend_disabled
-#endif		
+#endif
 		){
-        	dev->suspendFlag |= AUTOSUSPEND_LINKDOWN;
-        	suspendDevice(dev);
+			dev->suspendFlag |= AUTOSUSPEND_LINKDOWN;
+			suspendDevice(dev);
         }
 #endif //(LINUX_VERSION_CODE > KERNEL_VERSION(2,6,18)) && defined(CONFIG_PM)
     }
@@ -1338,7 +1328,7 @@ static void myevent(struct work_struct *work)
 
 #endif //(LINUX_VERSION_CODE > KERNEL_VERSION(2,6,18)) && defined(CONFIG_PM)
 	if (test_bit (EVENT_LINK_RESET, &dev->flags)) {
-		struct driver_info 	*info = dev->driver_info;
+		struct driver_info	*info = dev->driver_info;
 		int			retval = 0;
 
 		clear_bit (EVENT_LINK_RESET, &dev->flags);
@@ -1353,20 +1343,15 @@ static void myevent(struct work_struct *work)
 		if (test_bit (EVENT_LINK_UP, &dev->flags)) {
 		     clear_bit (EVENT_LINK_UP, &dev->flags);
 		     tasklet_schedule (&dev->bh);
-        
 	    }
         if (test_bit (EVENT_LINK_DOWN, &dev->flags)) {
 		     clear_bit (EVENT_LINK_DOWN, &dev->flags);
 		     unlink_urbs (dev, &dev->rxq);
-        
 	    }
-	       
 	}
 
-	
-
 	if (test_bit (EVENT_SET_MULTICAST, &dev->flags)) {
-		struct driver_info 	*info = dev->driver_info;
+		struct driver_info	*info = dev->driver_info;
 		int			retval = 0;
 
 		clear_bit (EVENT_SET_MULTICAST, &dev->flags);
@@ -1484,7 +1469,7 @@ static int smscusbnet_bundle_skb_ximt(struct usbnet *dev, struct sk_buff_head *q
 	int			retval = NET_XMIT_SUCCESS;
 	struct urb		*urb = NULL;
 
-	if((struct sk_buff *)q == q->next)return 	retval;
+	if((struct sk_buff *)q == q->next)return retval;
 
 	spin_lock_irqsave(&q->lock, flags);
 
@@ -1603,7 +1588,7 @@ int smscusbnet_start_xmit (struct sk_buff *skb, struct net_device *net)
 #else
     if(dev->uintf->pm_usage_cnt <= 0){
 #endif
-    	netif_stop_queue (net);
+		netif_stop_queue (net);
         smscusbnet_defer_myevent(dev, EVENT_IDLE_RESUME);
         return NET_XMIT_DROP;
     }
@@ -1624,8 +1609,6 @@ int smscusbnet_start_xmit (struct sk_buff *skb, struct net_device *net)
 	}
 
 	if(dev->tx_hold_on_completion){
-
-		
 			unsigned long		flags;
 			skb_queue_tail (&dev->tx_pending_q, skb);
 
@@ -1638,7 +1621,6 @@ int smscusbnet_start_xmit (struct sk_buff *skb, struct net_device *net)
 				retval = smscusbnet_bundle_skb_ximt(dev, &dev->tx_pending_q);
 			}
 			spin_unlock_irqrestore (&dev->txq.lock, flags);
-		
 	}else{
 
 		retval = smscusbnet_xmit(skb, net);
@@ -1804,13 +1786,13 @@ int
 smscusbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 {
 	struct usbnet			*dev = NULL;
-	struct net_device 		*net = NULL;
+	struct net_device		*net = NULL;
 	struct usb_host_interface	*interface = NULL;
 	struct driver_info		*info = NULL;
 	struct usb_device		*xdev = NULL;
 	int				status = 0;
 	char version[15];
-	
+
 	info = (struct driver_info *) prod->driver_info;
 	if (!info) {
 		return -ENODEV;
@@ -1872,7 +1854,6 @@ smscusbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 	dev->delay.data = (unsigned long) dev;
 	init_timer (&dev->delay);
 
-	
 	dev->StopLinkPolling=FALSE;
 	dev->LinkPollingTimer.function=smscusbnet_linkpolling;
 	dev->LinkPollingTimer.data=(unsigned long) dev;
@@ -2095,7 +2076,7 @@ static int __init smscusbnet_init(void)
 			< sizeof (struct skb_data));
 
 	random_ether_addr(node_id);
- 	return 0;
+	return 0;
 }
 module_init(smscusbnet_init);
 

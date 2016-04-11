@@ -2592,8 +2592,13 @@ static void tc300k_shutdown(struct i2c_client *client)
 {
 	struct tc300k_data *data = i2c_get_clientdata(client);
 
-	data->pdata->keyled(false);
-	data->pdata->power(false);
+	if (data->enabled) {
+		disable_irq(client->irq);
+		data->pdata->keyled(false);
+		data->led_on = false;
+		data->pdata->power(false);
+		data->enabled = false;
+	}
 }
 
 #if defined(CONFIG_PM)

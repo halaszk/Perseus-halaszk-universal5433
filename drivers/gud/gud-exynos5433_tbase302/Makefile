@@ -22,7 +22,8 @@ mcKernelApi-objs := MobiCoreKernelApi/main.o \
 		MobiCoreKernelApi/device.o \
 		MobiCoreKernelApi/session.o \
 		MobiCoreKernelApi/connection.o
-	
+
+obj-$(CONFIG_SECURE_OS_CONTROL) += sec-os-ctrl/
 obj-$(CONFIG_SECURE_OS_BOOSTER_API) += sec-os-booster/
 
 # Release mode by default

@@ -40,6 +40,8 @@
 #include "pm.h"
 #include "debug.h"
 
+uint8_t core_status = 0xff;
+
 /* MobiCore context data */
 static struct mc_context *ctx;
 static int disable_local_timer;
@@ -208,7 +210,7 @@ static void fastcall_work_func(struct work_struct *work)
 		fc_generic->as_in.param[0] = cpu_id[fc_generic->as_in.param[0]];
 	}
 
-	if (disable_local_timer) {
+	if (active_cpu == DEFAULT_BIG_CORE && disable_local_timer) {
 		irq_check_cnt++;
 		disable_irq(MC_INTR_LOCAL_TIMER);
 #ifdef CONFIG_SECURE_OS_BOOSTER_API
@@ -227,7 +229,7 @@ static void fastcall_work_func(struct work_struct *work)
 		if (fc_generic->as_out.ret == 0) {
 			cpumask_t cpu;
 			active_cpu = new_cpu;
-			MCDRV_DBG(mcd, "CoreSwap ok %d -> %d\n",
+			dev_info(mcd, "CoreSwap ok %d -> %d\n",
 				  raw_smp_processor_id(), active_cpu);
 			cpumask_clear(&cpu);
 			cpumask_set_cpu(active_cpu, &cpu);
@@ -235,7 +237,7 @@ static void fastcall_work_func(struct work_struct *work)
 			set_cpus_allowed(fastcall_thread, cpu);
 #endif
 		} else {
-			MCDRV_DBG(mcd, "CoreSwap failed %d -> %d\n",
+			dev_info(mcd, "CoreSwap failed %d -> %d\n",
 				  raw_smp_processor_id(),
 				  fc_generic->as_in.param[0]);
 		}
@@ -394,7 +396,7 @@ uint32_t mc_active_core(void)
 	return active_cpu;
 }
 
-int mc_switch_core(uint32_t core_num)
+int __mc_switch_core(uint32_t core_num)
 {
 	int32_t ret = 0;
 	union mc_fc_swich_core fc_switch_core;
@@ -416,7 +418,7 @@ int mc_switch_core(uint32_t core_num)
 		  "<- cmd=0x%08x, core_id=0x%08x\n",
 		 fc_switch_core.as_in.cmd,
 		 fc_switch_core.as_in.core_id);
-	MCDRV_DBG(mcd,
+	dev_info(mcd,
 		  "<- core_num=0x%08x, active_cpu=0x%08x\n",
 		 core_num, active_cpu);
 	mc_fastcall(&(fc_switch_core.as_generic));
@@ -428,8 +430,24 @@ int mc_switch_core(uint32_t core_num)
 	return ret;
 }
 
+int mc_switch_core(uint32_t core_num)
+{
+	int ret;
+	mutex_lock(&ctx->core_switch_lock);
+	if (!(core_status & (0x1<<core_num))){
+		MCDRV_DBG(mcd, "Core status... core #%d is off line\n",core_num);
+		mutex_unlock(&ctx->core_switch_lock);
+		return 1;
+	}
+	ret = __mc_switch_core(core_num);
+	mutex_unlock(&ctx->core_switch_lock);
+	return ret;
+}
+
 void mc_cpu_offfline(int cpu)
 {
+	mutex_lock(&ctx->core_switch_lock);
+	core_status &= ~(0x1<<cpu);
 	if (active_cpu == cpu) {
 		int i;
 		/* Chose the first online CPU and switch! */
@@ -440,12 +458,22 @@ void mc_cpu_offfline(int cpu)
 			}
 			MCDRV_DBG(mcd, "CPU %d is dying, switching to %d\n",
 				  cpu, i);
-			mc_switch_core(i);
+			mc_set_schedule_policy(DEFAULT_LITTLE_CORE);
+			__mc_switch_core(i);
 			break;
 		}
 	} else {
 		MCDRV_DBG(mcd, "not active CPU, no action taken\n");
 	}
+
+	mutex_unlock(&ctx->core_switch_lock);
+}
+
+void mc_cpu_online(int cpu)
+{
+	mutex_lock(&ctx->core_switch_lock);
+	core_status |= (0x1<<cpu);
+	mutex_unlock(&ctx->core_switch_lock);
 }
 
 static int mobicore_cpu_callback(struct notifier_block *nfb,
@@ -454,6 +482,9 @@ static int mobicore_cpu_callback(struct notifier_block *nfb,
 	unsigned int cpu = (unsigned long)hcpu;
 
 	switch (action) {
+	case CPU_ONLINE:
+		mc_cpu_online(cpu);
+		break;
 	case CPU_DOWN_PREPARE:
 	case CPU_DOWN_PREPARE_FROZEN:
 		mc_cpu_offfline(cpu);

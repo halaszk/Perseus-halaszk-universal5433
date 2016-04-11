@@ -232,6 +232,9 @@ struct device_driver {
 	const struct dev_pm_ops *pm;
 
 	struct driver_private *p;
+#ifdef CONFIG_MULTITHREAD_PROBE
+	unsigned int multithread_probe;
+#endif
 };
 
 

@@ -44,5 +44,5 @@ config TRUSTONIC_TRUSTED_UI_FB_BLANK
     default y
     depends on TRUSTONIC_TRUSTED_UI
 
-source "drivers/gud/gud-exynos5430/sec-os-ctrl/Kconfig"
-source "drivers/gud/gud-exynos5433/sec-os-booster/Kconfig"
+source "drivers/gud/gud-exynos5430_tbase302/sec-os-ctrl/Kconfig"
+source "drivers/gud/gud-exynos5430_tbase302/sec-os-booster/Kconfig"

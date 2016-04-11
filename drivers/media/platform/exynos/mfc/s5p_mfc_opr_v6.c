@@ -890,7 +890,6 @@ int s5p_mfc_set_dec_stream_buffer(struct s5p_mfc_ctx *ctx, dma_addr_t buf_addr,
 	if (ctx->state == MFCINST_GOT_INST && strm_size == 0)
 		mfc_info_ctx("stream size is 0\n");
 
-
 	WRITEL(strm_size, S5P_FIMV_D_STREAM_DATA_SIZE);
 	WRITEL(buf_addr, S5P_FIMV_D_CPB_BUFFER_ADDR);
 	WRITEL(cpb_buf_size, S5P_FIMV_D_CPB_BUFFER_SIZE);
@@ -1177,6 +1176,8 @@ int s5p_mfc_set_enc_stream_buffer(struct s5p_mfc_ctx *ctx,
 		dma_addr_t addr, unsigned int size)
 {
 	struct s5p_mfc_dev *dev = ctx->dev;
+
+	size = ALIGN(size, 512);
 
 	WRITEL(addr, S5P_FIMV_E_STREAM_BUFFER_ADDR); /* 16B align */
 	WRITEL(size, S5P_FIMV_E_STREAM_BUFFER_SIZE);

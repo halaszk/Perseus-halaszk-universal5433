@@ -534,6 +534,48 @@ int detach_ps_cable(muic_data_t *pmuic)
 	return ret;
 }
 
+int attach_mmdock(muic_data_t *pmuic,
+			muic_attached_dev_t new_dev, u8 vbvolt)
+{
+	struct vendor_ops *pvendor = pmuic->regmapdesc->vendorops;
+
+	pr_info("%s:%s new_dev=%d, vbvolt=%d\n", MUIC_DEV_NAME, __func__, new_dev, vbvolt);
+
+	if (pvendor) {
+		pr_info("%s: ", __func__);
+		pvendor->attach_mmdock(pmuic->regmapdesc, vbvolt);
+	} else
+		pr_info("%s: No Vendor API ready.\n", __func__);
+
+	if (vbvolt)
+		pr_info("%s:%s vbus. updated attached_dev.\n", MUIC_DEV_NAME, __func__);
+	else {
+		pr_info("%s:%s no vbus. discarded.\n", MUIC_DEV_NAME, __func__);
+		return 0;
+	}
+
+	pmuic->attached_dev = new_dev;
+
+	return 0;
+}
+
+int detach_mmdock(muic_data_t *pmuic)
+{
+	struct vendor_ops *pvendor = pmuic->regmapdesc->vendorops;
+
+	pr_info("%s:%s attached_dev type(%d)\n", MUIC_DEV_NAME, __func__,
+			pmuic->attached_dev);
+
+	if (pvendor) {
+		pr_info("%s: ", __func__);
+		pvendor->detach_mmdock(pmuic->regmapdesc);
+	} else
+		pr_info("%s: No Vendor API ready.\n", __func__);
+
+	pmuic->attached_dev = ATTACHED_DEV_NONE_MUIC;
+
+	return 0;
+}
 int attach_deskdock(muic_data_t *pmuic,
 			muic_attached_dev_t new_dev)
 {

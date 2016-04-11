@@ -24,6 +24,7 @@
 #include <linux/smpboot.h>
 #include <linux/tick.h>
 
+#include <mach/exynos-ss.h>
 #define CREATE_TRACE_POINTS
 #include <trace/events/irq.h>
 
@@ -254,8 +255,10 @@ restart:
 			kstat_incr_softirqs_this_cpu(vec_nr);
 
 			trace_softirq_entry(vec_nr);
+			exynos_ss_softirq(ESS_FLAG_SOFTIRQ, h->action, irqs_disabled(), ESS_FLAG_IN);
 			sec_debug_softirq_log(9999, h->action, 7);
 			h->action(h);
+			exynos_ss_softirq(ESS_FLAG_SOFTIRQ, h->action, irqs_disabled(), ESS_FLAG_OUT);
 			sec_debug_softirq_log(9999, h->action, 8);
 			trace_softirq_exit(vec_nr);
 #ifdef CONFIG_SEC_DEBUG_RT_THROTTLE_ACTIVE
@@ -506,8 +509,12 @@ static void tasklet_action(struct softirq_action *a)
 #endif
 				if (!test_and_clear_bit(TASKLET_STATE_SCHED, &t->state))
 					BUG();
+				exynos_ss_softirq(ESS_FLAG_SOFTIRQ_TASKLET,
+							t->func, irqs_disabled(), ESS_FLAG_IN);
 				sec_debug_softirq_log(9997, t->func, 7);
 				t->func(t->data);
+				exynos_ss_softirq(ESS_FLAG_SOFTIRQ_TASKLET,
+							t->func, irqs_disabled(), ESS_FLAG_OUT);
 				sec_debug_softirq_log(9997, t->func, 8);
 #ifdef CONFIG_SEC_DEBUG_RT_THROTTLE_ACTIVE
 				end_time = sec_debug_clock();
@@ -554,8 +561,12 @@ static void tasklet_hi_action(struct softirq_action *a)
 #endif
 				if (!test_and_clear_bit(TASKLET_STATE_SCHED, &t->state))
 					BUG();
+				exynos_ss_softirq(ESS_FLAG_SOFTIRQ_HI_TASKLET,
+							t->func, irqs_disabled(), ESS_FLAG_IN);
 				sec_debug_softirq_log(9998, t->func, 7);
 				t->func(t->data);
+				exynos_ss_softirq(ESS_FLAG_SOFTIRQ_HI_TASKLET,
+							t->func, irqs_disabled(), ESS_FLAG_OUT);
 				sec_debug_softirq_log(9998, t->func, 8);
 #ifdef CONFIG_SEC_DEBUG_RT_THROTTLE_ACTIVE
 				end_time = sec_debug_clock();

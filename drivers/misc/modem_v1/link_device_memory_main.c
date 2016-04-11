@@ -104,20 +104,22 @@ static inline void purge_txq(struct mem_link_device *mld)
 {
 	struct link_device *ld = &mld->link_dev;
 	int i;
-
+	struct sk_buff *skb;
 	/* Purge the skb_q in every TX RB */
 	if (ld->sbd_ipc) {
 		struct sbd_link_device *sl = &mld->sbd_link_dev;
 		for (i = 0; i < sl->num_channels; i++) {
 			struct sbd_ring_buffer *rb = sbd_id2rb(sl, i, TX);
-			skb_queue_purge(&rb->skb_q);
+			while ((skb = skb_dequeue(&rb->skb_q)) != NULL)
+				dev_kfree_skb_any(skb);
 		}
 	}
 
 	/* Purge the skb_txq in every IPC device (IPC_FMT, IPC_RAW, etc.) */
 	for (i = 0; i < MAX_SIPC5_DEVICES; i++) {
 		struct mem_ipc_device *dev = mld->dev[i];
-		skb_queue_purge(dev->skb_txq);
+		while ((skb = skb_dequeue(dev->skb_txq)) != NULL)
+			dev_kfree_skb_any(skb);
 	}
 }
 
@@ -176,6 +178,12 @@ static enum hrtimer_restart sbd_tx_timer_func(struct hrtimer *timer)
 	need_schedule = false;
 	mask = 0;
 
+#ifdef CONFIG_LINK_POWER_MANAGEMENT
+	if (cp_online(mc) && mld->forbid_cp_sleep) {
+		mld->forbid_cp_sleep(mld, REFCNT_SBD);
+	}
+#endif
+
 	spin_lock_irqsave(&mc->lock, flags);
 	if (unlikely(!ipc_active(mld))) {
 		spin_unlock_irqrestore(&mc->lock, flags);
@@ -195,6 +203,7 @@ static enum hrtimer_restart sbd_tx_timer_func(struct hrtimer *timer)
 		int ret;
 
 		ret = tx_frames_to_rb(rb);
+
 		if (unlikely(ret < 0)) {
 			if (ret == -EBUSY || ret == -ENOSPC) {
 				need_schedule = true;
@@ -241,6 +250,11 @@ exit:
 	if (need_schedule) {
 		ktime_t ktime = ktime_set(0, ms2ns(TX_PERIOD_MS));
 		hrtimer_start(timer, ktime, HRTIMER_MODE_REL);
+#ifdef CONFIG_LINK_POWER_MANAGEMENT
+	} else {
+		if (mld->permit_cp_sleep)
+			mld->permit_cp_sleep(mld, REFCNT_SBD);
+#endif
 	}
 
 	return HRTIMER_NORESTART;
@@ -275,11 +289,6 @@ static int xmit_ipc_to_rb(struct mem_link_device *mld, enum sipc_ch_id ch,
 
 	skb_txq = &rb->skb_q;
 
-#ifdef CONFIG_LINK_POWER_MANAGEMENT
-	if (cp_online(mc) && mld->forbid_cp_sleep)
-		mld->forbid_cp_sleep(mld);
-#endif
-
 	spin_lock_irqsave(&rb->lock, flags);
 
 	if (unlikely(skb_txq->qlen >= MAX_SKB_TXQ_DEPTH)) {
@@ -299,11 +308,6 @@ static int xmit_ipc_to_rb(struct mem_link_device *mld, enum sipc_ch_id ch,
 	}
 
 	spin_unlock_irqrestore(&rb->lock, flags);
-
-#ifdef CONFIG_LINK_POWER_MANAGEMENT
-	if (cp_online(mc) && mld->permit_cp_sleep)
-		mld->permit_cp_sleep(mld);
-#endif
 
 	return ret;
 }
@@ -631,31 +635,32 @@ static int mem_init_comm(struct link_device *ld, struct io_device *iod)
 	int fmt2rfs = (SIPC5_CH_ID_RFS_0 - SIPC5_CH_ID_FMT_0);
 	int rfs2fmt = (SIPC5_CH_ID_FMT_0 - SIPC5_CH_ID_RFS_0);
 
-	if (atomic_read(&mld->cp_boot_done))
+	if (sipc5_udl_ch(id))
 		return 0;
 
+	if (atomic_read(&mld->cp_boot_done)) {
 #ifdef CONFIG_LINK_CONTROL_MSG_IOSM
-	if (mld->iosm) {
 		struct sbd_link_device *sl = &mld->sbd_link_dev;
 		struct sbd_ipc_device *sid = sbd_ch2dev(sl, iod->id);
 
-		if (atomic_read(&sid->config_done)) {
+		if (sid && atomic_read(&sid->config_done)) {
 			tx_iosm_message(mld, IOSM_A2C_OPEN_CH, (u32 *)&id);
-			return 0;
 		} else {
 			mif_err("%s isn't configured channel\n", iod->name);
 			return -ENODEV;
 		}
-	}
 #endif
+		return 0;
+	}
 
 	switch (id) {
 	case SIPC5_CH_ID_FMT_0 ... SIPC5_CH_ID_FMT_9:
+		tx_iosm_message(mld, IOSM_A2C_OPEN_CH, (u32 *)&id);
 		check_iod = link_get_iod_with_channel(ld, (id + fmt2rfs));
 		if (check_iod ? atomic_read(&check_iod->opened) : true) {
 			mif_err("%s: %s->INIT_END->%s\n",
 				ld->name, iod->name, mc->name);
-			send_ipc_irq(mld, cmd2int(CMD_INIT_END));
+			__tx_iosm_message(mld, IOSM_A2C_INIT_END);
 			atomic_set(&mld->cp_boot_done, 1);
 		} else {
 			mif_err("%s is not opened yet\n", check_iod->name);
@@ -663,21 +668,24 @@ static int mem_init_comm(struct link_device *ld, struct io_device *iod)
 		break;
 
 	case SIPC5_CH_ID_RFS_0 ... SIPC5_CH_ID_RFS_9:
+		tx_iosm_message(mld, IOSM_A2C_OPEN_CH, (u32 *)&id);
 		check_iod = link_get_iod_with_channel(ld, (id + rfs2fmt));
 		if (check_iod) {
 			if (atomic_read(&check_iod->opened)) {
 				mif_err("%s: %s->INIT_END->%s\n",
 					ld->name, iod->name, mc->name);
-				send_ipc_irq(mld, cmd2int(CMD_INIT_END));
+				__tx_iosm_message(mld, IOSM_A2C_INIT_END);
 				atomic_set(&mld->cp_boot_done, 1);
 			} else {
 				mif_err("%s not opened yet\n", check_iod->name);
 			}
 		}
 		break;
-
+#ifdef CONFIG_LINK_CONTROL_MSG_IOSM
 	default:
-		break;
+		mif_err("%s channel is not ready\n", iod->name);
+		return -ENODEV;
+#endif
 	}
 
 	return 0;
@@ -692,12 +700,16 @@ static int mem_init_comm(struct link_device *ld, struct io_device *iod)
 */
 static void mem_terminate_comm(struct link_device *ld, struct io_device *iod)
 {
-#ifdef CONFIG_LINK_CONTROL_MSG_IOSM
 	struct mem_link_device *mld = to_mem_link_device(ld);
+#ifdef CONFIG_LINK_CONTROL_MSG_IOSM
+	struct sbd_link_device *sl = &mld->sbd_link_dev;
+	struct sbd_ipc_device *sid = sbd_ch2dev(sl, iod->id);
 
-	if (mld->iosm)
+	if (sid && atomic_read(&mld->cp_boot_done))
 		tx_iosm_message(mld, IOSM_A2C_CLOSE_CH, (u32 *)&iod->id);
 #endif
+	if (sipc5_udl_ch(iod->id) && !atomic_read(&iod->opened))
+		atomic_set(&mld->cp_boot_done, 0);
 }
 
 /**
@@ -780,6 +792,10 @@ static void mem_boot_on(struct link_device *ld, struct io_device *iod)
 		memset(mld->base + CMD_RGN_OFFSET, 0, CMD_RGN_SIZE);
 		mif_info("Control message region has been initialized\n");
 	}
+
+#ifdef CONFIG_LINK_CONTROL_MSG_IOSM
+	iowrite32(IOSM_MAGIC, mld->base + CMD_RGN_OFFSET + IOSM_MAGIC_OFFSET);
+#endif
 
 	purge_txq(mld);
 }

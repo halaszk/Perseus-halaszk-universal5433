@@ -18,6 +18,7 @@
 
 #include <trace/events/irq.h>
 
+#include <mach/exynos-ss.h>
 #include <linux/sec_debug.h>
 
 #include "internals.h"
@@ -146,7 +147,9 @@ handle_irq_event_percpu(struct irq_desc *desc, struct irqaction *action)
 #endif
 		sec_debug_irq_log(irq, (void *)action->handler, 1);
 		trace_irq_handler_entry(irq, action);
+		exynos_ss_irq(irq, (void *)action->handler, (int)irqs_disabled(), ESS_FLAG_IN);
 		res = action->handler(irq, action->dev_id);
+		exynos_ss_irq(irq, (void *)action->handler, (int)irqs_disabled(), ESS_FLAG_OUT);
 		trace_irq_handler_exit(irq, action, res);
 		sec_debug_irq_log(irq, (void *)action->handler, 2);
 #ifdef CONFIG_SEC_DEBUG_RT_THROTTLE_ACTIVE

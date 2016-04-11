@@ -24,7 +24,6 @@
 #include <linux/sec_sysfs.h>
 #include <linux/platform_device.h>
 #include <linux/platform_data/modem.h>
-
 #include <plat/usb-phy.h>
 
 #include "modem_prj.h"
@@ -569,10 +568,9 @@ static int link_pm_usb_resume(struct usb_device *udev, pm_message_t msg)
 		mif_info("due to dpm_suspending, %s will be resumed later(pm event: %x)\n",
 			dev_name(&udev->dev), msg.event);
 		udev->can_submit = 0;
-
 		return -EBUSY;
 	}
-
+	
 	mif_debug("%s - dir: %d status: %d pm event: %x pm state: %d/%d\n",
 		dev_name(&udev->dev), dir, status, msg.event,
 		pmdata->udev->state, pmdata->hdev->state);
@@ -799,6 +797,25 @@ static void link_pm_clear_udev_runtime_error(struct usb_device *udev)
 	spin_unlock_irqrestore(&dev->power.lock, flags);
 }
 
+void clear_runtime_error_nowait(struct device *dev)
+{
+	unsigned long flags;
+	int loop = 1;
+
+	if (dev->parent)
+		loop++;
+	
+	while (loop-- && dev->power.runtime_error == -EBUSY && 
+			dev->power.runtime_status == RPM_SUSPENDED) {
+		mif_debug("%s: runtime error cleared\n", dev_name(dev));
+		spin_lock_irqsave(&dev->power.lock, flags);
+		dev->power.runtime_error = 0;
+		spin_unlock_irqrestore(&dev->power.lock, flags);
+
+		dev = dev->parent;
+	}
+}
+
 static int link_pm_notify(struct notifier_block *nfb,
 					unsigned long event, void *arg)
 {
@@ -808,16 +825,22 @@ static int link_pm_notify(struct notifier_block *nfb,
 	if (!pmdata)
 		return NOTIFY_DONE;
 
-	mif_debug("event: %ld\n", event);
+	mif_debug("event++: %ld\n", event);
 
 	switch (event) {
 	case PM_SUSPEND_PREPARE:
-		if (!wake_lock_active(&pmdata->wake))
+		if (!wake_lock_active(&pmdata->wake)) {
 			atomic_set(&pmdata->dpm_suspending, 1);
+			mif_debug("%s: dpm_suspending set\n", __func__);
+		}
 		break;
 	case PM_POST_SUSPEND:
 		atomic_set(&pmdata->dpm_suspending, 0);
+		mif_debug("%s: dpm_suspending cleared\n", __func__);
+
 		if (wake_lock_active(&pmdata->wake)) {
+			mif_debug("%s: rpm error cleared\n", __func__);
+
 			link_pm_clear_udev_runtime_error(pmdata->hdev);
 			link_pm_clear_udev_runtime_error(pmdata->udev);
 
@@ -825,6 +848,8 @@ static int link_pm_notify(struct notifier_block *nfb,
 		}
 		break;
 	}
+
+	mif_debug("event--: \n");
 
 	return NOTIFY_DONE;
 }
@@ -1004,7 +1029,8 @@ static irqreturn_t link_pm_hostwake_handler(int irq, void *data)
 	hostwake = gpio_get_value(pdata->gpio_link_hostwake);
 	hostactive = gpio_get_value(pdata->gpio_link_active);
 
-	mif_debug("hostwake: %d\n", hostwake);
+	mif_debug("hostwake: %d, rpm evalue: %d \n", hostwake, 
+			pmdata->udev->dev.power.runtime_error);
 
 	irq_set_irq_type(irq, hostwake ? IRQF_TRIGGER_LOW : IRQF_TRIGGER_HIGH);
 
@@ -1031,7 +1057,10 @@ static irqreturn_t link_pm_hostwake_handler(int irq, void *data)
 			if (atomic_read(&pmdata->dpm_suspending))
 				log = "start later(dpm_suspending)";
 			else {
-				pm_request_resume(&pmdata->udev->dev);
+				struct device *dev = &pmdata->udev->dev;
+
+				clear_runtime_error_nowait(dev);
+				pm_request_resume(dev);
 				log = "start";
 			}
 		}

@@ -34,7 +34,7 @@
 
 #define MFD_DEV_NAME "max77804"
 
-#ifdef CONFIG_VIBETONZ
+#ifdef CONFIG_MOTOR_DRV_MAX77804
 #define MOTOR_LRA			(1<<7)
 #define MOTOR_EN			(1<<6)
 #define EXT_PWM				(0<<5)
@@ -74,7 +74,7 @@ struct max77804_platform_data {
 
 	int num_regulators;
 	struct max77804_regulator_data *regulators;
-#ifdef CONFIG_VIBETONZ
+#ifdef CONFIG_MOTOR_DRV_MAX77804
 	/* haptic motor data */
 	struct max77804_haptic_platform_data *haptic_data;
 #endif

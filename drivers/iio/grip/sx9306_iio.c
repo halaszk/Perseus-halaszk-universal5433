@@ -454,8 +454,7 @@ static int sx9306_save_caldata(struct sx9306_p *data)
 	set_fs(KERNEL_DS);
 
 	cal_filp = filp_open(CALIBRATION_FILE_PATH,
-			O_CREAT | O_TRUNC | O_WRONLY | O_SYNC,
-			S_IRUGO | S_IWUSR | S_IWGRP);
+			O_CREAT | O_TRUNC | O_WRONLY | O_SYNC, 0660);
 	if (IS_ERR(cal_filp)) {
 		pr_err("[SX9306]: %s - Can't open calibration file\n",
 			__func__);
@@ -487,8 +486,7 @@ static void sx9306_open_caldata(struct sx9306_p *data)
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
 
-	cal_filp = filp_open(CALIBRATION_FILE_PATH, O_RDONLY,
-			S_IRUGO | S_IWUSR | S_IWGRP);
+	cal_filp = filp_open(CALIBRATION_FILE_PATH, O_RDONLY, 0);
 	if (IS_ERR(cal_filp)) {
 		ret = PTR_ERR(cal_filp);
 		if (ret != -ENOENT)

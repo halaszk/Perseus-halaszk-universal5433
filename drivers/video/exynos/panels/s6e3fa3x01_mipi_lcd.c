@@ -360,35 +360,6 @@ static int s6e3fa3x01_read_tset(struct lcd_info *lcd)
 	return ret;
 }
 
-static void s6e3fa3x01_update_seq(struct lcd_info *lcd)
-{
-#if 0
-	u8 id = lcd->id[2];
-
-	/* Panel revision history
-		0x00: Rev A, B, C
-		0x01: Rev D, E, F
-		0x02: Rev G,
-		0x12: Rev H
-		0x13: Rev I, J */
-
-	if (id < 0x02) { /* Panel rev.A ~ rev.F */
-		/* Panel Command */
-		pSEQ_AOR_CONTROL = SEQ_AOR_CONTROL_RevF;
-		pELVSS_DIM_TABLE = ELVSS_DIM_TABLE_RevF;
-		ELVSS_STATUS_MAX = ARRAY_SIZE(ELVSS_DIM_TABLE_RevF);
-		pELVSS_TABLE = ELVSS_TABLE_RevF;
-
-		/* Dynamic AID parameta */
-		paor_cmd = aor_cmd_revF;
-	}
-
-	if (id < 0x12) { /* Panel rev.A ~ rev.G */
-		pSEQ_TOUCH_HSYNC_ON = SEQ_TOUCH_HSYNC_ON_RevG;
-	}
-#endif
-}
-
 static int get_backlight_level_from_brightness(int brightness)
 {
 	int backlightlevel = DEFAULT_GAMMA_INDEX;
@@ -440,26 +411,21 @@ exit:
 
 static int s6e3fa3x01_set_acl(struct lcd_info *lcd, u8 force)
 {
-	int ret = 0, level = ACL_STATUS_15P;
+	int ret = 0, level = ACL_STATUS_8P;
 
-	if (lcd->siop_enable || LEVEL_IS_HBM(lcd->auto_brightness))
-		goto acl_update;
-
-	if (!lcd->acl_enable)
+	if(DIM_TABLE[lcd->bl] == 360 && (lcd->bl != lcd->current_bl)) {
 		level = ACL_STATUS_0P;
-
-acl_update:
-	if (force || lcd->current_acl != ACL_CUTOFF_TABLE[level][1]) {
-		if (level || LEVEL_IS_HBM(lcd->auto_brightness))
-			ret = s6e3fa3x01_write(lcd, SEQ_ACL_ON_OPR_AVR, ARRAY_SIZE(SEQ_ACL_ON_OPR_AVR));
-		else
-			ret = s6e3fa3x01_write(lcd, SEQ_ACL_OFF_OPR_AVR, ARRAY_SIZE(SEQ_ACL_OFF_OPR_AVR));
-
+		ret = s6e3fa3x01_write(lcd, SEQ_ACL_OFF_OPR_AVR, ARRAY_SIZE(SEQ_ACL_OFF_OPR_AVR));
 		ret = s6e3fa3x01_write(lcd, ACL_CUTOFF_TABLE[level], ACL_PARAM_SIZE);
-		lcd->current_acl = ACL_CUTOFF_TABLE[level][1];
-
-		dev_info(&lcd->ld->dev, "acl: %d, auto_brightness: %d\n", lcd->current_acl, lcd->auto_brightness);
+	} else if((DIM_TABLE[lcd->bl] != 360) && (lcd->current_acl != 0x02)) {
+		level = ACL_STATUS_8P;
+		ret = s6e3fa3x01_write(lcd, SEQ_ACL_ON_OPR_AVR, ARRAY_SIZE(SEQ_ACL_ON_OPR_AVR));
+		ret = s6e3fa3x01_write(lcd, ACL_CUTOFF_TABLE[level], ACL_PARAM_SIZE);
 	}
+
+	lcd->current_acl = ACL_CUTOFF_TABLE[level][1];
+
+	dev_info(&lcd->ld->dev, "acl: %d, auto_brightness: %d\n", lcd->current_acl, lcd->auto_brightness);
 
 	if (!ret)
 		ret = -EPERM;
@@ -491,37 +457,49 @@ static int s6e3fa3x01_set_elvss(struct lcd_info *lcd, u8 force)
 
 	elvss.hbm = lcd->elvss_hbm[0];	// normal brightness
 
-	if(lcd->temperature <= -20 && nit >= 6) elvss.hbm -= 0x04;
+	if(lcd->temperature <= -20 && nit >= 20) elvss.hbm -= 0x04;
 
-	if( nit < 6) {
+	if( nit < 20) {
 		if (lcd->temperature <= 0 && lcd->temperature > -20 ){
 			switch(nit) {
-				case 5:
-					elvss.hbm += 0x01;
+				case 2 ... 11:
+					elvss.hbm = 0x18;
 					break;
-				case 4:
+				case 12 ... 15:
+					elvss.hbm += 0x09;
+					break;
+				case 16:
+					elvss.hbm += 0x07;
+					break;
+				case 17:
+					elvss.hbm += 0x05;
+					break;
+				case 19:
 					elvss.hbm += 0x02;
-					break;
-				case 3:
-					elvss.hbm += 0x03;
-					break;
-				case 2:
-					elvss.hbm += 0x04;
 					break;
 			}
 		} else if( lcd->temperature <= -20 ) {
 			switch(nit) {
-				case 5:
-					elvss.hbm -= 0x03;
+				case 2 ... 11:
+					elvss.hbm = 0x17;
 					break;
-				case 4:
-					elvss.hbm -= 0x02;
+				case 12 ... 15:
+					elvss.hbm += 0x08;
 					break;
-				case 3:
-					elvss.hbm -= 0x01;
+				case 16:
+					elvss.hbm += 0x06;
+					break;
+				case 17:
+					elvss.hbm += 0x04;
+					break;
+				case 19:
+					elvss.hbm += 0x01;
 					break;
 			}
+		} else if( lcd->temperature > 0 && nit <= 11 ) {
+			elvss.hbm = 0x0F;
 		}
+
 	}
 
 
@@ -551,24 +529,24 @@ static int s6e3fa3x01_set_vint(struct lcd_info *lcd, u8 force)
 	int ret = 0, i, level;
 	u32 nit;
 
-	nit = index_brightness_table[lcd->bl];
-	level = VINT_STATUS_014;
+	nit = DIM_TABLE[lcd->bl];
+	level = VINT_STATUS_550;
 	for (i = 0; i < VINT_STATUS_MAX; i++) {
 		if (nit <= VINT_DIM_TABLE[i]) {
 			level = i;
 			break;
 		}
 	}
-
-	if(lcd->vint_table[level][2] != VINT_TABLE[level] && lcd->temperature > -20)
-		lcd->vint_table[level][2] = VINT_TABLE[level];
-	else if(lcd->temperature <= -20)
+	if(lcd->temperature <= -20)
 		lcd->vint_table[level][2] = 0x1E;
+	else if(lcd->vint_table[level][2] != VINT_TABLE[level] && lcd->temperature > -20)
+		lcd->vint_table[level][2] = VINT_TABLE[level];
+
 
 	if (force || lcd->current_vint != VINT_TABLE[level]) {
 		ret = s6e3fa3x01_write(lcd, lcd->vint_table[level], VINT_PARAM_SIZE);
 		lcd->current_vint = VINT_TABLE[level];
-		dev_info(&lcd->ld->dev, "vint: %x\n", lcd->current_vint);
+		dev_info(&lcd->ld->dev, "vint: %x, candella =%d\n", lcd->current_vint, DIM_TABLE[lcd->bl]);
 	}
 
 	if (!ret)
@@ -1091,6 +1069,8 @@ static int s6e3fa3x01_ldi_init(struct lcd_info *lcd)
 	s6e3fa3x01_write(lcd, SEQ_TEST_KEY_ON_FC, ARRAY_SIZE(SEQ_TEST_KEY_ON_FC));
 	s6e3fa3x01_write(lcd, SEQ_SLEEP_OUT, ARRAY_SIZE(SEQ_SLEEP_OUT));
 	msleep(20);
+	s6e3fa3x01_write(lcd, SEQ_MIC_DISABLE, ARRAY_SIZE(SEQ_MIC_DISABLE));
+
 	s6e3fa3x01_write(lcd, SEQ_SET_TE_LINE, ARRAY_SIZE(SEQ_SET_TE_LINE));
 
 	s6e3fa3x01_read_id(lcd, lcd->id);
@@ -1197,6 +1177,7 @@ static int s6e3fa3x01_power_off(struct lcd_info *lcd)
 	mutex_lock(&lcd->bl_lock);
 	lcd->ldi_enable = 0;
 	mutex_unlock(&lcd->bl_lock);
+	lcd->current_acl = 0;
 
 	ret = s6e3fa3x01_ldi_disable(lcd);
 
@@ -1845,7 +1826,6 @@ static int s6e3fa3x01_probe(struct mipi_dsim_device *dsim)
 
 	s6e3fa3x01_write(lcd, SEQ_TEST_KEY_ON_F0, ARRAY_SIZE(SEQ_TEST_KEY_ON_F0));
 	s6e3fa3x01_read_id(lcd, lcd->id);
-	s6e3fa3x01_update_seq(lcd);
 	s6e3fa3x01_read_ddi_id(lcd, lcd->ddi_id);
 	s6e3fa3x01_read_coordinate(lcd);
 	s6e3fa3x01_read_mtp(lcd, mtp_data);

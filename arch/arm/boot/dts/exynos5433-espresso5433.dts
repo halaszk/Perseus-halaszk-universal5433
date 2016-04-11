@@ -27,7 +27,7 @@
 	};
 
 	chosen {
-		bootargs = "console=ttySAC2,115200 vmalloc=256M ess_setup=0x26000000";
+		bootargs = "console=ttySAC2,115200 vmalloc=256M ess_setup=0x26000000 androidboot.hardware=espresso5433";
 	};
 
 	fixed-rate-clocks {

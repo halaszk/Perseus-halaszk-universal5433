@@ -274,6 +274,14 @@ config SEC_FACTORY
         help
           It will support a sec factory mode
 
+config SEC_FACTORY_BOOT_CLOCK_LIMIT_1G
+        bool "AP clock limitation when factory mode boot while specified time"
+        depends on SEC_FACTORY
+        default n
+        help
+          This option is for newly added Exynos54xx project after A8 to limit
+          AP clock(1G) when factory mode boot while specified time(360sec).
+
 source "init/Kconfig"
 
 source "kernel/Kconfig.freezer"

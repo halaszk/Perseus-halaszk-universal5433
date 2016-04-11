@@ -848,6 +848,9 @@ static int irda_accept(struct socket *sock, struct socket *newsock, int flags)
 	struct sk_buff *skb;
 	int err;
 
+	if (protocol < 0 || protocol > SK_PROTOCOL_MAX)
+		return -EINVAL;
+
 	IRDA_DEBUG(2, "%s()\n", __func__);
 
 	err = irda_create(sock_net(sk), newsock, sk->sk_protocol, 0);

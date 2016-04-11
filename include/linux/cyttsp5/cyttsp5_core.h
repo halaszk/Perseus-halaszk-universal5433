@@ -53,7 +53,7 @@ __stringify(CY_DRIVER_NAME)		    \
 
 /* FW VERSION */
 #define CY_HW_VERSION 0x01
-#define CY_FW_VERSION 0x0f00
+#define CY_FW_VERSION 0x1000
 
 enum cyttsp5_core_platform_flags {
 	CY_CORE_FLAG_NONE,

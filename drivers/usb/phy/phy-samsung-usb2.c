@@ -29,10 +29,15 @@
 #include <linux/usb/otg.h>
 #include <linux/usb/samsung_usb_phy.h>
 #include <linux/platform_data/samsung-usbphy.h>
+#ifdef CONFIG_PM_RUNTIME
+#include <mach/regs-clock.h>
+#endif
 
 #include "phy-samsung-usb.h"
 
+#ifndef CONFIG_MACH_XYREF5422
 #define EXYNOS5_PICO_SLEEP
+#endif
 
 static int samsung_usbphy_set_host(struct usb_otg *otg, struct usb_bus *host)
 {
@@ -53,6 +58,76 @@ static bool exynos5_phyhost_is_on(void __iomem *regs)
 
 	return !(reg & HOST_CTRL0_SIDDQ);
 }
+
+#ifdef CONFIG_PM_RUNTIME
+static void s5p_ehci_set_ignore(void)
+{
+#if defined(CONFIG_SOC_EXYNOS5430) || defined(CONFIG_SOC_EXYNOS5433)
+	u32 reg;
+
+	reg = __raw_readl(EXYNOS5430_SRC_IGNORE_FSYS2);
+	pr_info("%s (0x%08x)\n", __func__, reg);
+
+	reg |= (1 << 20) | (1 << 16) | (1 << 12) | (1 << 8);
+	__raw_writel(reg, EXYNOS5430_SRC_IGNORE_FSYS2);
+
+	reg = __raw_readl(EXYNOS5430_SRC_IGNORE_FSYS2);
+	pr_info("%s (0x%08x)\n", __func__, reg);
+#endif
+}
+
+static void s5p_ehci_clear_ignore(void)
+{
+#if defined(CONFIG_SOC_EXYNOS5430) || defined(CONFIG_SOC_EXYNOS5433)
+	u32 reg;
+
+	reg = __raw_readl(EXYNOS5430_SRC_IGNORE_FSYS2);
+	pr_info("%s (0x%08x)\n", __func__, reg);
+
+	reg &= ~((1 << 20) | (1 << 16) | (1 << 12) | (1 << 8));
+	__raw_writel(reg, EXYNOS5430_SRC_IGNORE_FSYS2);
+
+	reg = __raw_readl(EXYNOS5430_SRC_IGNORE_FSYS2);
+	pr_info("%s (0x%08x)\n", __func__, reg);
+#endif
+}
+#endif
+
+#ifdef CONFIG_ERICSSON_MODEM_CLK_RESET
+static void samsung_exynos5_usb2phy_reset(struct samsung_usbphy *sphy)
+{
+	void __iomem *regs = sphy->regs;
+	u32 phyclk, temp;
+	u32 phyhost;
+	u32 count = 50;
+
+	phyclk = __raw_readl(EXYNOS5430_SRC_STAT_FSYS2);
+	temp = phyclk & ((0x4<<16) | (0x4<<8));
+
+	while (temp)
+	{
+		dev_info(sphy->dev, "retry reset (0x%08x)\n", phyclk);
+
+		phyhost = readl(regs + EXYNOS5_PHY_HOST_CTRL0);
+		phyhost |= HOST_CTRL0_PHYSWRST;
+		writel(phyhost, regs + EXYNOS5_PHY_HOST_CTRL0);
+		udelay(20);
+
+		phyhost &= ~HOST_CTRL0_PHYSWRST;
+		writel(phyhost, regs + EXYNOS5_PHY_HOST_CTRL0);
+		udelay(10);
+
+		count--;
+		if(!count) {
+			dev_err(sphy->dev, "%s timeout\n", __func__);
+			return;
+		}
+
+		phyclk = __raw_readl(EXYNOS5430_SRC_STAT_FSYS2);
+	        temp = phyclk & ((0x4<<16) | (0x4<<8));
+	}
+}
+#endif
 
 static void samsung_exynos5_usb2phy_enable(struct samsung_usbphy *sphy)
 {
@@ -139,7 +214,9 @@ static void samsung_exynos5_usb2phy_enable(struct samsung_usbphy *sphy)
 			OTG_SYS_LINKSWRST_UOTG |
 			OTG_SYS_PHYLINK_SWRESET);
 	writel(phyotg, regs + EXYNOS5_PHY_OTG_SYS);
-
+#ifdef CONFIG_ERICSSON_MODEM_CLK_RESET
+	samsung_exynos5_usb2phy_reset(sphy);
+#endif
 	/* HSIC phy configuration */
 	phyhsic = (HSIC_CTRL_REFCLKDIV_12 |
 			HSIC_CTRL_REFCLKSEL |
@@ -276,6 +353,10 @@ static int samsung_usb2phy_init(struct usb_phy *phy)
 	dev_vdbg(sphy->dev, "%s\n", __func__);
 
 	host = phy->otg->host;
+
+#ifdef CONFIG_PM_RUNTIME
+	s5p_ehci_clear_ignore();
+#endif
 
 	/* Enable the phy clock */
 	ret = clk_enable(sphy->clk);
@@ -601,6 +682,9 @@ static int samsung_usb2phy_runtime_suspend(struct device *dev)
 					atomic_read(&dev->power.usage_count),
 					atomic_read(&dev->power.child_count));
 #endif
+
+	s5p_ehci_set_ignore();
+
 	return 0;
 }
 
@@ -618,6 +702,8 @@ static int samsung_usb2phy_runtime_resume(struct device *dev)
 		dev_info(dev, "Runtime PM is not supported for this cpu type\n");
 		return 0;
 	}
+
+	s5p_ehci_clear_ignore();
 
 	/* Enable the phy clock */
 	ret = clk_enable(sphy->clk);
@@ -639,6 +725,11 @@ static int samsung_usb2phy_runtime_resume(struct device *dev)
 #endif
 	writel(phyctrl, regs + EXYNOS5_PHY_HOST_CTRL0);
 
+#ifdef CONFIG_ERICSSON_MODEM_CLK_RESET
+	spin_unlock_irqrestore(&sphy->lock, flags);
+	samsung_exynos5_usb2phy_reset(sphy);
+#endif
+
 	phyctrl = readl(regs + EXYNOS5_PHY_HSIC_CTRL1);
 	phyctrl &= ~HSIC_CTRL_FORCESUSPEND;
 	writel(phyctrl, regs + EXYNOS5_PHY_HSIC_CTRL1);
@@ -647,7 +738,9 @@ static int samsung_usb2phy_runtime_resume(struct device *dev)
 	phyctrl &= ~HSIC_CTRL_FORCESUSPEND;
 	writel(phyctrl, regs + EXYNOS5_PHY_HSIC_CTRL2);
 
+#ifndef CONFIG_ERICSSON_MODEM_CLK_RESET
 	spin_unlock_irqrestore(&sphy->lock, flags);
+#endif
 
 	/* Disable the phy clock */
 	clk_disable(sphy->clk);

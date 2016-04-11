@@ -237,12 +237,13 @@ int wacom_i2c_query(struct wacom_i2c *wac_i2c)
 	return ret;
 }
 
-
 int wacom_i2c_modecheck(struct wacom_i2c *wac_i2c)
 {
 	u8 buf = COM_QUERY;
 	int ret;
 	int mode = WACOM_I2C_MODE_NORMAL;
+	u8 data[COM_QUERY_BUFFER] = {0, };
+	int read_size = COM_QUERY_NUM;
 
 	ret = wacom_i2c_send(wac_i2c, &buf, 1, false);
 	if (ret < 0) {
@@ -251,7 +252,11 @@ int wacom_i2c_modecheck(struct wacom_i2c *wac_i2c)
 	else{
 		mode = WACOM_I2C_MODE_NORMAL;
 	}
-	printk(KERN_DEBUG "epen:I2C send at usermode(%d)\n", ret);
+
+	ret = wacom_i2c_recv(wac_i2c, data, read_size, false);
+	ret = wacom_i2c_recv(wac_i2c, data, read_size, false);
+	printk(KERN_DEBUG "epen:I2C send at usermode(%d) querys(%d)\n",mode, ret);
+
 	return mode;
 }
 

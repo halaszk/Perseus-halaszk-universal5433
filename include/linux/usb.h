@@ -588,6 +588,11 @@ struct usb_device {
 	unsigned do_remote_wakeup:1;
 	unsigned reset_resume:1;
 	unsigned port_is_suspended:1;
+	
+#if defined(CONFIG_LINK_DEVICE_HSIC)
+	unsigned remote_wake:1;
+#endif	
+
 #endif
 	struct wusb_dev *wusb_dev;
 	int slot_id;

@@ -87,12 +87,12 @@
 #define PROX_READ_NUM		40
 
  /* proximity sensor threshold */
-#define DEFUALT_HI_THD		0x0013
-#define DEFUALT_LOW_THD		0x0010
-#define CANCEL_HI_THD		0x0009
-#define CANCEL_LOW_THD		0x0006
+#define DEFUALT_HI_THD		0x0011
+#define DEFUALT_LOW_THD		0x000D
+#define CANCEL_HI_THD		0x000A
+#define CANCEL_LOW_THD		0x0007
 
-#define DEFAULT_TRIM		0X0000
+#define DEFAULT_TRIM		0X0003
  /*lightsnesor log time 6SEC 200mec X 30*/
 #define LIGHT_LOG_TIME		30
 #define LIGHT_ADD_STARTTIME	300000000
@@ -168,9 +168,9 @@ enum {
 };
 
 static u16 ps_reg_init_setting[PS_REG_NUM][2] = {
-	{REG_PS_CONF1, 0x5328},	/* REG_PS_CONF1 */
+	{REG_PS_CONF1, 0x7728},	/* REG_PS_CONF1 */
 	{REG_PS_CONF3, 0x0000},	/* REG_PS_CONF3 */
-	{REG_PS_THD, 0x01611},	/* REG_PS_THD */
+	{REG_PS_THD, 0x0110D},	/* REG_PS_THD */
 	{REG_PS_CANC, DEFAULT_TRIM},	/* REG_PS_CANC */
 };
 
@@ -372,12 +372,13 @@ static int proximity_open_cancelation(struct cm36652_data *data)
 {
 	struct file *cancel_filp = NULL;
 	int err = 0;
+	u16 buf = 0;
 	mm_segment_t old_fs;
 
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
 
-	cancel_filp = filp_open(CANCELATION_FILE_PATH, O_RDONLY, 0666);
+	cancel_filp = filp_open(CANCELATION_FILE_PATH, O_RDONLY, 0);
 	if (IS_ERR(cancel_filp)) {
 		err = PTR_ERR(cancel_filp);
 		if (err != -ENOENT)
@@ -387,21 +388,26 @@ static int proximity_open_cancelation(struct cm36652_data *data)
 		return err;
 	}
 
-	err = cancel_filp->f_op->read(cancel_filp,
-		(char *)&ps_reg_init_setting[PS_CANCEL][CMD],
+	err = cancel_filp->f_op->read(cancel_filp, (char *)&buf,
 		sizeof(u16), &cancel_filp->f_pos);
 	if (err != sizeof(u16)) {
 		pr_err("%s: Can't read the cancel data from file\n", __func__);
 		err = -EIO;
 	}
 
+	if (buf < CAL_SKIP_ADC)
+		goto exit;
+
+	ps_reg_init_setting[PS_CANCEL][CMD] = buf;
 	/*If there is an offset cal data. */
-	if (ps_reg_init_setting[PS_CANCEL][CMD] != data->pdata->trim) {
+	if ((ps_reg_init_setting[PS_CANCEL][CMD] != data->pdata->trim)
+		&& (ps_reg_init_setting[PS_CANCEL][CMD] != 0)) {
 			ps_reg_init_setting[PS_THD][CMD] =
 				((data->pdata->cancel_hi_thd << 8) & 0xff00)
 				| (data->pdata->cancel_low_thd & 0xff);
 	}
 
+exit:
 	pr_info("%s prox_cal[%d] PS_THD[%x]\n", __func__,
 		ps_reg_init_setting[PS_CANCEL][CMD],
 		ps_reg_init_setting[PS_THD][CMD]);
@@ -422,8 +428,7 @@ static int proximity_store_cancelation(struct device *dev, bool do_calib)
 
 	if (do_calib) {
 		mutex_lock(&cm36652_iio->read_lock);
-		cm36652_i2c_read_word(cm36652_iio,
-			REG_PS_DATA, &ps_data);
+		cm36652_i2c_read_word(cm36652_iio, REG_PS_DATA, &ps_data);
 		ps_reg_init_setting[PS_CANCEL][CMD] = ps_data;
 		mutex_unlock(&cm36652_iio->read_lock);
 
@@ -450,7 +455,7 @@ static int proximity_store_cancelation(struct device *dev, bool do_calib)
 			err = 1;
 		}
 	} else { /* reset */
-		ps_reg_init_setting[PS_CANCEL][CMD] = cm36652_iio->pdata->trim;;
+		ps_reg_init_setting[PS_CANCEL][CMD] = cm36652_iio->pdata->trim;
 		ps_reg_init_setting[PS_THD][CMD] =
 			((cm36652_iio->pdata->default_hi_thd << 8) & 0xff00)
 			| (cm36652_iio->pdata->default_low_thd & 0xff);
@@ -475,7 +480,7 @@ static int proximity_store_cancelation(struct device *dev, bool do_calib)
 	set_fs(KERNEL_DS);
 
 	cancel_filp = filp_open(CANCELATION_FILE_PATH,
-			O_CREAT | O_TRUNC | O_WRONLY | O_SYNC, 0666);
+			O_CREAT | O_TRUNC | O_WRONLY | O_SYNC, 0660);
 	if (IS_ERR(cancel_filp)) {
 		pr_err("[SENSOR] %s: Can't open cancelation file\n", __func__);
 		set_fs(old_fs);
@@ -1085,24 +1090,28 @@ done:
 irqreturn_t cm36652_irq_thread_fn(int irq, void *data)
 {
 	struct cm36652_data *cm36652_iio = data;
-
 	u8 val;
 	u16 ps_data = 0;
 
 	val = gpio_get_value(cm36652_iio->pdata->irq);
 	cm36652_i2c_read_word(cm36652_iio, REG_PS_DATA, &ps_data);
-	cm36652_iio->proximity_detection = val;
 
-	if (cm36652_iio->power_state & PROXIMITY_ENABLED) {
-		/* 0 is close, 1 is far */
-		cm36652_prox_data_rdy_trig_poll(cm36652_iio->indio_dev_prox);
+#ifdef CONFIG_SENSORS_CM36652_DEFENCE_CODE_FOR_NOISE
+	if (((ps_data < (ps_reg_init_setting[PS_THD][CMD] & 0x00ff))
+		&& (val == 0)) || ((val == 1)
+		&& (ps_data > ps_reg_init_setting[PS_THD][CMD] >> 8))
+		|| (ps_data > 256)) {
+		pr_err("[SENSOR] %s: exception case! val = %d, ps_data = %d\n",
+			__func__, val, ps_data);
+		return IRQ_HANDLED;
 	}
-
+#endif
+	cm36652_iio->proximity_detection = val;
+	cm36652_prox_data_rdy_trig_poll(cm36652_iio->indio_dev_prox);
 	wake_lock_timeout(&cm36652_iio->prx_wake_lock, 3 * HZ);
 
-	pr_info("%s: val = %u, ps_data = %u (close:0, far:1)\n",
+	pr_info("[SENSOR] %s: val = %u, ps_data = %u (close:0, far:1)\n",
 		__func__, val, ps_data);
-
 	return IRQ_HANDLED;
 }
 

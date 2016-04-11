@@ -50,6 +50,14 @@
 #define BATT_SWELLING_BLOCK_TIME		10 * 60 /* 10 min */
 #endif
 
+#if defined(CONFIG_CHARGING_VZWCONCEPT)
+#define STORE_MODE_CHARGING_MAX 35
+#define STORE_MODE_CHARGING_MIN 30
+#else
+#define STORE_MODE_CHARGING_MAX 70
+#define STORE_MODE_CHARGING_MIN 60
+#endif
+
 #define ADC_CH_COUNT		10
 #define ADC_SAMPLE_COUNT	10
 
@@ -179,6 +187,7 @@ struct sec_battery_info {
 	int test_mode;
 	bool factory_mode;
 	bool store_mode;
+	bool ignore_store_mode;
 	bool slate_mode;
 
 	int siop_level;
@@ -298,6 +307,7 @@ enum {
 	BATT_TEMP_TABLE,
 	HV_CHARGER_STATUS,
 	HV_CHARGER_SET,
+	HV_CHARGER_SUPPORT,
 #if defined(CONFIG_SAMSUNG_BATTERY_ENG_TEST)
 	BATT_TEST_CHARGE_CURRENT,
 	BATT_STABILITY_TEST,

@@ -84,6 +84,14 @@
 #define DEFENCE_CODE_FOR_DEVICE_DAMAGE
 #define SX9310_CPS_CTRL0_REG_VAL	0x10
 
+#ifdef CONFIG_SENSORS_SX9310_WIFI_DEFENCE_CODE_FOR_TA_NOISE
+#ifdef CONFIG_SENSORS_GTS210_COMMON
+#define SX9310_NORMAL_TOUCH_CABLE_THRESHOLD	192
+#else
+#define SX9310_NORMAL_TOUCH_CABLE_THRESHOLD	232
+#endif
+#endif
+
 struct sx9310_p {
 	struct i2c_client *client;
 	struct device *factory_device;
@@ -148,7 +156,6 @@ static const struct iio_chan_spec sx9310_channels[] = {
 
 #ifdef CONFIG_SENSORS_SX9310_WIFI_DEFENCE_CODE_FOR_TA_NOISE
 #include <linux/power_supply.h>
-#define SX9310_NORMAL_TOUCH_CABLE_THRESHOLD	192
 
 static int check_ta_state(void)
 {
@@ -181,8 +188,7 @@ static int sx9310_get_temp(void)
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
 
-	filp = filp_open(TEMP_FILE_PATH, O_RDONLY | O_NOFOLLOW,
-			S_IRUGO | S_IWUSR | S_IWGRP);
+	filp = filp_open(TEMP_FILE_PATH, O_RDONLY | O_NOFOLLOW, 0);
 	if (IS_ERR(filp)) {
 		ret = PTR_ERR(filp);
 		if (ret != -ENOENT)
@@ -468,9 +474,9 @@ static void sx9310_get_data(struct sx9310_p *data)
 		(8 * 65536));
 
 	mutex_unlock(&data->read_mutex);
-
-	pr_info("[SX9310_WIFI]: %s - CapsMain: %d, Useful: %d, Offset: %u\n",
-		__func__, data->capmain, data->useful, data->offset);
+	pr_info("[SX9310_WIFI]: %s - CapsMain: %d, Useful: %d, Offset: %u, avg: %d, diff:%d\n",
+		__func__, data->capmain, data->useful,
+		data->offset, data->avg, (data->useful - data->avg) >> 4);
 }
 
 static void sx9310_touchCheckWithRefSensor(struct sx9310_p *data)
@@ -503,8 +509,7 @@ static int sx9310_save_caldata(struct sx9310_p *data)
 	set_fs(KERNEL_DS);
 
 	cal_filp = filp_open(CALIBRATION_FILE_PATH,
-			O_CREAT | O_TRUNC | O_WRONLY | O_SYNC,
-			S_IRUGO | S_IWUSR | S_IWGRP);
+			O_CREAT | O_TRUNC | O_WRONLY | O_SYNC, 0660);
 	if (IS_ERR(cal_filp)) {
 		pr_err("[SX9310_WIFI]: %s - Can't open calibration file\n",
 			__func__);
@@ -536,8 +541,7 @@ static void sx9310_open_caldata(struct sx9310_p *data)
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
 
-	cal_filp = filp_open(CALIBRATION_FILE_PATH, O_RDONLY,
-			S_IRUGO | S_IWUSR | S_IWGRP);
+	cal_filp = filp_open(CALIBRATION_FILE_PATH, O_RDONLY, 0);
 	if (IS_ERR(cal_filp)) {
 		ret = PTR_ERR(cal_filp);
 		if (ret != -ENOENT)
@@ -577,8 +581,7 @@ static int sx9310_save_temp_caldata(struct sx9310_p *data)
 	set_fs(KERNEL_DS);
 
 	cal_filp = filp_open(TEMP_CAL_FILE_PATH,
-			O_CREAT | O_TRUNC | O_WRONLY | O_SYNC,
-			S_IRUGO | S_IWUSR | S_IWGRP);
+			O_CREAT | O_TRUNC | O_WRONLY | O_SYNC, 0660);
 	if (IS_ERR(cal_filp)) {
 		pr_err("[SX9310]: %s - Can't open calibration file\n",
 			__func__);
@@ -610,8 +613,7 @@ static void sx9310_open_temp_caldata(struct sx9310_p *data)
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
 
-	cal_filp = filp_open(TEMP_CAL_FILE_PATH, O_RDONLY,
-			S_IRUGO | S_IWUSR | S_IWGRP);
+	cal_filp = filp_open(TEMP_CAL_FILE_PATH, O_RDONLY, 0);
 	if (IS_ERR(cal_filp)) {
 		ret = PTR_ERR(cal_filp);
 		if (ret != -ENOENT)
@@ -1184,12 +1186,20 @@ static void sx9310_touch_process(struct sx9310_p *data, u8 flag)
 {
 	u8 status = 0;
 	s32 threshold;
-
+#ifdef CONFIG_SENSORS_SX9310_WIFI_DEFENCE_CODE_FOR_DAMAGE
+	static s64 time_first;
+	s64 time_last = 0;
+#endif
 	threshold = sx9310_get_init_threshold(data);
 	sx9310_get_data(data);
 	sx9310_i2c_read(data, SX9310_STAT0_REG, &status);
 
 	if (flag & SX9310_IRQSTAT_COMPDONE_FLAG) {
+#ifdef CONFIG_SENSORS_SX9310_WIFI_DEFENCE_CODE_FOR_DAMAGE
+		pr_info("[SX9310_WIFI]: %s - SX9310_IRQSTAT_COMPDONE_FLAG\n",
+			__func__);
+		time_first = iio_get_time_ns();
+#endif
 		if (data->state == IDLE) {
 			if (status & (CSX_STATUS_REG << MAIN_SENSOR))
 				send_event(data, ACTIVE);
@@ -1214,6 +1224,31 @@ static void sx9310_touch_process(struct sx9310_p *data, u8 flag)
 
 	if (data->state == IDLE) {
 		if (status & (CSX_STATUS_REG << MAIN_SENSOR)) {
+#ifdef CONFIG_SENSORS_SX9310_WIFI_DEFENCE_CODE_FOR_DAMAGE
+			time_last = iio_get_time_ns();
+			if ((time_last - time_first < 2500000000LL)
+				&& (data->touch_mode == NORMAL_TOUCH_MODE)) {
+
+				pr_err("[SX9310_WIFI]: %s - Defence START!! \n",
+					__func__);
+
+				sx9310_i2c_write(data, SX9310_CPS_CTRL0_REG,
+					setup_reg[2].val);
+				msleep(20);
+				sx9310_i2c_write(data, SX9310_CPS_CTRL0_REG,
+					setup_reg[2].val | ENABLE_CSX);
+				msleep(20);
+
+				sx9310_set_offset_calibration(data);
+				msleep(400);
+				sx9310_touchCheckWithRefSensor(data);
+				sx9310_read_irqstate(data);
+				pr_err("[SX9310_WIFI]: %s - Defence END!!\n",
+					__func__);
+				return;
+			}
+#endif
+
 #ifdef DEFENCE_CODE_FOR_DEVICE_DAMAGE
 			if ((data->cal_data[0] - 5000) > data->capmain) {
 				sx9310_set_offset_calibration(data);
@@ -1324,7 +1359,11 @@ static void sx9310_initialize_variable(struct sx9310_p *data)
 	data->freq = setup_reg[6].val >> 3;
 	memset(data->cal_data, 0, sizeof(int) * 3);
 	atomic_set(&data->enable, OFF);
+#if defined(CONFIG_SEC_FACTORY) && defined(CONFIG_SENSORS_GTS210_COMMON)
+	data->init_th = 1000;
+#else
 	data->init_th = (int)CONFIG_SENSORS_SX9310_WIFI_INIT_TOUCH_THRESHOLD;
+#endif
 	pr_info("[SX9310_WIFI]: %s - Init Touch Threshold : %d\n",
 		__func__, data->init_th);
 	data->normal_th = (u8)CONFIG_SENSORS_SX9310_WIFI_NORMAL_TOUCH_THRESHOLD;

@@ -799,11 +799,10 @@ static void dwc3_ep0_complete_data(struct dwc3 *dwc,
 	ep0 = dwc->eps[0];
 
 	dwc->ep0_next_event = DWC3_EP0_NRDY_STATUS;
-
-	r = next_request(&ep0->request_list);
-	ur = &r->request;
-
 	trb = dwc->ep0_trb;
+	r = next_request(&ep0->request_list);
+	if (!r)
+		return;
 
 	status = DWC3_TRB_SIZE_TRBSTS(trb->size);
 	if (status == DWC3_TRBSTS_SETUP_PENDING) {
@@ -817,6 +816,8 @@ static void dwc3_ep0_complete_data(struct dwc3 *dwc,
 
 	if (dwc->ep0_zlp_sent)
 		goto finish_zlp;
+
+	ur = &r->request;
 
 	length = trb->size & DWC3_TRB_SIZE_MASK;
 

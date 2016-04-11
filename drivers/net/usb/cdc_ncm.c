@@ -1252,6 +1252,11 @@ static const struct usb_device_id cdc_devs[] = {
 	  .driver_info = (unsigned long)&wwan_noarp_info,
 	},
 
+	{ USB_DEVICE_AND_INTERFACE_INFO(0x04cc, 0x2342,	USB_CLASS_COMM,
+		USB_CDC_SUBCLASS_NCM, USB_CDC_PROTO_NONE),
+	.driver_info = 0,
+	}, /* ERICSSON M7450 MAIN NCM */
+
 	/* Generic CDC-NCM devices */
 	{ USB_INTERFACE_INFO(USB_CLASS_COMM,
 		USB_CDC_SUBCLASS_NCM, USB_CDC_PROTO_NONE),

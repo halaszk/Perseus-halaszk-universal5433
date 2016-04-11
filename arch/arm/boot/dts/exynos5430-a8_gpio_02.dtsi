@@ -12,6 +12,17 @@
 #include "exynos_gpio_config_macros.dtsi"
 
 /* A8 Project Rev00 Support */
+&pinctrl_0 {
+	pinctrl-names = "default","sleep";
+	pinctrl-0 = <&initial0>;
+	pinctrl-1 = <&sleep0>;
+	initial0: initial-state {
+		PIN_IN(gpa3-7, NONE, LV1);  /* IF_PMIC_RST */
+	};
+	sleep0: sleep-state {
+		PIN_SLP(gpa3-7, OUT1, NONE);	/* IF_PMIC_RST */
+	};
+};
 
 &pinctrl_1 {
 	pinctrl-names = "sleep";
@@ -129,8 +140,8 @@
 
 		PIN_IN(gpd2-5, DOWN, LV1);	/* NC */
 
-		PIN_IN(gpd4-3, DOWN, LV1);	/* SENSOR_I2C_SDA */
-		PIN_IN(gpd4-4, DOWN, LV1);	/* SENSOR_I2C_SCL */
+		PIN_IN(gpd4-3, NONE, LV1);	/* SENSOR_I2C_SDA */
+		PIN_IN(gpd4-4, NONE, LV1);	/* SENSOR_I2C_SCL */
 
 		PIN_IN(gpd8-0, DOWN, LV1);	/* NC */
 
@@ -164,6 +175,7 @@
 		PIN_SLP(gpb0-4, INPUT, DOWN);	/* ERR_FG */
 
 		//PIN_SLP(gpa0-6, INPUT, DOWN);	/* ELON1_EN */
+
 
 		PIN_SLP(gpc0-1, INPUT, DOWN);	/* FLASH_LED_STROBE */
 		PIN_SLP(gpc0-2, PREV, NONE);	/* FLASH_LED_TORCH */
@@ -221,8 +233,8 @@
 		PIN_SLP(gpd4-0, PREV, NONE);	/* MOTOR_EN */
 		PIN_SLP(gpd4-1, PREV, DOWN);	/* BTP_OCP_EN  */
 		PIN_SLP(gpd4-2, INPUT, DOWN);	/* NC */
-		PIN_SLP(gpd4-3, INPUT, DOWN);	/* SENSOR_I2C_SDA */
-		PIN_SLP(gpd4-4, INPUT, DOWN);	/* SENSOR_I2C_SCL */
+		PIN_SLP(gpd4-3, INPUT, NONE);	/* SENSOR_I2C_SDA */
+		PIN_SLP(gpd4-4, INPUT, NONE);	/* SENSOR_I2C_SCL */
 
 		PIN_SLP(gpd5-0, OUT0, DOWN);	/* BTP_SPI_CLK */
 		PIN_SLP(gpd5-1, OUT0, DOWN);	/* BTP_SPI_CS_N */

@@ -47,6 +47,58 @@
 
 #define DAPM_UPDATE_STAT(widget, val) widget->dapm->card->dapm_stats.val++;
 
+/* Lock for cross i/f checks */
+static DEFINE_SPINLOCK(dapm_lock);
+
+static void list_add_dapm(struct list_head *new, struct list_head *head)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&dapm_lock, flags);
+
+	list_add(new, head);
+
+	spin_unlock_irqrestore(&dapm_lock, flags);
+}
+
+static void list_del_dapm(struct list_head *entry)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&dapm_lock, flags);
+
+	list_del(entry);
+
+	spin_unlock_irqrestore(&dapm_lock, flags);
+}
+
+static void list_add_tail_dapm(struct list_head *new, struct list_head *head)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&dapm_lock, flags);
+
+	list_add_tail(new, head);
+
+	spin_unlock_irqrestore(&dapm_lock, flags);
+}
+
+static void list_del_init_dapm(struct list_head *entry)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&dapm_lock, flags);
+
+	list_del_init(entry);
+
+	spin_unlock_irqrestore(&dapm_lock, flags);
+}
+
+#define list_add(x, y)		list_add_dapm(x, y)
+#define list_del(x)		list_del_dapm(x)
+#define list_add_tail(x, y)	list_add_tail_dapm(x, y)
+#define list_del_init(x)	list_del_init_dapm(x)
+
 /* dapm power sequences - make this per codec in the future */
 static int dapm_up_seq[] = {
 	[snd_soc_dapm_pre] = 0,
@@ -3379,6 +3431,7 @@ int snd_soc_dapm_new_dai_widgets(struct snd_soc_dapm_context *dapm,
 		if (!w) {
 			dev_err(dapm->dev, "ASoC: Failed to create %s widget\n",
 				dai->driver->playback.stream_name);
+			return -ENOMEM;
 		}
 
 		w->priv = dai;
@@ -3397,6 +3450,7 @@ int snd_soc_dapm_new_dai_widgets(struct snd_soc_dapm_context *dapm,
 		if (!w) {
 			dev_err(dapm->dev, "ASoC: Failed to create %s widget\n",
 				dai->driver->capture.stream_name);
+			return -ENOMEM;
 		}
 
 		w->priv = dai;
@@ -3439,7 +3493,7 @@ int snd_soc_dapm_link_dai_widgets(struct snd_soc_card *card)
 				break;
 			}
 
-			if (!w->sname)
+			if (!w->sname || !strstr(w->sname, dai_w->name))
 				continue;
 
 			if (dai->driver->playback.stream_name &&

@@ -26,6 +26,7 @@
 
 #include "modem_prj.h"
 #include "modem_utils.h"
+#include "link_device_memory.h"
 
 static unsigned long cp_hold_time = CP_HOLD_TIME;
 module_param(cp_hold_time, ulong, S_IRUGO | S_IWUSR);
@@ -501,6 +502,12 @@ static void run_pm_fsm(struct modem_link_pm *pm, enum pm_event event)
 			schedule_cp_free(pm);
 		} else if (event == PM_EVENT_CP2AP_STATUS_LOW) {
 			n_state = PM_STATE_CP_FAIL;
+		} else if (event == PM_EVENT_CP_HOLD_TIMEOUT) {
+			if (!gpio_get_value(pm->gpio_cp2ap_wakeup)) {
+				cancel_cp_free(pm);
+				n_state = PM_STATE_AP_FREE;
+				schedule_cp_free(pm);
+			}
 		}
 		break;
 
@@ -510,7 +517,7 @@ static void run_pm_fsm(struct modem_link_pm *pm, enum pm_event event)
 			cancel_cp_free(pm);
 			assert_ap2cp_wakeup(pm);
 		} else if (event == PM_EVENT_CP_HOLD_REQUEST) {
-			n_state = PM_STATE_AP_FREE;
+			n_state = PM_STATE_ACTIVE;
 			cancel_cp_free(pm);
 			assert_ap2cp_wakeup(pm);
 			schedule_cp_free(pm);
@@ -521,7 +528,8 @@ static void run_pm_fsm(struct modem_link_pm *pm, enum pm_event event)
 			So, cp2ap_wakeup must always be checked before state
 			transition.
 			*/
-			if (!gpio_get_value(pm->gpio_cp2ap_wakeup)) {
+			if (!gpio_get_value(pm->gpio_cp2ap_wakeup) &&
+					!atomic_read(&pm->ref_cnt)) {
 				n_state = PM_STATE_CP_FREE;
 				pm->hold_requested = false;
 				release_ap2cp_wakeup(pm);
@@ -746,7 +754,12 @@ static inline void link_resume_cb(void *owner)
 static inline void link_mount_cb(void *owner)
 {
 	struct modem_link_pm *pm = (struct modem_link_pm *)owner;
+	struct link_device *ld = pm_to_link_device(pm);
+	struct mem_link_device *mld = ld_to_mem_link_device(ld);
+
 	run_pm_fsm(pm, PM_EVENT_LINK_MOUNTED);
+
+	wake_up_all(&mld->wq);
 }
 
 static inline void link_error_cb(void *owner)

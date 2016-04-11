@@ -12,6 +12,9 @@
 #include <linux/kthread.h>
 #include <linux/platform_device.h>
 
+#define VIDEO_MODE      1
+#define COMMAND_MODE    0
+
 struct decon_lcd {
 	u32	mode;
 	u32	vfp;

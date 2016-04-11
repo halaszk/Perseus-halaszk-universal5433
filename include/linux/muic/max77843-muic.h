@@ -92,6 +92,10 @@ struct max77843_muic_data {
 	u8				hvcontrol1;
 	u8				hvcontrol2;
 
+#if defined(CONFIG_USB_EXTERNAL_NOTIFY)
+	/* USB Notifier */
+	struct notifier_block	usb_nb;
+#endif
 };
 
 /* max77843 muic register read/write related information defines. */

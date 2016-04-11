@@ -43,7 +43,7 @@ endif
 
 # ==================================
 # Start ---- ARM Midgard device ----
-ifeq ($(CONFIG_MALI_MIDGARD),y)
+#ifeq ($(CONFIG_MALI_MIDGARD),y)
 
 # --- For EXYNOS5422(MaliT628) Device. 
 ifeq ($(CONFIG_SOC_EXYNOS5422),y)
@@ -52,7 +52,7 @@ gpu_sysfs-y +=	gpu_sysfs_target_exynos5422.o
 GPU_SYSFS_TARGET_FILE_DEFINED=1
 endif
 
-endif
+#endif
 # End ---- ARM Midgard device ------
 # ==================================
 

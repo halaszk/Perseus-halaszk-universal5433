@@ -727,6 +727,7 @@ static int s2m_rtc_remove(struct platform_device *pdev)
 		enable_irq(info->irq);
 
 	wakeup_source_unregister(rtc_ws);
+
 	return 0;
 }
 

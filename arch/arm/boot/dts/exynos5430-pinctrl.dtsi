@@ -121,6 +121,15 @@
 			samsung,pin-con-pdn = <1>;
 			samsung,pin-pud-pdn = <3>;
 		};
+
+		uart_aud_bus_lpm: uart-aud-bus-lpm {
+			samsung,pins = "gpz1-3";
+			samsung,pin-function = <1>;
+			samsung,pin-val = <1>;
+			samsung,pin-pud = <0>;
+			samsung,pin-con-pdn = <1>;
+			samsung,pin-pud-pdn = <3>;
+		};
 	};
 
 	pinctrl@10FE0000 {

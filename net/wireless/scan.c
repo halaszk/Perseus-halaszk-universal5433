@@ -429,6 +429,8 @@ static int cmp_bss(struct cfg80211_bss *a,
 
 #if !(defined(CONFIG_BCM4335) || defined(CONFIG_BCM4335_MODULE) \
         || defined(CONFIG_BCM4339) || defined(CONFIG_BCM4339_MODULE) \
+        || defined(CONFIG_BCM43454) || defined(CONFIG_BCM43454_MODULE) \
+        || defined(CONFIG_BCM43455) || defined(CONFIG_BCM43455_MODULE) \
         || defined(CONFIG_BCM4354) || defined(CONFIG_BCM4354_MODULE) \
         || defined(CONFIG_BCM4356) || defined(CONFIG_BCM4356_MODULE) \
         || defined(CONFIG_BCM4358) || defined(CONFIG_BCM4358_MODULE))
@@ -479,6 +481,8 @@ static int cmp_bss(struct cfg80211_bss *a,
 		return r;
 #if (defined(CONFIG_BCM4339) || defined(CONFIG_BCM4339_MODULE) \
         || defined(CONFIG_BCM4339) || defined(CONFIG_BCM4339_MODULE) \
+        || defined(CONFIG_BCM43454) || defined(CONFIG_BCM43454_MODULE) \
+        || defined(CONFIG_BCM43455) || defined(CONFIG_BCM43455_MODULE) \
         || defined(CONFIG_BCM4354) || defined(CONFIG_BCM4354_MODULE) \
         || defined(CONFIG_BCM4356) || defined(CONFIG_BCM4356_MODULE) \
         || defined(CONFIG_BCM4358) || defined(CONFIG_BCM4358_MODULE))

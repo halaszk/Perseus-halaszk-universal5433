@@ -103,10 +103,11 @@ enum {
 #define SM5703_BST_IQ3LIMIT_MASK        0x80
 #define SM5703_BST_IQ3LIMIT_SHIFT       0x7
 
+#define START_VBUSLIMIT_DELAY			1200
 #define VBUSLIMIT_DELAY					200
 #define REDUCE_CURRENT_STEP				50
 #define MINIMUM_INPUT_CURRENT			300
-#define SLOW_CHARGING_CURRENT_STANDARD	999
+#define SLOW_CHARGING_CURRENT_STANDARD	1050
 #define SIOP_INPUT_LIMIT_CURRENT		1200
 
 extern sec_battery_platform_data_t sec_battery_pdata;

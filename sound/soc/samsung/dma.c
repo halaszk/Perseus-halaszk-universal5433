@@ -38,15 +38,18 @@
 #define ST_OPENED		(1<<1)
 
 #define SRAM_END		(0x04000000)
+#define MAX_DEEPBUF_SIZE	(0x8000)	/* 32 KB */
 
 static atomic_t dram_usage_cnt;
+static struct snd_dma_buffer  *dram_uhqa_tx_buf = NULL;
 
 static const struct snd_pcm_hardware dma_hardware = {
 	.info			= SNDRV_PCM_INFO_INTERLEAVED |
 				  SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				  SNDRV_PCM_INFO_MMAP |
 				  SNDRV_PCM_INFO_MMAP_VALID,
-	.formats		= SNDRV_PCM_FMTBIT_S16_LE |
+	.formats		= SNDRV_PCM_FMTBIT_S24_LE |
+				  SNDRV_PCM_FMTBIT_S16_LE |
 				  SNDRV_PCM_FMTBIT_U16_LE |
 				  SNDRV_PCM_FMTBIT_U8 |
 				  SNDRV_PCM_FMTBIT_S8,
@@ -54,7 +57,7 @@ static const struct snd_pcm_hardware dma_hardware = {
 	.channels_max		= 8,
 	.buffer_bytes_max	= 256*1024,
 	.period_bytes_min	= 128,
-	.period_bytes_max	= 32*1024,
+	.period_bytes_max	= 64*1024,
 	.periods_min		= 2,
 	.periods_max		= 128,
 	.fifo_size		= 32,
@@ -241,7 +244,11 @@ static int dma_hw_params(struct snd_pcm_substream *substream,
 		prtd->params->ops->config(prtd->params->ch, &config);
 	}
 
-	snd_pcm_set_runtime_buffer(substream, &substream->dma_buffer);
+	if ((substream->stream == SNDRV_PCM_STREAM_PLAYBACK) &&
+		(totbytes > MAX_DEEPBUF_SIZE) && dram_uhqa_tx_buf)
+		snd_pcm_set_runtime_buffer(substream, dram_uhqa_tx_buf);
+	else
+		snd_pcm_set_runtime_buffer(substream, &substream->dma_buffer);
 
 	runtime->dma_bytes = totbytes;
 
@@ -371,9 +378,7 @@ static snd_pcm_uframes_t dma_pointer(struct snd_pcm_substream *substream)
 static int dma_open(struct snd_pcm_substream *substream)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
-	struct snd_dma_buffer *buf = &substream->dma_buffer;
 	struct runtime_data *prtd;
-	size_t period_bytes;
 
 	pr_debug("Entered %s\n", __func__);
 
@@ -384,11 +389,6 @@ static int dma_open(struct snd_pcm_substream *substream)
 	spin_lock_init(&prtd->lock);
 
 	memcpy(&prtd->hw, &dma_hardware, sizeof(struct snd_pcm_hardware));
-
-	prtd->hw.buffer_bytes_max = buf->bytes;
-	period_bytes = buf->bytes / prtd->hw.periods_min;
-	if (period_bytes < prtd->hw.period_bytes_max)
-		prtd->hw.period_bytes_max = period_bytes;
 
 	snd_pcm_hw_constraint_integer(runtime, SNDRV_PCM_HW_PARAM_PERIODS);
 	runtime->private_data = prtd;
@@ -492,7 +492,7 @@ static int preallocate_dma_buffer_of(struct snd_pcm *pcm, int stream,
 #ifdef CONFIG_SND_SAMSUNG_IOMMU
 	struct iommu_domain *domain = lpass_get_iommu_domain();
 	dma_addr_t dma_buf_pa;
-	struct dma_iova *di;
+	struct dma_iova *di, *di_uhqa;
 	int ret;
 #endif
 	pr_debug("Entered %s\n", __func__);
@@ -537,6 +537,65 @@ static int preallocate_dma_buffer_of(struct snd_pcm *pcm, int stream,
 				__func__, dma_addr, dma_buf_pa);
 	} else {
 		buf->area = ioremap(buf->addr, size);
+	}
+
+	/*
+	 * With UHQA Playback, Platform DAI driver should provide USER with DRAM
+	 * Buffer if UHQA buffer size is bigger than MAX_DEEPBUF_SIZE(40KB).
+	 */
+	if (!dram_uhqa_tx_buf) {
+		if (of_find_property(np, "samsung,tx-uhqa-buf", NULL)) {
+			u32 dram_info[2];
+			phys_addr_t tx_uhqa_buf_pa = 0;
+			dram_uhqa_tx_buf = devm_kzalloc(pcm->card->dev,
+				sizeof(*dram_uhqa_tx_buf), GFP_KERNEL);
+			if (!dram_uhqa_tx_buf) {
+				pr_err("Failed to allocate dram-tx-uhqa buffer = %pa\n",
+					dram_uhqa_tx_buf);
+				return -ENOMEM;
+			}
+			dram_uhqa_tx_buf->dev.type = SNDRV_DMA_TYPE_DEV;
+			dram_uhqa_tx_buf->dev.dev = pcm->card->dev;
+
+			/* Array Value : TX-UHQA DVA Base Address Size*/
+			of_property_read_u32_array(np, "samsung,tx-uhqa-buf",
+				dram_info, 2);
+			dram_uhqa_tx_buf->addr = (dma_addr_t)dram_info[0];
+			dram_uhqa_tx_buf->bytes = (size_t)dram_info[1];
+			if (!dram_uhqa_tx_buf->addr || !dram_uhqa_tx_buf->bytes) {
+				pr_err("Failed to find tx-uhqa-buf information\n");
+				return -ENOMEM;
+			}
+
+			di_uhqa = devm_kzalloc(pcm->card->dev,
+					sizeof(struct dma_iova), GFP_KERNEL);
+			if (!di_uhqa)
+				return -ENOMEM;
+
+			dram_uhqa_tx_buf->area = dma_alloc_coherent(pcm->card->dev,
+					dram_uhqa_tx_buf->bytes,
+					&tx_uhqa_buf_pa, GFP_KERNEL);
+			if (!dram_uhqa_tx_buf->area)
+				return -ENOMEM;
+
+			ret = iommu_map(domain, dram_uhqa_tx_buf->addr,
+					tx_uhqa_buf_pa, dram_uhqa_tx_buf->bytes, 0);
+			if (ret) {
+				dma_free_coherent(pcm->card->dev, size,
+						dram_uhqa_tx_buf->area, tx_uhqa_buf_pa);
+				pr_err("%s: Failed to iommu_map: %d\n", __func__, ret);
+				return -ENOMEM;
+			}
+
+			di_uhqa->iova = dram_uhqa_tx_buf->addr;
+			di_uhqa->pa = tx_uhqa_buf_pa;
+			di_uhqa->va = dram_uhqa_tx_buf->area;
+			list_add(&di_uhqa->node, &iova_list);
+
+			pr_info("Audio TX-UHQA-BUF Information, pa = %pa, size = %zx, kva = %p\n",
+				&dram_uhqa_tx_buf->addr, dram_uhqa_tx_buf->bytes,
+				dram_uhqa_tx_buf->area);
+		}
 	}
 #else
 	if (of_find_property(np, dma_prop_iommu[stream], NULL))

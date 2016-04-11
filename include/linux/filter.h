@@ -31,6 +31,7 @@ struct sk_filter
 	struct sock_filter     	insns[0];
 };
 
+
 static inline unsigned int sk_filter_len(const struct sk_filter *fp)
 {
 	return fp->len * sizeof(struct sock_filter) + sizeof(*fp);

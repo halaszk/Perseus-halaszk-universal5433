@@ -730,8 +730,13 @@
 		};
 
 	/* disp_driver : should be moved to common dts later */
-		mipi_dsi: mipi_dsi {
-			gpios = <&gpg0 0 0x1>, <&gpf1 5 0x1>;
+		decon_board_list: decon_board_list {
+			disable_display_driver_power {
+				gpios = <&gpg0 0 0x1>, <&gpf1 5 0x1>;
+			};
+			reset_display_driver_panel {
+				gpios = <&gpg0 0 0x1>, <&gpg0 0 0x1>, <&gpg0 0 0x1>;
+			};
 		};
 	};
 

@@ -195,6 +195,8 @@ ssize_t ktd2692_show(struct device *dev,
 
 static DEVICE_ATTR(rear_flash, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH,
 	ktd2692_show, ktd2692_store);
+static DEVICE_ATTR(rear_torch_flash, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH,
+	ktd2692_show, ktd2692_store);
 
 static int ktd2692_parse_dt(struct device *dev,
                                 struct ktd2692_platform_data *pdata)
@@ -256,6 +258,10 @@ static int ktd2692_probe(struct platform_device *pdev)
 		LED_ERROR("failed to create device file, %s\n",
 				dev_attr_rear_flash.attr.name);
 	}
+	if (device_create_file(ktd2692_dev, &dev_attr_rear_torch_flash) < 0) {
+		LED_ERROR("failed to create device file, %s\n",
+				dev_attr_rear_torch_flash.attr.name);
+	}
 	spin_lock_init(&pdata->int_lock);
 
 	return 0;
@@ -263,6 +269,7 @@ static int ktd2692_probe(struct platform_device *pdev)
 static int __devexit ktd2692_remove(struct platform_device *pdev)
 {
 	device_remove_file(ktd2692_dev, &dev_attr_rear_flash);
+	device_remove_file(ktd2692_dev, &dev_attr_rear_torch_flash);
 	device_destroy(camera_class, 0);
 	class_destroy(camera_class);
 

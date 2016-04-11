@@ -285,6 +285,9 @@ struct bq24160_data {
 	struct i2c_client *clientp;
 	struct delayed_work work;
 	struct delayed_work enable_work;
+#if defined(CONFIG_MACH_ESPRESSO5433) && defined(CONFIG_FUELGAUGE_S2MG001)
+	struct delayed_work polling_work;
+#endif
 	struct workqueue_struct *wq;
 	struct bq24160_status_data cached_status;
 	struct mutex lock;
@@ -306,6 +309,12 @@ struct bq24160_data {
 	u8 chg_disabled_by_input_current;
 	u8 restricted_enable_charger;
 	u8 status_update_disregard;
+#if defined(CONFIG_MACH_ESPRESSO5433) && defined(CONFIG_FUELGAUGE_S2MG001)
+	int voltage_now;
+	int voltage_avg;
+	int voltage_ocv;
+	unsigned int capacity;
+#endif
 };
 
 static void bq24160_hz_enable(struct bq24160_data *bd, int enable);
@@ -737,7 +746,9 @@ static irqreturn_t bq24160_thread_irq(int irq, void *data)
 		if (bd->cached_status.stat != old_status.stat) {
 			if (bd->cached_status.stat == STAT_NO_VALID_SOURCE) {
 				if (old_status.stat == STAT_CHARGING_FROM_IN || old_status.stat == STAT_CHARGING_FROM_USB
-						|| old_status.stat == STAT_IN_READY || old_status.stat == STAT_USB_READY) {
+					|| old_status.stat == STAT_IN_READY || old_status.stat == STAT_USB_READY
+					|| old_status.stat == STAT_CHARGE_DONE || old_status.stat == STAT_NA
+					|| old_status.stat == STAT_FAULT) {
 					bq24160_hz_enable(bd, 1);
 					bq24160_set_ce(bd, 1);
 					bq24160_stop_watchdog_reset(bd);
@@ -970,12 +981,54 @@ static void bq24160_delayed_enable_worker(struct work_struct *work)
 		bq24160_update_power_supply(bd);
 }
 
+#if defined(CONFIG_MACH_ESPRESSO5433) && defined(CONFIG_FUELGAUGE_S2MG001)
+static void sec_bat_get_battery_info(
+				struct work_struct *work)
+{
+	struct bq24160_data *bd =
+		container_of(work, struct bq24160_data, polling_work.work);
+
+	union power_supply_propval value;
+
+	psy_do_property(bd->control->fuelgauge_name, get,
+		POWER_SUPPLY_PROP_VOLTAGE_NOW, value);
+	bd->voltage_now = value.intval;
+
+	value.intval = SEC_BATTERY_VOLTAGE_AVERAGE;
+	psy_do_property(bd->control->fuelgauge_name, get,
+		POWER_SUPPLY_PROP_VOLTAGE_AVG, value);
+	bd->voltage_avg = value.intval;
+
+	value.intval = SEC_BATTERY_VOLTAGE_OCV;
+	psy_do_property(bd->control->fuelgauge_name, get,
+		POWER_SUPPLY_PROP_VOLTAGE_AVG, value);
+	bd->voltage_ocv = value.intval;
+
+	/* To get SOC value (NOT raw SOC), need to reset value */
+	value.intval = 0;
+	psy_do_property(bd->control->fuelgauge_name, get,
+		POWER_SUPPLY_PROP_CAPACITY, value);
+	bd->capacity = value.intval;
+
+	dev_info(&bd->clientp->dev,
+		"%s:Vnow(%dmV), Vavg(%dmV), Vocv(%dmV), SOC(%d%%)\n",
+		__func__,
+		bd->voltage_now, bd->voltage_avg, bd->voltage_ocv,
+							bd->capacity);
+
+	schedule_delayed_work(&bd->polling_work, HZ * 10);
+}
+#endif
+
 static int bq24160_bat_get_property(struct power_supply *bat_ps,
 				    enum power_supply_property psp,
 				    union power_supply_propval *val)
 {
 	struct bq24160_data *bd =
 		container_of(bat_ps, struct bq24160_data, bat_ps);
+#if defined(CONFIG_MACH_ESPRESSO5433) && defined(CONFIG_FUELGAUGE_S2MG001)
+	union power_supply_propval value;
+#endif
 
 	MUTEX_LOCK(&bd->lock);
 	switch (psp) {
@@ -991,8 +1044,33 @@ static int bq24160_bat_get_property(struct power_supply *bat_ps,
 	case POWER_SUPPLY_PROP_TECHNOLOGY:
 		val->intval = POWER_SUPPLY_TECHNOLOGY_LION;
 		break;
+#if defined(CONFIG_MACH_ESPRESSO5433) && defined(CONFIG_FUELGAUGE_S2MG001)
+	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
+		psy_do_property(bd->control->fuelgauge_name, get,
+				POWER_SUPPLY_PROP_VOLTAGE_NOW, value);
+		bd->voltage_now = value.intval;
+		dev_err(&bd->clientp->dev,
+			"%s: voltage now(%d)\n", __func__, bd->voltage_now);
+		val->intval = bd->voltage_now * 1000;
+		break;
+	case POWER_SUPPLY_PROP_VOLTAGE_AVG:
+		value.intval = SEC_BATTERY_VOLTAGE_AVERAGE;
+		psy_do_property(bd->control->fuelgauge_name, get,
+				POWER_SUPPLY_PROP_VOLTAGE_AVG, value);
+		bd->voltage_avg = value.intval;
+		dev_err(&bd->clientp->dev,
+			"%s: voltage avg(%d)\n", __func__, bd->voltage_avg);
+		val->intval = bd->voltage_now * 1000;
+		break;
+#endif
 	case POWER_SUPPLY_PROP_CAPACITY:
-		val->intval = (bd->chg_status == POWER_SUPPLY_STATUS_FULL) ? 100 : FAKE_BAT_LEVEL;
+#if defined(CONFIG_MACH_ESPRESSO5433) && defined(CONFIG_FUELGAUGE_S2MG001)
+		val->intval = (bd->chg_status == POWER_SUPPLY_STATUS_FULL) ?
+							100 : bd->capacity;
+#else
+		val->intval = (bd->chg_status == POWER_SUPPLY_STATUS_FULL) ?
+							100 : FAKE_BAT_LEVEL;
+#endif
 		break;
 	case POWER_SUPPLY_PROP_TEMP:
 		val->intval = FAKE_BAT_TEMP;
@@ -1784,7 +1862,10 @@ static int __exit bq24160_remove(struct i2c_client *client)
 
 	if (delayed_work_pending(&bd->enable_work))
 		cancel_delayed_work_sync(&bd->enable_work);
-
+#if defined(CONFIG_MACH_ESPRESSO5433) && defined(CONFIG_FUELGAUGE_S2MG001)
+	if (delayed_work_pending(&bd->polling_work))
+		cancel_delayed_work_sync(&bd->polling_work);
+#endif
 	destroy_workqueue(bd->wq);
 
 	wake_lock_destroy(&bd->wake_lock);
@@ -1811,6 +1892,10 @@ static enum power_supply_property bq24160_bat_main_props[] = {
 	POWER_SUPPLY_PROP_HEALTH,
 	POWER_SUPPLY_PROP_PRESENT,
 	POWER_SUPPLY_PROP_TECHNOLOGY,
+#if defined(CONFIG_MACH_ESPRESSO5433) && defined(CONFIG_FUELGAUGE_S2MG001)
+	POWER_SUPPLY_PROP_VOLTAGE_NOW,
+	POWER_SUPPLY_PROP_VOLTAGE_AVG,
+#endif
 	POWER_SUPPLY_PROP_CAPACITY,
 	POWER_SUPPLY_PROP_TEMP,
 };
@@ -1878,6 +1963,12 @@ static struct bq24160_platform_data *bq24160_parse_dt(struct device *dev)
 		dev_err(dev, "failed to get name\n");
 		return ERR_PTR(-EINVAL);
 	}
+#if defined(CONFIG_MACH_ESPRESSO5433) && defined(CONFIG_FUELGAUGE_S2MG001)
+	if (of_property_read_string(np, "battery,fuelgauge_name", (char const **)&pdata->fuelgauge_name)) {
+		dev_err(dev, "failed to get fuelgauge_name\n");
+		return ERR_PTR(-EINVAL);
+	}
+#endif
 
 	if (of_property_read_u8(np, "support_boot_charging", &pdata->support_boot_charging)) {
 		dev_err(dev, "failed to get support_boot_charging\n");
@@ -1965,6 +2056,11 @@ static int bq24160_probe(struct i2c_client *client,
 	INIT_DELAYED_WORK(&bd->work, bq24160_reset_watchdog_worker);
 	INIT_DELAYED_WORK(&bd->enable_work,
 				bq24160_delayed_enable_worker);
+#if defined(CONFIG_MACH_ESPRESSO5433) && defined(CONFIG_FUELGAUGE_S2MG001)
+	INIT_DELAYED_WORK(&bd->polling_work,
+				sec_bat_get_battery_info);
+	schedule_delayed_work(&bd->polling_work, HZ * 10);
+#endif
 
 	rc = power_supply_register(&client->dev, &bd->bat_ps);
 	if (rc) {

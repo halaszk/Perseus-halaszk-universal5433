@@ -58,4 +58,6 @@ struct link_pm_data {
 #endif
 };
 
+extern void clear_runtime_error_nowait(struct device *dev);
+
 #endif	/* __LINK_PM_HSIC_SHANNON_H__ */

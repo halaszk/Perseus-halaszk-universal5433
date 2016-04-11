@@ -25,10 +25,6 @@
 	model_info-hw_rev_end = <255>;
 	compatible = "samsung,GTS2 8 LTE 06", "samsung,exynos5433";
 
-	dwmmc0@15540000 {
-		clk_val = <0x2>;
-	};
-
 	i2c@25 {
 		status = "okay";
 		muic-universal@25 {
@@ -155,41 +151,6 @@
 		audio_ctrl: audio-ctl {
 			samsung,pins ="gpr3-2";
 			samsung,pin-con-pdn =<3>;
-		};
-	};
-
-	pinctrl@15690000 {
-		sd0_clk: sd0-clk {
-			samsung,pins = "gpr0-0";
-			samsung,pin-function = <2>;
-			samsung,pin-pud = <0>;
-			samsung,pin-drv = <2>;
-		};
-		sd0_cmd: sd0-cmd {
-			samsung,pins = "gpr0-1";
-			samsung,pin-function = <2>;
-			samsung,pin-pud = <0>;
-			samsung,pin-drv = <2>;
-		};
-		sd0_bus1: sd0-bus-width1 {
-			samsung,pins = "gpr1-0";
-			samsung,pin-function = <2>;
-			samsung,pin-pud = <0>;
-			samsung,pin-drv = <2>;
-		};
-
-		sd0_bus4: sd0-bus-width4 {
-			samsung,pins = "gpr1-1", "gpr1-2", "gpr1-3";
-			samsung,pin-function = <2>;
-			samsung,pin-pud = <0>;
-			samsung,pin-drv = <2>;
-		};
-
-		sd0_bus8: sd0-bus-width8 {
-			samsung,pins = "gpr1-4", "gpr1-5", "gpr1-6", "gpr1-7";
-			samsung,pin-function = <2>;
-			samsung,pin-pud = <0>;
-			samsung,pin-drv = <2>;
 		};
 	};
 
@@ -796,11 +757,11 @@
 			interrupt-parent = <&gpa0>;
 			interrupts = <5 0 0>;
 			cm36652,irq_gpio = <&gpa0 5 0x00>;
-			cm36652,default_hi_thd = <18>;
-			cm36652,default_low_thd = <14>;
+			cm36652,default_hi_thd = <17>;
+			cm36652,default_low_thd = <13>;
 			cm36652,cancel_hi_thd = <10>;
 			cm36652,cancel_low_thd = <7>;
-			cm36652,trim = <0x0000>;
+			cm36652,trim = <0x0003>;
 		};
 	};
 
@@ -870,5 +831,9 @@
 
 	fimc_is_sensor0: fimc_is_sensor@12100000 {
 		actuator_id = <13>;
+	};
+
+	fimc_is@14000000 {
+		vtcam_mipi_lane_num = <1>;
 	};
 };

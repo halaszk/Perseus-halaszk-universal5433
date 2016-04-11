@@ -185,7 +185,7 @@ static const unsigned char SEQ_GPARAM_ELVSS[] = {
 
 static const unsigned char SEQ_SET_TE_LINE[] = {
 	0xB9,
-	0x02, 0x07, 0x82, 0x00, 0x09
+	0x02, 0x07, 0x7C, 0x07, 0x7E
 };
 
 static const unsigned char SEQ_TE_ON[] = {
@@ -235,12 +235,10 @@ static const unsigned char SEQ_HBM_ON[] = {
 	0xC0
 };
 
-#ifdef CONFIG_DECON_MIC
-static const unsigned char SEQ_MIC_ENABLE[] = {
+static const unsigned char SEQ_MIC_DISABLE[] = {
 	0xF9,
-	0x0B,
+	0x13,
 };
-#endif
 
 static const unsigned char SEQ_ACL_OFF[] = {
 	0x55,
@@ -304,11 +302,8 @@ static const unsigned int DIM_TABLE[GAMMA_MAX] = {
 };
 
 static const unsigned int ELVSS_DIM_TABLE[] = {
-	2, 3, 4, 5,
-	6, 37, 77, 93,
-	111, 126, 143, 162,
-	172, 220, 249, 282,
-	300, 333, 360, 550,
+	15, 16, 17, 19, 34, 72, 87, 105, 119, 134,
+	152, 162, 207, 234, 265, 282, 316, 333, 360, 550
 };
 
 static const unsigned int *pELVSS_DIM_TABLE = ELVSS_DIM_TABLE;
@@ -329,10 +324,10 @@ static const unsigned char *HBM_TABLE[HBM_STATUS_MAX] = {
 };
 
 static const unsigned char ELVSS_TABLE[][ELVSS_TABLE_NUM] = {
-	{0x14, 0x14},
+	{0x0E, 0x0E},
+	{0x10, 0x10},
+	{0x12, 0x12},
 	{0x15, 0x15},
-	{0x16, 0x16},
-	{0x17, 0x17},
 	{0x18, 0x18},
 	{0x17, 0x17},
 	{0x16, 0x16},
@@ -348,13 +343,14 @@ static const unsigned char ELVSS_TABLE[][ELVSS_TABLE_NUM] = {
 	{0x0C, 0x0C},
 	{0x0B, 0x0B},
 	{0x0A, 0x0A},
+	{0x0A, 0x0A},
 };
 
 static const unsigned char (*pELVSS_TABLE)[ELVSS_TABLE_NUM] = ELVSS_TABLE;
 
 enum {
 	ACL_STATUS_0P,
-	ACL_STATUS_15P,
+	ACL_STATUS_8P,
 	ACL_STATUS_MAX
 };
 
@@ -373,13 +369,13 @@ enum {
 	VINT_STATUS_011,
 	VINT_STATUS_012,
 	VINT_STATUS_013,
-	VINT_STATUS_014,
+	VINT_STATUS_550,
 	VINT_STATUS_MAX
 };
 
 static const unsigned int VINT_DIM_TABLE[VINT_STATUS_MAX] = {
 	5,	6,	7,	8,	9,
-	10,	11,	12,	13,	14
+	10,	11,	12,	13,	550
 };
 
 static const unsigned char VINT_TABLE[VINT_STATUS_MAX] = {

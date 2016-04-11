@@ -452,6 +452,14 @@ struct _mmc_csd {
 #define MMC_SWITCH_MODE_WRITE_BYTE	0x03	/* Set target to value */
 
 /*
+ * Manufacturer ID from CID
+ */
+#define CID_MANFID_SANDISK	0x2
+#define CID_MANFID_TOSHIBA	0x11
+#define CID_MANFID_MICRON	0x13
+#define CID_MANFID_SAMSUNG	0x15
+
+/*
  * HS_TIMING
  */
 #define MMC_HS_TIMING_LEGACY	0	/* for legacy mode */

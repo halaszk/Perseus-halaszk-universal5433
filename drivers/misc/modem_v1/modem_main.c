@@ -51,6 +51,8 @@
 #define FMT_WAKE_TIME   (HZ/2)
 #define RAW_WAKE_TIME   (HZ*6)
 
+extern unsigned int lpcharge;
+
 static struct modem_shared *create_modem_shared_data(
 				struct platform_device *pdev)
 {
@@ -550,6 +552,12 @@ static int modem_probe(struct platform_device *pdev)
 	struct io_device **iod;
 	unsigned size;
 	struct link_device *ld;
+
+	if (lpcharge) {
+		mif_err("modem probe canceled - lpcharge mode\n");
+		return -EINVAL;
+	}
+
 	mif_err("%s: +++\n", pdev->name);
 
 	if (dev->of_node) {

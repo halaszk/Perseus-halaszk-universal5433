@@ -28,6 +28,7 @@ struct exynos_ohci_hcd {
 	struct exynos4_ohci_platdata *pdata;
 	struct notifier_block lpa_nb;
 	int power_on;
+	int retention;
 	unsigned post_lpa_resume:1;
 };
 
@@ -226,6 +227,7 @@ static int exynos_ohci_lpa_event(struct notifier_block *nb,
 static int exynos_ohci_probe(struct platform_device *pdev)
 {
 	struct exynos4_ohci_platdata *pdata = pdev->dev.platform_data;
+	struct device_node *node = (&pdev->dev)->of_node;
 	struct exynos_ohci_hcd *exynos_ohci;
 	struct usb_hcd *hcd;
 	struct ohci_hcd *ohci;
@@ -267,6 +269,10 @@ static int exynos_ohci_probe(struct platform_device *pdev)
 		exynos_ohci->otg = phy->otg;
 	}
 
+	err = of_property_read_u32_index(node, "l2-retention", 0,
+						&exynos_ohci->retention);
+	if (err)
+		dev_err(&pdev->dev, " can not find l2-retention value\n");
 skip_phy:
 
 	exynos_ohci->dev = &pdev->dev;
@@ -351,9 +357,11 @@ skip_phy:
 	exynos_ohci->lpa_nb.next = NULL;
 	exynos_ohci->lpa_nb.priority = 0;
 
-	err = register_samsung_usb_lpa_notifier(&exynos_ohci->lpa_nb);
-	if (err)
-		dev_err(&pdev->dev, "Failed to register lpa notifier\n");
+	if (!exynos_ohci->retention) {
+		err = register_samsung_usb_lpa_notifier(&exynos_ohci->lpa_nb);
+		if (err)
+			dev_err(&pdev->dev, "Failed to register lpa notifier\n");
+	}
 
 	exynos_ohci->power_on = 1;
 
@@ -381,7 +389,8 @@ static int exynos_ohci_remove(struct platform_device *pdev)
 	pm_runtime_disable(&pdev->dev);
 
 	exynos_ohci->power_on = 0;
-	unregister_samsung_usb_lpa_notifier(&exynos_ohci->lpa_nb);
+	if (!exynos_ohci->retention)
+		unregister_samsung_usb_lpa_notifier(&exynos_ohci->lpa_nb);
 	remove_ohci_sys_file(hcd_to_ohci(hcd));
 
 	usb_remove_hcd(hcd);

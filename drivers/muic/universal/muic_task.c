@@ -70,6 +70,12 @@ enum {
 
 extern struct muic_platform_data muic_pdata;
 
+static bool muic_online = false;
+
+bool muic_is_online(void)
+{
+	return muic_online;
+}
 static int muic_irq_handler(muic_data_t *pmuic, int irq)
 {
 	struct i2c_client *i2c = pmuic->i2c;
@@ -385,6 +391,9 @@ static int muic_probe(struct i2c_client *i2c,
 	INIT_DELAYED_WORK(&pmuic->usb_work, muic_show_debug_info);
 	schedule_delayed_work(&pmuic->usb_work, msecs_to_jiffies(10000));
 #endif
+
+	muic_online =  true;
+
 	return 0;
 
 fail_init_irq:
@@ -423,6 +432,7 @@ static int __devexit muic_remove(struct i2c_client *i2c)
 		i2c_set_clientdata(pmuic->i2c, NULL);
 		kfree(pmuic);
 	}
+	muic_online = false;
 	return 0;
 }
 
@@ -447,6 +457,16 @@ static void muic_shutdown(struct i2c_client *i2c)
 		return;
 	}
 
+	if (cancel_delayed_work(&pmuic->usb_work))
+		pr_info("%s: usb_work canceled.\n", __func__);
+	else
+		pr_info("%s: usb_work is not pending.\n", __func__);
+
+
+	if (cancel_delayed_work(&pmuic->init_work))
+		pr_info("%s: init_work canceled.\n", __func__);
+	else
+		pr_info("%s: init_work is not pending.\n", __func__);
 	pr_info("%s:%s open D+,D-\n", pmuic->chip_name, __func__);
 	ret = com_to_open_with_vbus(pmuic);
 	if (ret < 0)
@@ -461,6 +481,7 @@ static void muic_shutdown(struct i2c_client *i2c)
 	if (pmuic->pdata && pmuic->pdata->cleanup_switch_dev_cb)
 		pmuic->pdata->cleanup_switch_dev_cb();
 
+	muic_online =  false;
 	pr_info("%s:%s -\n", MUIC_DEV_NAME, __func__);
 }
 #if defined(CONFIG_PM)
@@ -470,6 +491,7 @@ static int muic_suspend(struct device *dev)
 	muic_data_t *pmuic = dev_get_drvdata(dev);
 	struct i2c_client *i2c = pmuic->i2c;
 
+	cancel_delayed_work(&pmuic->usb_work);
 	disable_irq_nosync(i2c->irq);
 
 	return 0;
@@ -481,6 +503,7 @@ static int muic_resume(struct device *dev)
 	struct i2c_client *i2c = pmuic->i2c;
 
 	enable_irq(i2c->irq);
+	schedule_delayed_work(&pmuic->usb_work, msecs_to_jiffies(1000));
 
 	return 0;
 }

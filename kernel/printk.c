@@ -310,6 +310,37 @@ static u32 log_next(u32 idx)
 	return idx + msg->len;
 }
 
+#ifdef CONFIG_EXYNOS_SNAPSHOT
+static void (*func_hook_logbuf)(const char *buf, u64 ts_nsec, size_t size);
+void register_hook_logbuf(void (*func)(const char *buf, u64 ts_sec, size_t size))
+{
+	unsigned long flags;
+
+	raw_spin_lock_irqsave(&logbuf_lock, flags);
+	/*
+	 * In register hooking function,  we should check messages already
+	 * printed on log_buf. If so, they will be copyied to backup
+	 * exynos log buffer
+	 * */
+	if (log_first_seq != log_next_seq) {
+		unsigned int step_seq, step_idx, start, end;
+		struct log *msg;
+		start = log_first_seq;
+		end = log_next_seq;
+		step_idx = log_first_idx;
+		for (step_seq = start; step_seq < end; step_seq++) {
+			msg = (struct log *)(log_buf + step_idx);
+			func(log_text(msg), msg->ts_nsec,
+				msg->text_len + msg->dict_len);
+			step_idx = log_next(step_idx);
+		}
+	}
+	func_hook_logbuf = func;
+	raw_spin_unlock_irqrestore(&logbuf_lock, flags);
+}
+EXPORT_SYMBOL(register_hook_logbuf);
+#endif
+
 #if defined(CONFIG_PRINTK_PROCESS)
 static bool printk_process = 1;
 #else
@@ -438,6 +469,12 @@ static void log_store(int facility, int level,
 		log_text_hook(sec_text, size);
 	}
 #endif
+#ifdef CONFIG_EXYNOS_SNAPSHOT
+	if (func_hook_logbuf)
+		func_hook_logbuf(log_text(msg),
+			msg->ts_nsec, text_len + dict_len);
+#endif
+
 	/* insert message */
 	log_next_idx += msg->len;
 	log_next_seq++;

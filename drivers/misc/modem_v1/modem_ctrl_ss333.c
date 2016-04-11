@@ -500,6 +500,7 @@ static int modemctl_notify_call(struct notifier_block *nfb,
 	case MDM_CRASH_CMD_RESET:
 	case MDM_CRASH_CMD_EXIT:
 	case MDM_EVENT_CP_FORCE_CRASH:
+	case MDM_CRASH_BY_IOSM:
 		ss333_force_crash_exit(mc);
 		break;
 	case MDM_EVENT_CP_ABNORMAL_RX:

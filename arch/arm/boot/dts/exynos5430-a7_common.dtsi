@@ -651,15 +651,15 @@
 
 		decon_board_list: decon_board_list {
 			enable_display_driver_power {
-				type = "regulator,enable", "gpio,high", "regulator,enable", "delay,usleep", "pinctrl,default", "pinctrl,turnon_tes";
-				desc = "Turn on VDDI(VDD3): 1.8", "Turn on VDDR(VDDI_REG): 1.5", "Turn on VCI: 3.0", "Wait 10ms", "default", "turnon_tes";
+				type = "regulator,enable", "delay,usleep", "regulator,enable", "delay,usleep", "gpio,high", "delay,usleep", "pinctrl,default", "pinctrl,turnon_tes";
+				desc = "Turn on VDDI(VDD3): 1.8", "Wait 1ms", "Turn on VCI: 3.0", "Wait 2ms", "Turn on VDDR(VDDI_REG): 1.5", "Wait 10ms", "default", "turnon_tes";
 				gpios = <&gpf1 5 0x1>;
-				delay = <10000 11000>;
+				delay = <1000 1000>, <2000 2000>, <10000 11000>;
 				regulator = "VCC_1.8V_LCD_AP", "VCC_3.0V_LCD_AP";
 			};
 			disable_display_driver_power {
-				type = "gpio,low", "regulator,disable", "gpio,low", "delay,usleep", "regulator,disable", "pinctrl,turnoff_tes";
-				desc = "", "Turn off VCI: 3.0", "Turn on VDDR(VDDI_REG): 1.5", "Wait 3ms", "Turn off VDDI(VDD3): 1.8", "turnoff_tes";
+				type = "gpio,low", "gpio,low", "delay,usleep", "regulator,disable", "regulator,disable", "pinctrl,turnoff_tes";
+				desc = "", "Turn on VDDR(VDDI_REG): 1.5", "Wait 3ms", "Turn off VCI: 3.0", "Turn off VDDI(VDD3): 1.8", "turnoff_tes";
 				gpios = <&gpv7 2 0x1>, <&gpf1 5 0x1>;
 				delay = <3000 5000>;
 				regulator = "VCC_3.0V_LCD_AP", "VCC_1.8V_LCD_AP";
@@ -1305,12 +1305,13 @@
 		earjack-micbias-gpio = <&gpv7 3 0>;
 
 		det-zones-list = <&det_zones 0 10 10 0>,
-				 <&det_zones 1000 10 10 0>,
-				 <&det_zones 1001 10 10 1>,
+				 <&det_zones 1520 10 10 0>,
+				 <&det_zones 1521 10 10 1>,
 				 <&det_zones 9999 10 10 1>;
-		but-zones-list = <&but_zones 0 0 530>,
-				 <&but_zones 1 531 621>,
-				 <&but_zones 2 622 999>;
+		but-zones-list = <&but_zones 0 0 204>,
+				 <&but_zones 3 205 285>,
+				 <&but_zones 1 286 499>,
+				 <&but_zones 2 500 1100>;
 		pinctrl-names = "earjack_gpio_active","earjack_gpio_suspend";
 		pinctrl-0 = <&earjack_det_act &earjack_switch_act>;
 		pinctrl-1 = <&earjack_det_sus &earjack_switch_sus>;
@@ -1393,7 +1394,7 @@
 		contig = <0 0x400000 0x0>,
 		         <2 0x100000 0x0>,
 		         <10 0x800000 0x0>,
-		         <11 0x6C00000 0x0>,
+		         <11 0x7300000 0x0>,
 		         <9 0x100000 0x0>,
 		         <8 0x200000 0x0>,
 		         <12 0x200000 0x0>,

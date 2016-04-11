@@ -79,16 +79,16 @@ typedef unsigned char BYTE;
 
 
 // SCSRs
-#define ID_REV                  	(0x00UL)
-    #define ID_REV_CHIP_ID_MASK_   			(0xffff0000UL)
-    #define ID_REV_CHIP_REV_MASK_  			(0x0000ffffUL)
-    #define ID_REV_CHIP_ID_9500_        	(0x9500UL)
-    #define GetChipIdFromID_REV(dwReg)     	((dwReg & ID_REV_CHIP_ID_MASK_) >> 16)
-    #define GetChiprevFromID_REV(dwReg)    	(dwReg & ID_REV_CHIP_REV_MASK_)
+#define ID_REV								(0x00UL)
+    #define ID_REV_CHIP_ID_MASK_			(0xffff0000UL)
+    #define ID_REV_CHIP_REV_MASK_			(0x0000ffffUL)
+    #define ID_REV_CHIP_ID_9500_			(0x9500UL)
+    #define GetChipIdFromID_REV(dwReg)		((dwReg & ID_REV_CHIP_ID_MASK_) >> 16)
+    #define GetChiprevFromID_REV(dwReg)		(dwReg & ID_REV_CHIP_REV_MASK_)
 
 #define	FPGA_REV			(0x04UL)
 
-#define INT_STS                  	(0x08UL)
+#define INT_STS				(0x08UL)
     #define		INT_STS_TX_STOP_				(0x00020000UL)
     #define		INT_STS_RX_STOP_				(0x00010000UL)
     #define		INT_STS_PHY_INT_				(0x00008000UL)
@@ -96,39 +96,39 @@ typedef unsigned char BYTE;
     #define		INT_STS_TDFU_					(0x00002000UL)
     #define		INT_STS_TDFO_					(0x00001000UL)
     #define		INT_STS_RXDF_					(0x00000800UL)
-    #define		INT_STS_GPIOS_	    			(0x000007FFUL)
+    #define		INT_STS_GPIOS_					(0x000007FFUL)
 
-#define RX_CFG                  	(0x0CUL)
-	#define RX_FIFO_FLUSH_         	   		    (0x00000001UL)
+#define RX_CFG									(0x0CUL)
+	#define RX_FIFO_FLUSH_						(0x00000001UL)
 
-#define TX_CFG                  	(0x10UL)
-	#define TX_CFG_ON_                 			(0x00000004UL)
-	#define TX_CFG_STOP_               			(0x00000002UL)
-	#define TX_CFG_FIFO_FLUSH_         			(0x00000001UL)
+#define TX_CFG									(0x10UL)
+	#define TX_CFG_ON_							(0x00000004UL)
+	#define TX_CFG_STOP_						(0x00000002UL)
+	#define TX_CFG_FIFO_FLUSH_					(0x00000001UL)
 
-#define HW_CFG                  	(0x14UL)
-	#define HW_CFG_SMDET_STS         			(0x00040000UL)
-	#define HW_CFG_SMDET_EN	         			(0x00020000UL)
-	#define HW_CFG_EEM		         			(0x00010000UL)
-	#define HW_CFG_RST_PROTECT         			(0x00008000UL)
-	#define HW_CFG_PHY_BOOST           			(0x00006000UL)
-		#define HW_CFG_PHY_BOOST_NORMAL			(0x00000000UL)
-		#define HW_CFG_PHY_BOOST_4				(0x00002000UL)
-		#define HW_CFG_PHY_BOOST_8				(0x00004000UL)
-		#define HW_CFG_PHY_BOOST_12				(0x00006000UL)
-	#define HW_CFG_BIR_             			(0x00001000UL)
-	#define HW_CFG_LEDB_             			(0x00000800UL)
-	#define HW_CFG_RXDOFF_            	 		(0x00000600UL)
-	#define HW_CFG_RXDOFF_2_            	 	(0x00000400UL)
-	#define HW_CFG_SBP_               			(0x00000100UL)
-	#define HW_CFG_IME_               			(0x00000080UL)
-	#define HW_CFG_DRP_               			(0x00000040UL)
-	#define HW_CFG_MEF_               			(0x00000020UL)
-	#define HW_CFG_ETC_					(0x00000010UL)
-	#define HW_CFG_LRST_               			(0x00000008UL)
-	#define HW_CFG_PSEL_               			(0x00000004UL)
-	#define HW_CFG_BCE_               			(0x00000002UL)
-	#define HW_CFG_SRST_               			(0x00000001UL)
+#define HW_CFG									(0x14UL)
+	#define HW_CFG_SMDET_STS					(0x00040000UL)
+	#define HW_CFG_SMDET_EN						(0x00020000UL)
+	#define HW_CFG_EEM							(0x00010000UL)
+	#define HW_CFG_RST_PROTECT					(0x00008000UL)
+	#define HW_CFG_PHY_BOOST					(0x00006000UL)
+	#define HW_CFG_PHY_BOOST_NORMAL				(0x00000000UL)
+	#define HW_CFG_PHY_BOOST_4					(0x00002000UL)
+	#define HW_CFG_PHY_BOOST_8					(0x00004000UL)
+	#define HW_CFG_PHY_BOOST_12					(0x00006000UL)
+	#define HW_CFG_BIR_							(0x00001000UL)
+	#define HW_CFG_LEDB_						(0x00000800UL)
+	#define HW_CFG_RXDOFF_						(0x00000600UL)
+	#define HW_CFG_RXDOFF_2_					(0x00000400UL)
+	#define HW_CFG_SBP_							(0x00000100UL)
+	#define HW_CFG_IME_							(0x00000080UL)
+	#define HW_CFG_DRP_							(0x00000040UL)
+	#define HW_CFG_MEF_							(0x00000020UL)
+	#define HW_CFG_ETC_							(0x00000010UL)
+	#define HW_CFG_LRST_						(0x00000008UL)
+	#define HW_CFG_PSEL_						(0x00000004UL)
+	#define HW_CFG_BCE_							(0x00000002UL)
+	#define HW_CFG_SRST_						(0x00000001UL)
 
 #define RX_FIFO_INF                (0x18UL)
 
@@ -161,20 +161,20 @@ typedef unsigned char BYTE;
 	#define LED_GPIO_CFG_GPCTL_08_		(0x00030000UL)
 	#define LED_GPIO_CFG_GPCTL_08_SH				16
 
-	#define LED_GPIO_CFG_GPCTL_DIAG2_ 	(0x3UL)
-	#define LED_GPIO_CFG_GPCTL_DIAG1_ 	(0x2UL)
-	#define LED_GPIO_CFG_GPCTL_LED_ 	(0x1UL)
-	#define LED_GPIO_CFG_GPCTL_GPIO_ 	(0x0UL)
+	#define LED_GPIO_CFG_GPCTL_DIAG2_	(0x3UL)
+	#define LED_GPIO_CFG_GPCTL_DIAG1_	(0x2UL)
+	#define LED_GPIO_CFG_GPCTL_LED_		(0x1UL)
+	#define LED_GPIO_CFG_GPCTL_GPIO_	(0x0UL)
 
 	#define LED_GPIO_CFG_GPBUF_			(0x00000700UL)
-	#define LED_GPIO_CFG_GPBUF_10_ 		(0x00000400UL)
-	#define LED_GPIO_CFG_GPBUF_09_ 		(0x00000200UL)
-	#define LED_GPIO_CFG_GPBUF_08_ 		(0x00000100UL)
+	#define LED_GPIO_CFG_GPBUF_10_		(0x00000400UL)
+	#define LED_GPIO_CFG_GPBUF_09_		(0x00000200UL)
+	#define LED_GPIO_CFG_GPBUF_08_		(0x00000100UL)
 	#define LED_GPIO_CFG_GPDIR_			(0x00000070UL)
-	#define LED_GPIO_CFG_GPDIR_10_ 		(0x00000040UL)
-	#define LED_GPIO_CFG_GPDIR_09_ 		(0x00000020UL)
-	#define LED_GPIO_CFG_GPDIR_08_ 		(0x00000010UL)
-	#define LED_GPIO_CFG_GPDATA_   		(0x00000007UL)
+	#define LED_GPIO_CFG_GPDIR_10_		(0x00000040UL)
+	#define LED_GPIO_CFG_GPDIR_09_		(0x00000020UL)
+	#define LED_GPIO_CFG_GPDIR_08_		(0x00000010UL)
+	#define LED_GPIO_CFG_GPDATA_		(0x00000007UL)
 	#define LED_GPIO_CFG_GPDATA_10_		(0x00000004UL)
 	#define LED_GPIO_CFG_GPDATA_09_		(0x00000002UL)
 	#define LED_GPIO_CFG_GPDATA_08_		(0x00000001UL)
@@ -227,7 +227,7 @@ typedef unsigned char BYTE;
 #define DP_CMD				(0x44UL)
 	#define DP_CMD_READ		(0x0)
 	#define DP_CMD_WRITE	(0x1)
-#define DP_ADDR 			(0x48UL)
+#define DP_ADDR				(0x48UL)
 #define DP_DATA0			(0x4CUL)
 #define DP_DATA1			(0x50UL)
 #define RAM_BIST0			(0x54UL)
@@ -238,17 +238,17 @@ typedef unsigned char BYTE;
 #define INT_EP_CTL          (0x68UL)
 #define BULK_IN_DLY         (0x6CUL)
 
-#define 	INT_EP_CTL_INTEP_			(0x80000000UL)
-#define 	INT_EP_CTL_MACRTO_			(0x00080000UL)
-#define 	INT_EP_CTL_RX_FIFO_EN_		(0x00040000UL)
-#define		INT_EP_CTL_TX_STOP_			(0x00020000UL)
-#define		INT_EP_CTL_RX_STOP_			(0x00010000UL)
-#define		INT_EP_CTL_PHY_INT_			(0x00008000UL)
-#define		INT_EP_CTL_TXE_				(0x00004000UL)
-#define		INT_EP_CTL_TDFU_  			(0x00002000UL)
-#define		INT_EP_CTL_TDFO_  			(0x00001000UL)
-#define		INT_EP_CTL_RXDF_  			(0x00000800UL)
-#define		INT_EP_CTL_GPIOS_ 			(0x000007FFUL)
+#define INT_EP_CTL_INTEP_			(0x80000000UL)
+#define INT_EP_CTL_MACRTO_			(0x00080000UL)
+#define INT_EP_CTL_RX_FIFO_EN_		(0x00040000UL)
+#define INT_EP_CTL_TX_STOP_			(0x00020000UL)
+#define INT_EP_CTL_RX_STOP_			(0x00010000UL)
+#define INT_EP_CTL_PHY_INT_			(0x00008000UL)
+#define INT_EP_CTL_TXE_				(0x00004000UL)
+#define INT_EP_CTL_TDFU_			(0x00002000UL)
+#define INT_EP_CTL_TDFO_			(0x00001000UL)
+#define INT_EP_CTL_RXDF_			(0x00000800UL)
+#define INT_EP_CTL_GPIOS_			(0x000007FFUL)
 
 #define     FLAG_ATTR        (0xB0UL)
 
@@ -261,20 +261,18 @@ typedef unsigned char BYTE;
 	#define FLAG_ATTR_PME_BUFF_TYPE     (0x8UL)
 	#define FLAG_ATTR_PME_WAKE_PHY      (0x4UL)
 	#define FLAG_ATTR_PME_GPIO10_HIGH   (0x2UL)
-	
-	
 
 // MAC CSRs
 #define MAC_CR					(0x100UL)
 	#define MAC_CR_RXALL_						0x80000000UL
 	#define MAC_CR_ENABLE_EEE                   0x02000000UL
-	#define MAC_CR_RCVOWN_		       			0x00800000UL
+	#define MAC_CR_RCVOWN_						0x00800000UL
 	#define MAC_CR_LOOPBK_						0x00200000UL
 	#define MAC_CR_FDPX_						0x00100000UL
 	#define MAC_CR_MCPAS_						0x00080000UL
 	#define MAC_CR_PRMS_						0x00040000UL
 	#define MAC_CR_INVFILT_						0x00020000UL
-	#define MAC_CR_PASSBAD_				    	0x00010000UL
+	#define MAC_CR_PASSBAD_						0x00010000UL
 	#define MAC_CR_HFILT_						0x00008000UL
 	#define MAC_CR_HPFILT_						0x00002000UL
 	#define MAC_CR_LCOLL_						0x00001000UL
@@ -290,17 +288,17 @@ typedef unsigned char BYTE;
 #define HASHH					(0x10CUL)
 #define HASHL					(0x110UL)
 
-#define MII_ADDR                   	 (0x114UL)
-    #define MII_WRITE_      		 (0x02UL)
-    #define MII_BUSY_   			 (0x01UL)
-    #define MII_READ_	             (0x00UL)	// ~of MII Write bit
+#define MII_ADDR					(0x114UL)
+    #define MII_WRITE_				(0x02UL)
+    #define MII_BUSY_				(0x01UL)
+    #define MII_READ_				(0x00UL)	// ~of MII Write bit
 
-    #define MII_DATA               	 (0x118UL)
-    #define FLOW                   	 (0x11CUL)
-    #define FLOW_FCPT_ 				 (0xFFFF0000UL)
-    #define FLOW_FCPASS_			 (0x00000004UL)
-    #define FLOW_FCEN_  	       	 (0x00000002UL)
-    #define FLOW_FCBSY_ 			 (0x00000001UL)
+    #define MII_DATA				(0x118UL)
+    #define FLOW					(0x11CUL)
+    #define FLOW_FCPT_				(0xFFFF0000UL)
+    #define FLOW_FCPASS_			(0x00000004UL)
+    #define FLOW_FCEN_				(0x00000002UL)
+    #define FLOW_FCBSY_				(0x00000001UL)
 
 #define VLAN1					(0x120UL)
 #define VLAN2					(0x124UL)
@@ -328,7 +326,7 @@ typedef unsigned char BYTE;
 #define PHY_BCR_SPEED_SELECT_			((u16)0x2000U)
 #define PHY_BCR_AUTO_NEG_ENABLE_		((u16)0x1000U)
 #define PHY_BCR_POWER_DOWN              ((u16)0x0800U)
-#define PHY_BCR_ISOLATE                	((u16)0x0400U)
+#define PHY_BCR_ISOLATE					((u16)0x0400U)
 #define PHY_BCR_RESTART_AUTO_NEG_	    ((u16)0x0200U)
 #define PHY_BCR_DUPLEX_MODE_			((u16)0x0100U)
 
@@ -342,7 +340,7 @@ typedef unsigned char BYTE;
 
 #define PHY_ANEG_ADV    ((u32)4U)
 #define PHY_ANEG_NEXT_PAGE          ((u16)0x8000)
-#define PHY_ANEG_ADV_PAUSE_ 		((u16)0x0C00)
+#define PHY_ANEG_ADV_PAUSE_			((u16)0x0C00)
 #define PHY_ANEG_ADV_ASYMP_			((u16)0x0800)
 #define PHY_ANEG_ADV_SYMP_			((u16)0x0400)
 #define PHY_ANEG_ADV_SPEED_			((u16)0x1E0)
@@ -361,8 +359,8 @@ typedef unsigned char BYTE;
 #define PHY_ANEG_LPA_10FDX_			((u16)0x0040)
 #define PHY_ANEG_LPA_10HDX_			((u16)0x0020)
 
-#define PHY_ANEG_REG	 ((u32)6U)     /* Auto-Negotiation Expansion Reg */
-#define PHY_LP_AN_ABLE              		       ((u16)0x0001)
+#define PHY_ANEG_REG		((u32)6U)     /* Auto-Negotiation Expansion Reg */
+#define PHY_LP_AN_ABLE		((u16)0x0001)
 
 #define PHY_SILICON_REV  ((u32)16U)
 #define PHY_SILICON_REV_TX_NLP_EN_    BIT_15
@@ -430,7 +428,7 @@ typedef unsigned char BYTE;
 #define PHY_SPECIAL_SPD_100FULL_	((u16)0x0018U)
 
 #define AMDIX_DISABLE_STRAIGHT	    ((u16)0x0U)
-#define AMDIX_DISABLE_CROSSOVER  	((u16)0x01U)
+#define AMDIX_DISABLE_CROSSOVER		((u16)0x01U)
 #define AMDIX_ENABLE	            ((u16)0x02U)
 
 
@@ -444,29 +442,29 @@ typedef unsigned char BYTE;
 #define PHY_LAN83C183_MASK_INT			~0x8000
 #define PHY_LAN83C183_MASK_LINK			~0x4000
 
-#define PHY_FOX_INT_SOURCE		0x1D
-#define PHY_FOX_INT_ENERGY_ON				BIT_7
-#define PHY_FOX_INT_NWAY_DONE			BIT_6
-#define PHY_FOX_INT_REMOTE_FAULT			BIT_5
-#define PHY_FOX_INT_LINK_DOWN				BIT_4
-#define PHY_FOX_INT_NWAY_LP_ACK			BIT_3
-#define PHY_FOX_INT_PARALLEL_DET			BIT_2
-#define PHY_FOX_INT_NWAY_PAGE_RX			BIT_1
-#define PHY_FOX_INT_RESERVED				BIT_0
+#define PHY_FOX_INT_SOURCE			0x1D
+#define PHY_FOX_INT_ENERGY_ON		BIT_7
+#define PHY_FOX_INT_NWAY_DONE		BIT_6
+#define PHY_FOX_INT_REMOTE_FAULT	BIT_5
+#define PHY_FOX_INT_LINK_DOWN		BIT_4
+#define PHY_FOX_INT_NWAY_LP_ACK		BIT_3
+#define PHY_FOX_INT_PARALLEL_DET	BIT_2
+#define PHY_FOX_INT_NWAY_PAGE_RX	BIT_1
+#define PHY_FOX_INT_RESERVED		BIT_0
 
 #define PHY_FOX_INT_MASK			0x1E
 
 #define PHY_QSI_INT_SOURCE_REG      0x1D    /* Interrupt Source Register for QSI */
-#define PHY_QSI_AN_COMPLETE_INT     		BIT_6
-#define	PHY_QSI_REM_FAULT_INT       		BIT_5
-#define	PHY_QSI_LINK_DOWN_INT       		BIT_4
-#define	PHY_QSI_AN_LP_ACK_INT       		BIT_3
-#define	PHY_QSI_PAR_DET_INT         			BIT_2
-#define	PHY_QSI_AN_PAGE_RCVD_INT    		BIT_1
-#define	PHY_QSI_RCV_ERR_CNT_INT     		BIT_0
+#define PHY_QSI_AN_COMPLETE_INT		BIT_6
+#define	PHY_QSI_REM_FAULT_INT		BIT_5
+#define	PHY_QSI_LINK_DOWN_INT		BIT_4
+#define	PHY_QSI_AN_LP_ACK_INT		BIT_3
+#define	PHY_QSI_PAR_DET_INT			BIT_2
+#define	PHY_QSI_AN_PAGE_RCVD_INT	BIT_1
+#define	PHY_QSI_RCV_ERR_CNT_INT		BIT_0
 
 #define PHY_QSI_INT_MASK_REG        0x1E    /* Interrupt Mask Register for QSI */
-#define PHY_QSI_INT_MODE            			BIT_15
+#define PHY_QSI_INT_MODE			BIT_15
 
 /******************************************************************************/
 /* Bit Mask definitions                                                       */
@@ -510,7 +508,7 @@ typedef unsigned char BYTE;
 #define		USB_VENDOR_REQUEST_READ_REGISTER	0xA1
 #define		USB_VENDOR_REQUEST_GET_STATS		0xA2
 
-#define rx_stat_count   	8
+#define rx_stat_count		8
 #define tx_stat_count		10
 
 // Stats block structures
@@ -848,10 +846,9 @@ typedef struct _ADAPTER_DATA {
 	u32	RxFifoDroppedFrames;
 	u32     EeeRxLpiTransitions;
 	u32     EeeRxLpiTime;
-	
+
 	SMSC9500_RX_STATS rx_statistics;
 	SMSC9500_TX_STATS tx_statistics;
-	
 } ADAPTER_DATA, *PADAPTER_DATA;
 
 typedef struct _MAC_ADDR_IN_RAM{

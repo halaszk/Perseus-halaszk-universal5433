@@ -18,7 +18,8 @@
 		status = "okay";
 
 		pinctrl-names = "default";
-		pinctrl-0 = <&cp_on &cp_reset &pda_active &phone_active &ap2cp_wakeup &ap2cp_status &cp2ap_wakeup &cp2ap_status &gpio_ipc_int2cp>;
+		pinctrl-0 = <&cp_on &cp_reset &pda_active &phone_active &ap2cp_wakeup &ap2cp_status
+&cp2ap_wakeup &cp2ap_status &gpio_ipc_int2cp &ap_dump_int>;
 
 		mif,gpio_cp_on = <&gpr3 1 0x1>;
 
@@ -28,6 +29,7 @@
 
 		mif,gpio_cp_status = <&gpa2 5 0xf>;
 		mif,gpio_ipc_int2cp = <&gpf0 5 0x1>;
+		mif,gpio_ap_dump_int = <&gpr2 0 0x1>;
 
 		link_pm {
 			gpio_cp2ap_wakeup = <&gpa3 1 0xf>;
@@ -41,6 +43,14 @@
 		cp_on: cp_on {
 			samsung,pins = "gpr3-1";
 			samsung,pin-function = <1>;
+			samsung,pin-con-pdn = <3>;
+			samsung,pin-pud-pdn = <0>;
+		};
+
+		ap_dump_int: ap_dump_int {
+			samsung,pins = "gpr2-0";
+			samsung,pin-function = <1>;
+			samsung,pin-pud = <0>;
 			samsung,pin-con-pdn = <3>;
 			samsung,pin-pud-pdn = <0>;
 		};
@@ -182,8 +192,6 @@
 
 &pinctrl_5 {
 	sleep5: sleep-state {
-		PIN_SLP(gpr2-0, INPUT, DOWN);	/* AP_DUMP_INT */
-
 		PIN_SLP(gpr3-1, PREV, NONE);	/* CP_ON */
 	};
 };

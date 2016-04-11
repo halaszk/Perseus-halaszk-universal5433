@@ -1537,7 +1537,10 @@ static struct page *new_slab(struct kmem_cache *s, gfp_t flags, int node)
 	set_freepointer(s, last, NULL);
 #ifdef CONFIG_RKP_DBLMAP_PROT
 	if (boot_mode_security){
-		tima_send_cmd5(page_to_phys(page), compound_order(page), 1, (unsigned long) __pa(rkp_double_bitmap), 0, 0x4a);
+		unsigned long pa = page_to_phys(page);
+		if ((pa >= PHYS_OFFSET) && (pa <= PHYS_OFFSET + RAM_SIZE)){
+			tima_send_cmd5(page_to_phys(page), compound_order(page), 1, (unsigned long) __pa(rkp_double_bitmap), 0, 0x4a);
+		}
 	}
 #endif
 
@@ -1559,7 +1562,10 @@ static void __free_slab(struct kmem_cache *s, struct page *page)
 
 #ifdef CONFIG_RKP_DBLMAP_PROT
 	if (boot_mode_security){
-		tima_send_cmd5(page_to_phys(page), compound_order(page), 0, (unsigned long) __pa(rkp_double_bitmap), 0, 0x4a);
+		unsigned long pa = page_to_phys(page);
+		if ((pa >= PHYS_OFFSET) && (pa <= PHYS_OFFSET + RAM_SIZE)){
+			tima_send_cmd5(page_to_phys(page), compound_order(page), 0, (unsigned long) __pa(rkp_double_bitmap), 0, 0x4a);
+		}
 	}
 #endif
 

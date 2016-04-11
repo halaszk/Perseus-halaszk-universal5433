@@ -252,12 +252,12 @@ static int dirty_map(struct dm_target *ti, struct bio *bio)
 
 	if (bio->bi_size & ((1 << v->data_dev_block_bits) - 1) ||
 		(bio->bi_sector & ((1 << (v->data_dev_block_bits - SECTOR_SHIFT)) - 1))) {
-		DMERR("Not page size IO: size:%u, sector:%llu", bio->bi_size, bio->bi_sector);
+		DMERR("Not page size IO: size:%u, sector:%llu", bio->bi_size, (long long unsigned int)bio->bi_sector);
 		return -EIO;
 	}
 
 	if(sector_to_block(v, bio->bi_sector) + bytes_to_block(v, bio->bi_size) > v->data_blocks) {
-		DMERR("Out of range. sector:%llu, size:%u", bio->bi_sector, bio->bi_size);
+		DMERR("Out of range. sector:%llu, size:%u", (long long unsigned int)bio->bi_sector, bio->bi_size);
 		return -EIO;
 	}
 
@@ -375,12 +375,12 @@ static int finish_verity_tree(struct dm_verity *v)
 			dirty_one_level_up(v, block_num, i - 1, &hash_block, &offset);
 
 			if (dirty_update_hash(v, block_num, desc, result)) {
-				DMERR("Error calculating hash for block %llu", block_num);
+				DMERR("Error calculating hash for block %llu", (long long unsigned int)block_num);
 				goto free_desc;
 			}
 			hash_block_buf = dm_bufio_read(v->bufio, hash_block, &buf);
 			if (unlikely(IS_ERR(hash_block_buf))) {
-				DMERR("Error getting hash block %llu in dtr", hash_block);
+				DMERR("Error getting hash block %llu in dtr", (long long unsigned int)hash_block);
 				buf = NULL;
 				goto free_desc;
 			}
@@ -394,7 +394,7 @@ static int finish_verity_tree(struct dm_verity *v)
 	hash_block = v->hash_level_block[v->levels - 1];
 	/* Calculate root hash */
 	if(dirty_update_hash(v, hash_block, desc, result)) {
-		DMERR("Failed to calculate root hash. Block: %llu", hash_block);
+		DMERR("Failed to calculate root hash. Block: %llu", (long long unsigned int)hash_block);
 		goto free_desc;
 	}
 	memcpy(v->root_digest, result, v->digest_size);
@@ -518,7 +518,7 @@ static int dirty_ctr(struct dm_target *ti, unsigned argc, char **argv)
 	}
 
 	if (sscanf(argv[0], "%d%c", &num, &dummy) != 1 ||
-	    num < 0 || num > 1) {
+	    num > 1) {
 		ti->error = "Invalid version";
 		r = -EINVAL;
 		goto bad;
@@ -711,6 +711,28 @@ bad:
 	return r;
 }
 
+static int dirty_iterate_devices(struct dm_target *ti,
+				  iterate_devices_callout_fn fn, void *data)
+{
+	struct dm_verity *v = ti->private;
+
+	return fn(ti, v->data_dev, v->data_start, ti->len, data);
+}
+
+
+static void dirty_io_hints(struct dm_target *ti, struct queue_limits *limits)
+{
+	struct dm_verity *v = ti->private;
+
+	if (limits->logical_block_size < 1 << v->data_dev_block_bits) {
+		limits->logical_block_size = 1 << v->data_dev_block_bits;
+	}
+	if (limits->physical_block_size < 1 << v->data_dev_block_bits) {
+		limits->physical_block_size = 1 << v->data_dev_block_bits;
+	}
+	blk_limits_io_min(limits, limits->logical_block_size);
+}
+
 static struct target_type dirty_target = {
 	.name		= "dirty",
 	.version	= {1, 0, 0},
@@ -720,6 +742,8 @@ static struct target_type dirty_target = {
 	.map		= dirty_map,
 	.status		= dirty_status,
 	.ioctl		= dirty_ioctl,
+	.iterate_devices = dirty_iterate_devices,
+	.io_hints	= dirty_io_hints,
 };
 
 static int __init dm_dirty_init(void)

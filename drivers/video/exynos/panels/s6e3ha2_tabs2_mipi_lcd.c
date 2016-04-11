@@ -39,10 +39,10 @@
 #include "mdnie_lite_table_tabs28.h"
 #endif
 
-#define POWER_IS_ON(pwr)		(pwr <= FB_BLANK_NORMAL)
-#define LEVEL_IS_HBM(auto_brightness)	(auto_brightness >= 6)
-#define LEVEL_IS_CAPS_OFF(level)	(level <= IBRIGHTNESS_39NT)
-#define LEVEL_IS_ACL_OFF(brightness)	(brightness == 255)
+#define POWER_IS_ON(pwr)				(pwr <= FB_BLANK_NORMAL)
+#define LEVEL_IS_HBM(auto_brightness, brightness)	(auto_brightness >= 6 && brightness == MAX_BRIGHTNESS)
+#define LEVEL_IS_CAPS_OFF(level)			(level <= IBRIGHTNESS_39NT)
+#define LEVEL_IS_ACL_OFF(auto_brightness, brightness)	(auto_brightness < 6 && brightness == MAX_BRIGHTNESS)
 
 #define NORMAL_TEMPERATURE		25	/* 25 degrees Celsius */
 
@@ -637,7 +637,7 @@ static int s6e3ha2_set_acl(struct lcd_info *lcd, u8 force)
 	if (lcd->siop_enable)
 		goto acl_update;
 
-	if (!lcd->acl_enable && LEVEL_IS_ACL_OFF(lcd->brightness))
+	if (!lcd->acl_enable && LEVEL_IS_ACL_OFF(lcd->auto_brightness, lcd->brightness))
 		level = ACL_STATUS_0P;
 
 acl_update:
@@ -645,7 +645,7 @@ acl_update:
 		ret = s6e3ha2_write(lcd, ACL_CUTOFF_TABLE[level], ACL_PARAM_SIZE);
 		ret += s6e3ha2_write(lcd, ACL_OPR_TABLE[level], OPR_PARAM_SIZE);
 		lcd->current_acl = ACL_CUTOFF_TABLE[level][1];
-		dev_info(&lcd->ld->dev, "acl: %d, brightness: %d\n", lcd->current_acl, lcd->brightness);
+		dev_info(&lcd->ld->dev, "acl: %d, brightness: %d, auto: %d\n", lcd->current_acl, lcd->brightness, lcd->auto_brightness);
 	}
 
 	if (!ret)
@@ -729,7 +729,7 @@ static int s6e3ha2_set_tset(struct lcd_info *lcd, u8 force)
 
 static int s6e3ha2_set_hbm(struct lcd_info *lcd, u8 force)
 {
-	int ret = 0, level = LEVEL_IS_HBM(lcd->auto_brightness);
+	int ret = 0, level = LEVEL_IS_HBM(lcd->auto_brightness, lcd->brightness);
 
 	if (force || lcd->current_hbm != HBM_TABLE[level][1]) {
 		ret = s6e3ha2_write(lcd, HBM_TABLE[level], HBM_PARAM_SIZE);
@@ -1087,7 +1087,7 @@ static int update_brightness(struct lcd_info *lcd, u8 force)
 
 	lcd->bl = get_backlight_level_from_brightness(lcd->brightness);
 
-	if (LEVEL_IS_HBM(lcd->auto_brightness) && (lcd->brightness == lcd->bd->props.max_brightness))
+	if (LEVEL_IS_HBM(lcd->auto_brightness, lcd->brightness))
 		lcd->bl = IBRIGHTNESS_500NT;
 
 	if (force || lcd->ldi_enable) {

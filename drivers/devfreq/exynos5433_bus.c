@@ -2625,13 +2625,13 @@ struct devfreq_distriction_level {
 };
 
 struct devfreq_distriction_level distriction_fullhd[] = {
-	{MIF_LV9,       DISP_LV3},                      /*  78000 or  83000 */
-	{MIF_LV8,       DISP_LV3},                      /* 103000 or 111000 */
-	{MIF_LV7,       DISP_LV3},                      /* 138000 or 133000 */
-	{MIF_LV6,       DISP_LV2},                      /* 165000 or 167000 */
-	{MIF_LV5,       DISP_LV2},                      /* 206000 or 222000 */
-	{MIF_LV4,       DISP_LV2},                      /* 275000 or 334000 */
-	{MIF_LV0,       DISP_LV0},                      /* 825000 or 921000 */
+	{MIF_LV9,       DISP_LV3,	INT_LV6},                      /*  78000 or  83000 */
+	{MIF_LV8,       DISP_LV3,	INT_LV6},                      /* 103000 or 111000 */
+	{MIF_LV7,       DISP_LV3,	INT_LV6},                      /* 138000 or 133000 */
+	{MIF_LV6,       DISP_LV2,	INT_LV5},                      /* 165000 or 167000 */
+	{MIF_LV5,       DISP_LV2,	INT_LV5},                      /* 206000 or 222000 */
+	{MIF_LV4,       DISP_LV2,	INT_LV5},                      /* 275000 or 334000 */
+	{MIF_LV0,       DISP_LV0,	INT_LV3},                      /* 825000 or 921000 */
 };
 
 unsigned int timeout_fullhd[][2] = {
@@ -2648,13 +2648,13 @@ unsigned int timeout_fullhd[][2] = {
 };
 
 struct devfreq_distriction_level distriction_fullhd_gscl[] = {
-	{MIF_LV6,	DISP_LV2},
-	{MIF_LV5,	DISP_LV2},
-	{MIF_LV5,	DISP_LV2},
-	{MIF_LV4,	DISP_LV2},
-	{MIF_LV4,	DISP_LV2},
-	{MIF_LV0,	DISP_LV3},
-	{MIF_LV0,	DISP_LV0},
+	{MIF_LV6,	DISP_LV2,	INT_LV5},
+	{MIF_LV5,	DISP_LV2,	INT_LV5},
+	{MIF_LV5,	DISP_LV2,	INT_LV5},
+	{MIF_LV4,	DISP_LV2,	INT_LV5},
+	{MIF_LV4,	DISP_LV2,	INT_LV5},
+	{MIF_LV0,	DISP_LV3,	INT_LV6},
+	{MIF_LV0,	DISP_LV0,	INT_LV0},
 };
 
 unsigned int timeout_fullhd_gscl[][2] = {
@@ -2671,13 +2671,13 @@ unsigned int timeout_fullhd_gscl[][2] = {
 };
 
 struct devfreq_distriction_level distriction_fullhd_tv[] = {
-	{MIF_LV4,	DISP_LV1},
-	{MIF_LV4,	DISP_LV1},
-	{MIF_LV4,	DISP_LV1},
-	{MIF_LV4,	DISP_LV1},
-	{MIF_LV4,	DISP_LV1},
-	{MIF_LV3,	DISP_LV1},
-	{MIF_LV0,	DISP_LV0},
+	{MIF_LV4,	DISP_LV1,	INT_LV4},
+	{MIF_LV4,	DISP_LV1,	INT_LV4},
+	{MIF_LV4,	DISP_LV1,	INT_LV4},
+	{MIF_LV4,	DISP_LV1,	INT_LV4},
+	{MIF_LV4,	DISP_LV1,	INT_LV4},
+	{MIF_LV3,	DISP_LV1,	INT_LV4},
+	{MIF_LV0,	DISP_LV0,	INT_LV0},
 };
 
 unsigned int timeout_fullhd_tv[][2] = {
@@ -2695,13 +2695,13 @@ unsigned int timeout_fullhd_tv[][2] = {
 
 
 struct devfreq_distriction_level distriction_fullhd_camera[] = {
-	{MIF_LV3,	DISP_LV3},
-	{MIF_LV3,	DISP_LV3},
-	{MIF_LV3,	DISP_LV3},
-	{MIF_LV3,	DISP_LV2},
-	{MIF_LV3,	DISP_LV2},
-	{MIF_LV3,	DISP_LV2},
-	{MIF_LV0,	DISP_LV0},
+	{MIF_LV3,	DISP_LV3,	INT_LV6},
+	{MIF_LV3,	DISP_LV3,	INT_LV6},
+	{MIF_LV3,	DISP_LV3,	INT_LV6},
+	{MIF_LV3,	DISP_LV2,	INT_LV5},
+	{MIF_LV3,	DISP_LV2,	INT_LV5},
+	{MIF_LV3,	DISP_LV2,	INT_LV5},
+	{MIF_LV0,	DISP_LV0,	INT_LV0},
 };
 
 unsigned int timeout_fullhd_camera[][2] = {
@@ -3378,6 +3378,8 @@ void exynos5_update_media_layers(enum devfreq_media_type media_type, unsigned in
 		if (media_enabled_fimc_lite) {
 			if (mif_qos > distriction_fullhd_camera[total_layer_count].mif_level)
 				mif_qos = distriction_fullhd_camera[total_layer_count].mif_level;
+			if (int_qos > distriction_fullhd_camera[total_layer_count].int_level)
+				int_qos = distriction_fullhd_camera[total_layer_count].int_level;
 			timeout_table = timeout_fullhd_camera;
 		}
 		if (media_enabled_gscl_local) {
@@ -3392,6 +3394,8 @@ void exynos5_update_media_layers(enum devfreq_media_type media_type, unsigned in
 			}
 			if (mif_qos > distriction_fullhd_gscl[total_layer_count].mif_level)
 				mif_qos = distriction_fullhd_gscl[total_layer_count].mif_level;
+			if (int_qos > distriction_fullhd_gscl[total_layer_count].int_level)
+				int_qos = distriction_fullhd_gscl[total_layer_count].int_level;
 			if (disp_qos > distriction_fullhd_gscl[total_layer_count].disp_level)
 				disp_qos = distriction_fullhd_gscl[total_layer_count].disp_level;
 			timeout_table = timeout_fullhd_gscl;
@@ -3399,6 +3403,8 @@ void exynos5_update_media_layers(enum devfreq_media_type media_type, unsigned in
 		if (media_enabled_tv) {
 			if (mif_qos > distriction_fullhd_tv[total_layer_count].mif_level)
 				mif_qos = distriction_fullhd_tv[total_layer_count].mif_level;
+			if (int_qos > distriction_fullhd_tv[total_layer_count].int_level);
+				int_qos = distriction_fullhd_tv[total_layer_count].int_level;
 			if (disp_qos > distriction_fullhd_tv[total_layer_count].disp_level)
 				disp_qos = distriction_fullhd_tv[total_layer_count].disp_level;
 			timeout_table = timeout_fullhd_tv;
@@ -3407,6 +3413,8 @@ void exynos5_update_media_layers(enum devfreq_media_type media_type, unsigned in
 			timeout_table = timeout_fullhd;
 		if (mif_qos > distriction_fullhd[total_layer_count].mif_level)
 			mif_qos = distriction_fullhd[total_layer_count].mif_level;
+		if (int_qos > distriction_fullhd[total_layer_count].int_level)
+			int_qos = distriction_fullhd[total_layer_count].int_level;
 		if (disp_qos > distriction_fullhd[total_layer_count].disp_level)
 			disp_qos = distriction_fullhd[total_layer_count].disp_level;
 	} else if (media_resolution == RESOLUTION_WQHD || media_resolution == RESOLUTION_WQXGA) {

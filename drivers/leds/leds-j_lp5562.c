@@ -593,16 +593,10 @@ static ssize_t store_led_r(struct device *dev,
 {
 	struct lp55xx_led *led = i2c_get_clientdata(to_i2c_client(dev));
 	struct lp55xx_chip *chip = led->chip;
-	char buff[10] = {0,};
-	int cnt, ret;
+	int ret;
 	u8 brightness;
 
-	cnt = count;
-	cnt = (buf[cnt-1] == '\n') ? cnt-1 : cnt;
-	memcpy(buff, buf, cnt);
-	buff[cnt] = '\0';
-
-	ret = kstrtou8(buff, 0, &brightness);
+	ret = kstrtou8(buf, 0, &brightness);
 	if (ret != 0) {
 		dev_err(&chip->cl->dev, "fail to get brightness.\n");
 		goto out;
@@ -626,16 +620,10 @@ static ssize_t store_led_g(struct device *dev,
 {
 	struct lp55xx_led *led = i2c_get_clientdata(to_i2c_client(dev));
 	struct lp55xx_chip *chip = led->chip;
-	char buff[10] = {0,};
-	int cnt, ret;
+	int ret;
 	u8 brightness;
 
-	cnt = count;
-	cnt = (buf[cnt-1] == '\n') ? cnt-1 : cnt;
-	memcpy(buff, buf, cnt);
-	buff[cnt] = '\0';
-
-	ret = kstrtou8(buff, 0, &brightness);
+	ret = kstrtou8(buf, 0, &brightness);
 	if (ret != 0) {
 		dev_err(&chip->cl->dev, "fail to get brightness.\n");
 		goto out;
@@ -658,16 +646,10 @@ static ssize_t store_led_b(struct device *dev,
 {
 	struct lp55xx_led *led = i2c_get_clientdata(to_i2c_client(dev));
 	struct lp55xx_chip *chip = led->chip;
-	char buff[10] = {0,};
-	int cnt, ret;
+	int ret;
 	u8 brightness;
 
-	cnt = count;
-	cnt = (buf[cnt-1] == '\n') ? cnt-1 : cnt;
-	memcpy(buff, buf, cnt);
-	buff[cnt] = '\0';
-
-	ret = kstrtou8(buff, 0, &brightness);
+	ret = kstrtou8(buf, 0, &brightness);
 	if (ret != 0) {
 		dev_err(&chip->cl->dev, "fail to get brightness.\n");
 		goto out;

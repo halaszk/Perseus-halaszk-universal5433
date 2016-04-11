@@ -669,7 +669,7 @@ error:
 	return -ENODEV;
 }
 
-void cdc_ncm_unbind(struct if_usb_devdata *pipe_data,
+void cdc_ncm_unbind2(struct if_usb_devdata *pipe_data,
 		struct usb_interface *intf)
 {
 	struct cdc_ncm_ctx *ctx = (struct cdc_ncm_ctx *)pipe_data->sedata;

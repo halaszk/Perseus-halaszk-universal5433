@@ -583,6 +583,7 @@
 	/*disp_driver {*/
 	decon_fb: decon_fb {
 		lcd_info = <&s6e3ha0 &s6e3ha0_video>;
+		decon_board = <&decon_board_list>;
 		decon: decon_ctrl {
 			samsung,max_bpp = <32>;
 			samsung,default_bpp = <24>;
@@ -667,9 +668,6 @@
 		};
 
 		mipi_dsi: mipi_dsi {
-			/* gpios = <&gpv7 2 0x1>; */
-			gpios = <&gpv7 2 0x1>, <&gpf1 5 0x1>;
-
 			/* Interface definition: 0 - DSIM_COMMAND,
 						 1 - DSIM_VIDEO */
 			e_interface = <0>;
@@ -717,19 +715,16 @@
 			/* lp rx timeout 0 ~ 0xffff */
 			rx_timeout = <0xffff>;
 		};
-               decon_mic: decon_mic {
-                       sysreg1 = <0x13B81004>;
-                       sysreg2 = <0x13B81048>;
-               };
 		s6e3ha0: s6e3ha0_wqhd {
 			mode = <0>;
 			resolution = <1440 2560>;
+			size = <70 121>;
 			size = <65 115>;
 			timing,refresh = <60>;
 			timing,h-porch = <1 1 1>;
 			timing,v-porch = <15 1 1>;
-			timing,dsi-hs-clk = <1024>;
-			timing,dsi-escape-clk = <16>;
+			timing,dsi-hs-clk = <1100>;
+			timing,dsi-escape-clk = <20>;
 			mic = <1>;
 		};
 		s6e3ha0_video: s6e3ha0_wqhd_video_mode {
@@ -742,6 +737,20 @@
 			timing,dsi-hs-clk = <1024>;
 			timing,dsi-escape-clk = <16>;
 			mic = <1>;
+		};
+		decon_board_list: decon_board_list {
+			enable_display_driver_power {
+				type = "pinctrl,turnon_tes";
+			};
+			disable_display_driver_power {
+				type = "gpio,low", "pinctrl,turnoff_tes";
+				gpios = <&gpv7 2 0x1>;
+			};
+			reset_display_driver_panel {
+				type = "gpio,high", "delay,usleep", "gpio,low", "delay,usleep", "gpio,high", "delay,usleep";
+				gpios = <&gpv7 2 0x1>, <&gpv7 2 0x1>, <&gpv7 2 0x1>;
+				delay = <5000 6000>, <5000 6000>, <10000 11000>;
+			};
 		};
 	};
 
@@ -873,8 +882,8 @@
 			modem-name = "ss300";
 			modems {
 				ss300 {
-					/* initial-gear is HS-G2 */
-					init-gear = <2 2 1>;
+					/* initial-gear is HS-G1 */
+					init-gear = <2 1 1>;
 					/* use shared reference clock for MPHY */
 					shd-refclk = <1>;
 				};

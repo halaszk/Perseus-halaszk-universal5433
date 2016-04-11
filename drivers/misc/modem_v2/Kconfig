@@ -78,6 +78,12 @@ config SIM_SLOT_SWITCH
 	bool "SIM_SLOT_SWITCH"
 	depends on SEC_MODEM_V2
 	default n
+
+config ERICSSON_MODEM_CLK_RESET
+	bool "Reset USB PHY when PHY_CLK_USERMUX is on changing"
+	depends on SEC_MODEM_V2
+	default n
+
 choice
 	prompt "SEC MODEM CONFIG"
 	depends on SEC_MODEM_V2

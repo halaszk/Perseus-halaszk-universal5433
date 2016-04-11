@@ -219,7 +219,12 @@ int sensor_3p3_probe(struct i2c_client *client,
 	ext->actuator_con.peri_setting.i2c.slave_address = 0x18;
 	ext->actuator_con.peri_setting.i2c.speed = 400000;
 
+#ifdef CONFIG_LEDS_KTD2692
+	ext->flash_con.product_name = FLADRV_NAME_KTD2692;
+#else
 	ext->flash_con.product_name = FLADRV_NAME_DRV_FLASH_GPIO;
+#endif
+
 	ext->flash_con.peri_type = SE_GPIO;
 	ext->flash_con.peri_setting.gpio.first_gpio_port_no = 1;
 	ext->flash_con.peri_setting.gpio.second_gpio_port_no = 2;

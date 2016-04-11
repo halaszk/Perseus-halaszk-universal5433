@@ -99,7 +99,7 @@ static struct sock *__get_socket(struct file *filp)
 
 
 /* MobiCore interrupt context data */
-struct mc_context ctx;
+static struct mc_context ctx;
 
 /* Get process context from file pointer */
 static struct mc_instance *get_instance(struct file *file)
@@ -111,16 +111,16 @@ uint32_t mc_get_new_handle(void)
 {
 	uint32_t handle;
 	struct mc_buffer *buffer;
-	/* assumption ctx.bufs_lock mutex is locked */
+	
+	mutex_lock(&ctx.cont_bufs_lock);
 retry:
 	handle = atomic_inc_return(&ctx.handle_counter);
-	/*
-	 * The handle must leave 12 bits (PAGE_SHIFT) for the 12 LSBs to be
+	/* The handle must leave 12 bits (PAGE_SHIFT) for the 12 LSBs to be
 	 * zero, as mmap requires the offset to be page-aligned, plus 1 bit for
 	 * the MSB to be 0 too, so mmap does not see the offset as negative
 	 * and fail.
 	 */
-	if ((handle << (PAGE_SHIFT + 1)) == 0)  {
+	if ((handle << (PAGE_SHIFT+1)) == 0)  {
 		atomic_set(&ctx.handle_counter, 1);
 		handle = 1;
 	}
@@ -128,7 +128,8 @@ retry:
 		if (buffer->handle == handle)
 			goto retry;
 	}
-
+	mutex_unlock(&ctx.cont_bufs_lock);
+	
 	return handle;
 }
 
@@ -186,7 +187,7 @@ static uint32_t mc_find_cont_wsm_addr(struct mc_instance *instance, void *uaddr,
 
 	mutex_lock(&instance->lock);
 
-	mutex_lock(&ctx.bufs_lock);
+	mutex_lock(&ctx.cont_bufs_lock);
 
 	/* search for the given handle in the buffers list */
 	list_for_each_entry(buffer, &ctx.cont_bufs, list) {
@@ -200,7 +201,7 @@ static uint32_t mc_find_cont_wsm_addr(struct mc_instance *instance, void *uaddr,
 	ret = -EINVAL;
 
 found:
-	mutex_unlock(&ctx.bufs_lock);
+	mutex_unlock(&ctx.cont_bufs_lock);
 	mutex_unlock(&instance->lock);
 
 	return ret;
@@ -248,8 +249,10 @@ bool mc_check_owner_fd(struct mc_instance *instance, int32_t fd)
 		MCDRV_DBG(mcd, "Owner not found!");
 	}
 out:
-	if (peer)
+	if (peer) {
 		task_unlock(peer);
+		put_task_struct(peer);
+	}
 	rcu_read_unlock();
 	if (!ret)
 		MCDRV_DBG(mcd, "Owner not found!");
@@ -274,7 +277,7 @@ static uint32_t mc_find_cont_wsm(struct mc_instance *instance, uint32_t handle,
 
 	mutex_lock(&instance->lock);
 
-	mutex_lock(&ctx.bufs_lock);
+	mutex_lock(&ctx.cont_bufs_lock);
 
 	/* search for the given handle in the buffers list */
 	list_for_each_entry(buffer, &ctx.cont_bufs, list) {
@@ -293,7 +296,7 @@ static uint32_t mc_find_cont_wsm(struct mc_instance *instance, uint32_t handle,
 	ret = -EINVAL;
 
 found:
-	mutex_unlock(&ctx.bufs_lock);
+	mutex_unlock(&ctx.cont_bufs_lock);
 	mutex_unlock(&instance->lock);
 
 	return ret;
@@ -320,7 +323,7 @@ static int __free_buffer(struct mc_instance *instance, uint32_t handle,
 	if (WARN(!instance, "No instance data available"))
 		return -EFAULT;
 
-	mutex_lock(&ctx.bufs_lock);
+	mutex_lock(&ctx.cont_bufs_lock);
 	/* search for the given handle in the buffers list */
 	list_for_each_entry(buffer, &ctx.cont_bufs, list) {
 		if (buffer->handle == handle)
@@ -333,11 +336,9 @@ found_buffer:
 		ret = -EPERM;
 		goto err;
 	}
-	mutex_unlock(&ctx.bufs_lock);
-	/*
-	 * Only unmap if the request is coming from the user space and
-	 * it hasn't already been unmapped.
-	 */
+	mutex_unlock(&ctx.cont_bufs_lock);
+	/* Only unmap if the request is coming from the user space and
+	 * it hasn't already been unmapped */
 	if (!unlock && buffer->uaddr != NULL) {
 #ifndef MC_VM_UNMAP
 		/* do_munmap must be done with mm->mmap_sem taken */
@@ -351,17 +352,15 @@ found_buffer:
 		ret = vm_munmap((long unsigned int)buffer->uaddr, buffer->len);
 #endif
 		if (ret < 0) {
-			/*
-			 * Something is not right if we end up here, better not
+			/* Something is not right if we end up here, better not
 			 * clean the buffer so we just leak memory instead of
-			 * creating security issues
-			 */
+			 * creating security issues */
 			MCDRV_DBG_ERROR(mcd, "Memory can't be unmapped");
 			return -EINVAL;
 		}
 	}
 
-	mutex_lock(&ctx.bufs_lock);
+	mutex_lock(&ctx.cont_bufs_lock);
 	/* search for the given handle in the buffers list */
 	list_for_each_entry(buffer, &ctx.cont_bufs, list) {
 		if (buffer->handle == handle)
@@ -376,7 +375,7 @@ del_buffer:
 	else
 		ret = -EPERM;
 err:
-	mutex_unlock(&ctx.bufs_lock);
+	mutex_unlock(&ctx.cont_bufs_lock);
 	return ret;
 }
 
@@ -430,24 +429,20 @@ int mc_get_buffer(struct mc_instance *instance,
 	/* allocate a new buffer. */
 	cbuffer = kzalloc(sizeof(*cbuffer), GFP_KERNEL);
 
-	if (cbuffer == NULL) {
-		MCDRV_DBG_WARN(mcd,
-			       "MMAP_WSM request: could not allocate buffer");
+	if (!cbuffer) {
 		ret = -ENOMEM;
-		goto unlock_instance;
+		goto end;
 	}
-	mutex_lock(&ctx.bufs_lock);
 
 	MCDRV_DBG_VERBOSE(mcd, "size %ld -> order %d --> %ld (2^n pages)",
 			  len, order, allocated_size);
 
 	addr = (void *)__get_free_pages(GFP_USER | __GFP_ZERO, order);
-
-	if (addr == NULL) {
-		MCDRV_DBG_WARN(mcd, "get_free_pages failed");
+	if (!addr) {
 		ret = -ENOMEM;
-		goto err;
+		goto end;
 	}
+	
 	phys = virt_to_phys(addr);
 	cbuffer->handle = mc_get_new_handle();
 	cbuffer->phys = phys;
@@ -460,7 +455,9 @@ int mc_get_buffer(struct mc_instance *instance,
 	atomic_set(&cbuffer->usage, 1);
 
 	INIT_LIST_HEAD(&cbuffer->list);
+	mutex_lock(&ctx.cont_bufs_lock);
 	list_add(&cbuffer->list, &ctx.cont_bufs);
+	mutex_unlock(&ctx.cont_bufs_lock);
 
 	MCDRV_DBG_VERBOSE(mcd,
 			  "phy=0x%llx-0x%llx, kaddr=0x%p h=%d buf=%p usage=%d",
@@ -469,13 +466,11 @@ int mc_get_buffer(struct mc_instance *instance,
 			  addr, cbuffer->handle,
 			  cbuffer, atomic_read(&(cbuffer->usage)));
 	*buffer = cbuffer;
-	goto unlock;
 
-err:
-	kfree(cbuffer);
-unlock:
-	mutex_unlock(&ctx.bufs_lock);
-unlock_instance:
+end:
+	if (ret)
+		kfree(cbuffer);
+
 	mutex_unlock(&instance->lock);
 	return ret;
 }
@@ -497,7 +492,7 @@ static int __lock_buffer(struct mc_instance *instance, uint32_t handle)
 		return -EPERM;
 	}
 
-	mutex_lock(&ctx.bufs_lock);
+	mutex_lock(&ctx.cont_bufs_lock);
 	/* search for the given handle in the buffers list */
 	list_for_each_entry(buffer, &ctx.cont_bufs, list) {
 		if (buffer->handle == handle) {
@@ -511,7 +506,7 @@ static int __lock_buffer(struct mc_instance *instance, uint32_t handle)
 	ret = -EINVAL;
 
 unlock:
-	mutex_unlock(&ctx.bufs_lock);
+	mutex_unlock(&ctx.cont_bufs_lock);
 	return ret;
 }
 
@@ -565,7 +560,7 @@ int mc_register_wsm_mmu(struct mc_instance *instance,
 	}
 
 
-	/* The offset of the buffer */
+	/* The offset of the buffer*/
 	offset = (unsigned int)
 		(((unsigned long)(buffer)) & (~PAGE_MASK));
 
@@ -582,9 +577,8 @@ int mc_register_wsm_mmu(struct mc_instance *instance,
 	if (((page_number * PAGE_SIZE) & (SZ_1M - 1)) != 0)
 		nb_of_1mb_section++;
 
-	/*
-	 * Since for both non-LPAE and LPAE cases we use uint64_t records
-	 * for the fake table we don't support more than 512 MB TA size
+	/* since for both non-LPAE and LPAE cases we use uint64_t records
+	 *  for the fake table we don't support more than 512 MB TA size
 	 */
 	if (nb_of_1mb_section > SZ_4K / sizeof(uint64_t)) {
 		MCDRV_DBG_ERROR(mcd, "fake L1 table size too big");
@@ -592,8 +586,7 @@ int mc_register_wsm_mmu(struct mc_instance *instance,
 	}
 	MCDRV_DBG_VERBOSE(mcd, "nb_of_1mb_section=%d", nb_of_1mb_section);
 	if (nb_of_1mb_section > 1) {
-		/*
-		 * WSM buffer with size greater than 1Mb
+		/* WSM buffer with size greater than 1Mb
 		 * is available for open session command
 		 * from the Daemon only
 		 */
@@ -625,16 +618,13 @@ int mc_register_wsm_mmu(struct mc_instance *instance,
 		ret = -ENOMEM;
 		goto err;
 	}
-
-	/*
-	 * Each L1 record refers 1MB piece of TA blob
+	/* Each L1 record refers 1MB piece of TA blob
 	 * for both non-LPAE and LPAE modes
 	 */
+
 	tmp_len = (len + offset > SZ_1M) ? (SZ_1M - offset) : len;
 	for (index = 0; index < nb_of_1mb_section; index++) {
-		mutex_lock(&ctx.bufs_lock);
 		table = mc_alloc_mmu_table(instance, task, buffer, tmp_len, 0);
-		mutex_unlock(&ctx.bufs_lock);
 
 		if (IS_ERR(table)) {
 			MCDRV_DBG_ERROR(mcd, "mc_alloc_mmu_table() failed");
@@ -659,14 +649,12 @@ int mc_register_wsm_mmu(struct mc_instance *instance,
 				  mmu_table,
 				  nb_of_1mb_section*sizeof(uint64_t));
 
-		mutex_lock(&ctx.bufs_lock);
 		table = mc_alloc_mmu_table(
 					instance,
 					NULL,
 					mmu_table,
 					nb_of_1mb_section*sizeof(uint64_t),
 					MC_MMU_TABLE_TYPE_WSM_FAKE_L1);
-		mutex_unlock(&ctx.bufs_lock);
 		if (IS_ERR(table)) {
 			MCDRV_DBG_ERROR(mcd, "mc_alloc_mmu_table() failed");
 			ret = -EINVAL;
@@ -814,7 +802,7 @@ static int mc_fd_mmap(struct file *file, struct vm_area_struct *vmarea)
 		return -ENOMEM;
 	}
 	if (handle) {
-		mutex_lock(&ctx.bufs_lock);
+		mutex_lock(&ctx.cont_bufs_lock);
 
 		/* search for the buffer list. */
 		list_for_each_entry(buffer, &ctx.cont_bufs, list) {
@@ -832,7 +820,7 @@ static int mc_fd_mmap(struct file *file, struct vm_area_struct *vmarea)
 				}
 		}
 		/* Nothing found return */
-		mutex_unlock(&ctx.bufs_lock);
+		mutex_unlock(&ctx.cont_bufs_lock);
 		MCDRV_DBG_ERROR(mcd, "handle not found");
 		return -EINVAL;
 
@@ -844,18 +832,16 @@ found:
 		 * at PAGE_OFFSET, user address range is below PAGE_OFFSET.
 		 * Remapping the area is always done, so multiple mappings
 		 * of one region are possible. Now remap kernel address
-		 * space into user space.
+		 * space into user space
 		 */
 		ret = (int)remap_pfn_range(vmarea, vmarea->vm_start,
 				page_to_pfn(virt_to_page(buffer->addr)),
 				buffer->len, vmarea->vm_page_prot);
-		/*
-		 * If the remap failed then don't mark this buffer as marked
-		 * since the unmaping will also fail.
-		 */
+		/* If the remap failed then don't mark this buffer as marked
+		 * since the unmaping will also fail */
 		if (ret)
 			buffer->uaddr = NULL;
-		mutex_unlock(&ctx.bufs_lock);
+		mutex_unlock(&ctx.cont_bufs_lock);
 	} else {
 		if (!is_daemon(instance))
 			return -EPERM;
@@ -864,13 +850,11 @@ found:
 			return -EFAULT;
 
 		vmarea->vm_flags |= VM_IO;
-		/*
-		 * Convert kernel address to user address. Kernel address begins
+		/* Convert kernel address to user address. Kernel address begins
 		 * at PAGE_OFFSET, user address range is below PAGE_OFFSET.
 		 * Remapping the area is always done, so multiple mappings
 		 * of one region are possible. Now remap kernel address
-		 * space into user space.
-		 */
+		 * space into user space */
 		ret = (int)remap_pfn_range(vmarea, vmarea->vm_start,
 				page_to_pfn(virt_to_page(ctx.mci_base.addr)),
 				len, vmarea->vm_page_prot);
@@ -920,16 +904,14 @@ static long mc_fd_user_ioctl(struct file *file, unsigned int cmd,
 		ret = mc_free_buffer(instance, (uint32_t)arg);
 		break;
 
-	/*
-	 * 32/64 bit interface compatiblity notice:
+	/* 32/64 bit interface compatiblity notice:
 	 * mc_ioctl_reg_wsm has been defined with the buffer parameter
 	 * as void* which means that the size and layout of the structure
 	 * are different between 32 and 64 bit variants.
 	 * However our 64 bit Linux driver must be able to service both
 	 * 32 and 64 bit clients so we have to allow both IOCTLs. Though
 	 * we have a bit of copy paste code we provide maximum backwards
-	 * compatiblity.
-	 */
+	 * compatiblity */
 	case MC_IO_REG_WSM:{
 		struct mc_ioctl_reg_wsm reg;
 		phys_addr_t phys = 0;
@@ -990,11 +972,9 @@ static long mc_fd_user_ioctl(struct file *file, unsigned int cmd,
 			return -EFAULT;
 
 		map.handle = buffer->handle;
-		/*
-		 * Trick: to keep the same interface with the user space, store
-		 * the handle in the physical address.
-		 * It is given back with the offset when mmap() is called.
-		 */
+		/* Trick: to keep the same interface with the user space, store
+		   the handle in the physical address.
+		   It is given back with the offset when mmap() is called. */
 		map.phys_addr = buffer->handle << PAGE_SHIFT;
 		map.reused = 0;
 		if (copy_to_user(uarg, &map, sizeof(map)))
@@ -1303,23 +1283,21 @@ int mc_release_instance(struct mc_instance *instance)
 	mutex_lock(&instance->lock);
 	mc_clear_mmu_tables(instance);
 
-	mutex_lock(&ctx.bufs_lock);
+	mutex_lock(&ctx.cont_bufs_lock);
 	/* release all mapped data */
 
 	/* Check if some buffers are orphaned. */
 	list_for_each_entry_safe(buffer, tmp, &ctx.cont_bufs, list) {
-		/*
-		 * It's safe here to only call free_buffer() without unmapping
+		/* It's safe here to only call free_buffer() without unmapping
 		 * because mmap() takes a refcount to the file's fd so only
 		 * time we end up here is when everything has been unmapped or
-		 * the process called exit()
-		 */
+		 * the process called exit() */
 		if (buffer->instance == instance) {
 			buffer->instance = NULL;
 			free_buffer(buffer);
 		}
 	}
-	mutex_unlock(&ctx.bufs_lock);
+	mutex_unlock(&ctx.cont_bufs_lock);
 
 	mutex_unlock(&instance->lock);
 
@@ -1356,6 +1334,8 @@ static int mc_fd_user_open(struct inode *inode, struct file *file)
 static int mc_fd_admin_open(struct inode *inode, struct file *file)
 {
 	struct mc_instance *instance;
+
+	dev_err(mcd, "opened by PID(%d), name(%s)\n", current->pid, current->comm);
 
 	/*
 	 * The daemon is already set so we can't allow anybody else to open
@@ -1397,6 +1377,7 @@ static int mc_fd_release(struct inode *inode, struct file *file)
 	struct mc_instance *instance = get_instance(file);
 
 	MCDRV_DBG_VERBOSE(mcd, "enter");
+	dev_err(mcd, "closed by PID(%d), name(%s)\n", current->pid, current->comm);
 
 	if (WARN(!instance, "No instance data available"))
 		return -EFAULT;
@@ -1533,8 +1514,7 @@ static int __init mobicore_init(void)
 	int ret = 0;
 	dev_set_name(mcd, "mcd");
 
-	/*
-	 * Do not remove or change the following trace.
+	/* Do not remove or change the following trace.
 	 * The string "MobiCore" is used to detect if <t-base is in of the image
 	 */
 	dev_info(mcd, "MobiCore Driver, Build: " __TIMESTAMP__ "\n");
@@ -1603,7 +1583,10 @@ static int __init mobicore_init(void)
 	INIT_LIST_HEAD(&ctx.cont_bufs);
 
 	/* init lock for the buffers list */
-	mutex_init(&ctx.bufs_lock);
+	mutex_init(&ctx.cont_bufs_lock);
+
+	/* init lock for core switch processing */
+	mutex_init(&ctx.core_switch_lock);
 
 	memset(&ctx.mci_base, 0, sizeof(ctx.mci_base));
 	MCDRV_DBG(mcd, "initialized");

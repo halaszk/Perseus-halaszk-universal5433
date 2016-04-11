@@ -3431,6 +3431,9 @@ static int fimc_is_ischain_s_3aa_size(struct fimc_is_device_ischain *device,
 	taa_otf_input->bns_output_width = bns_width;
 	taa_otf_input->bns_output_height = bns_height;
 
+	if (output_crop[2] == 0 || output_crop[3] == 0)
+		taa_otf_input->bds_out_enable = ISP_BDS_COMMAND_DISABLE; /* default setting */
+
 	taa_otf_input->format = OTF_INPUT_FORMAT_BAYER;
 	taa_otf_input->bitwidth = OTF_INPUT_BIT_WIDTH_10BIT;
 	taa_otf_input->order = OTF_INPUT_ORDER_BAYER_GR_BG;
@@ -3609,7 +3612,7 @@ static int fimc_is_ischain_s_chain0_size(struct fimc_is_device_ischain *device,
 	input_crop->crop_height = chain0_height;
 	input_crop->in_width = chain0_width;
 	input_crop->in_height = chain0_height;
-
+	if (test_bit(FIMC_IS_ISCHAIN_REPROCESSING, &device->state)) {		input_crop->out_width = chain0_width;		input_crop->out_height = chain0_height;	}
 	*lindex |= LOWBIT_OF(PARAM_SCALERC_INPUT_CROP);
 	*hindex |= HIGHBIT_OF(PARAM_SCALERC_INPUT_CROP);
 	(*indexes)++;

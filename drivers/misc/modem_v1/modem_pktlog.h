@@ -14,6 +14,7 @@ struct pktbuf_private {
 #define PCAP_VERSION_MINOR 4
 #define TCPDUMP_MAGIC 0xa1b2c3d4
 
+#define DLT_RAW 101
 #define DLT_LINUX_SLL 113
 #define WTAP_ENCAP_USER0 147 /* sipc5 header */
 
@@ -49,7 +50,7 @@ struct sipc_debug {
 
 struct pktdump_hdr {
 	struct pcap_hdr pcap;
-	struct sipc_debug sd;
+	/*struct sipc_debug sd;*/
 } __packed;
 
 struct pktlog_data {

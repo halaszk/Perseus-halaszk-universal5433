@@ -37,6 +37,7 @@ struct abov_touchkey_platform_data {
 	int (*keyled) (struct abov_touchkey_platform_data *pdata, bool on);
 	const char *regulator_ic;
 	const char *regulator_led;
+	bool boot_on_ldo;
 };
 
 #endif /* LINUX_ABOV_TOUCHKEY_H */

@@ -1402,6 +1402,7 @@
 		clock-names = "gate", "mux_user", "mux_src";
 		clocks = <&clock 2394>, <&clock 3115>, <&clock 346>;
 		samsung,power-domain = <&spd_mscl0>;
+		mscl,int_qos_minlock = <334000>;
 	};
 
 	scaler_1: scaler@15010000 {
@@ -1776,6 +1777,7 @@
 		i2s-sec {
 			dmas = <&adma 1>;
 			dma-names = "tx-sec";
+			samsung,tx-uhqa-buf = <0x42000000 0x40000>;
 			samsung,tx-buf = <0x0303E000>;
 			samsung,tx-size = <0x8000>;
 		};

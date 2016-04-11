@@ -146,6 +146,9 @@ extern int mipi_lli_add_driver(struct device *dev,
 			       int irq);
 extern void mipi_lli_remove_driver(struct mipi_lli *lli);
 
+extern void __iomem *mipi_lli_request_sh_region(unsigned long sh_addr,
+						unsigned long size);
+extern void mipi_lli_release_sh_region(void *rgn);
 extern unsigned long mipi_lli_get_phys_base(void);
 extern unsigned long mipi_lli_get_phys_size(void);
 

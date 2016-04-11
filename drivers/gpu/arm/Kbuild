@@ -11,11 +11,19 @@
 
 
 obj-$(CONFIG_MALI_T6XX) += t6xx/
+ifeq ($(CONFIG_MALI_T6XX_R7P0),y)
+	ifeq ($(CONFIG_MALI_R7P0_T6XX),y)
+		obj-y += t6xx/
+	endif
+endif
 obj-$(CONFIG_MALI_MIDGARD) += midgard/
 obj-$(CONFIG_MALI_MIDGARD_WK04) += midgard_wk04/
 # obj-$(CONFIG_MALI400) += mali400/ # comment out for kernel build error fix
 ifeq ($(CONFIG_MALI_T7XX),y)
 	ifeq ($(CONFIG_MALI_R5P0),y)
 		obj-y += t7xx/r5p0/
+	endif
+	ifeq ($(CONFIG_MALI_R7P0),y)
+		obj-y += t7xx/r7p0/
 	endif
 endif

@@ -139,6 +139,16 @@ static const unsigned char SEQ_TEAR_SCANLINE[] = {
 	0x05, 0xF6
 };
 
+static const unsigned char SEQ_UPI_CLK_CHANGE_1[] = {
+	0xB0,
+	0xD0
+};
+
+static const unsigned char SEQ_UPI_CLK_CHANGE_2[] = {
+	0xB1,
+	0x2D
+};
+
 enum {
 	CAPS_OFF,
 	CAPS_ON,

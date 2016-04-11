@@ -70,6 +70,13 @@ config SENSORS_CM36652_IIO
 	help
 	  This option enables proximity & light sensors using CM36652 driver.
 
+config SENSORS_CM36652_DEFENCE_CODE_FOR_NOISE
+	depends on SENSORS_CM36652_IIO
+	tristate "CM366852 defence code"
+	default n
+	help
+	  This option enables CM36652 defence code for noise.
+
 config SENSORS_CM3323_IIO
 	depends on IIO
 	tristate "CM3323 driver"

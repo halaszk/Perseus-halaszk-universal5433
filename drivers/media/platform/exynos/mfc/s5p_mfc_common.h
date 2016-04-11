@@ -136,7 +136,7 @@ enum s5p_mfc_inst_state {
 	MFCINST_INIT = 100,
 	MFCINST_GOT_INST,
 	MFCINST_HEAD_PARSED,
-	MFCINST_BUFS_SET,
+	MFCINST_RUNNING_BUF_FULL,
 	MFCINST_RUNNING,
 	MFCINST_FINISHING,
 	MFCINST_FINISHED,
@@ -783,6 +783,7 @@ struct s5p_mfc_enc {
 		unsigned int bits;
 	} slice_size;
 	unsigned int in_slice;
+	unsigned int buf_full;
 
 	int stored_tag;
 	struct mfc_user_shared_handle sh_handle;
@@ -1034,6 +1035,14 @@ static inline unsigned int mfc_version(struct s5p_mfc_dev *dev)
 #define not_coded_cond(ctx)	is_mpeg4vc1(ctx)
 #define on_res_change(ctx)	((ctx)->state >= MFCINST_RES_CHANGE_INIT &&	\
 				(ctx)->state <= MFCINST_RES_CHANGE_END)
+
+#define need_to_wait_frame_start(ctx)		\
+	(((ctx->state == MFCINST_FINISHING) ||	\
+	  (ctx->state == MFCINST_RUNNING)) &&	\
+	 test_bit(ctx->num, &ctx->dev->hw_lock))
+#define need_to_wait_nal_abort(ctx)		 \
+	(((ctx->state == MFCINST_ABORT_INST)) && \
+	 test_bit(ctx->num, &ctx->dev->hw_lock))
 
 /* Extra information for Decoder */
 #define	DEC_SET_DUAL_DPB		(1 << 0)

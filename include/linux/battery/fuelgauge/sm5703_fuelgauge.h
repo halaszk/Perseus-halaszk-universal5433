@@ -36,6 +36,16 @@ struct battery_data_t {
 	const int battery_table[3][16];
 	const int rce_value[3];
 	const int dtcd_value;
+	const int rs_value[4];
+	const int vit_period;
+	const int mix_value[2];
+	const int topoff_soc[2];
+	const int volt_cal;
+	const int curr_cal;
+	const int temp_std;
+	const int temp_offset;
+	const int temp_offset_cal;
+	const int charge_offset_cal;
 };
 
 struct sm5703_fg_info {
@@ -64,6 +74,7 @@ struct sm5703_fg_info {
 	struct mutex io_lock;
 	struct device *dev;
 	int32_t temperature;; /* 0.1 deg C*/
+	int32_t temp_fg;; /* 0.1 deg C*/
 	/* register programming */
 	int reg_addr;
 	u8 reg_data[2];
@@ -94,6 +105,12 @@ struct sm5703_fg_info {
 
 
 	int32_t irq_ctrl;
+	
+	uint32_t is_FG_initialised;
+	int iocv_error_count;
+	/* previous battery voltage */
+	int p_batt_voltage;
+	int p_batt_current;
 };
 
 struct sm5703_platform_data {

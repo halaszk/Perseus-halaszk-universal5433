@@ -95,10 +95,12 @@ void gsc_hw_enable_localout(struct gsc_ctx *ctx, bool enable)
 		gsc_hw_set_qos_enable(dev);
 		gsc_hw_enable_control(dev, true);
 		gsc_dbg("GSC start(%d)", dev->id);
+		dev->out.enable_time = sched_clock();
 	} else {
 		gsc_hw_wait_sfr_update(ctx);
 		gsc_hw_set_smart_if_con(dev, false);
 		gsc_hw_enable_control(dev, false);
+		dev->out.disable_time = sched_clock();
 	}
 }
 

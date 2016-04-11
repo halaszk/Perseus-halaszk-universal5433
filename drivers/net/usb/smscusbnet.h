@@ -65,11 +65,11 @@ struct ExtraErrorCounter
 
 };
 
-#define AUTOSUSPEND_DYNAMIC 	0x01  //Suspend on s0, work for lan9500 and lan9500a
-#define AUTOSUSPEND_DYNAMIC_S3 	0x02  //Suspend on s3, only for lan9500a
-#define AUTOSUSPEND_LINKDOWN 	0x04  //Suspend when link is down
-#define AUTOSUSPEND_INTFDOWN 	0x08 //Suspend when interface is down
-#define AUTOSUSPEND_DETACH	 	0x10 //Enable net detach
+#define AUTOSUSPEND_DYNAMIC		0x01  //Suspend on s0, work for lan9500 and lan9500a
+#define AUTOSUSPEND_DYNAMIC_S3	0x02  //Suspend on s3, only for lan9500a
+#define AUTOSUSPEND_LINKDOWN	0x04  //Suspend when link is down
+#define AUTOSUSPEND_INTFDOWN	0x08 //Suspend when interface is down
+#define AUTOSUSPEND_DETACH		0x10 //Enable net detach
 
 enum{
 	FEATURE_SUSPEND3,
@@ -167,7 +167,7 @@ struct usbnet {
    int chipDependFeatures[FEATURE_MAX_NO]; //Flag for chip-depend feratures
    struct vlan_group	*vlgrp;  //vlan support
 
-   int device_id;	//DEV_SMSC9500 
+   int device_id;	//DEV_SMSC9500
    int tx_hold_on_completion;
 };
 #define PM_IDLE_DELAY   3 //Time before auto-suspend
@@ -259,10 +259,9 @@ extern void usbnet_cdc_unbind (struct usbnet *, struct usb_interface *);
 
 /* CDC and RNDIS support the same host-chosen packet filters for IN transfers */
 #define	DEFAULT_FILTER	(USB_CDC_PACKET_TYPE_BROADCAST \
- 			|USB_CDC_PACKET_TYPE_ALL_MULTICAST \
- 			|USB_CDC_PACKET_TYPE_PROMISCUOUS \
- 			|USB_CDC_PACKET_TYPE_DIRECTED)
-
+			|USB_CDC_PACKET_TYPE_ALL_MULTICAST \
+			|USB_CDC_PACKET_TYPE_PROMISCUOUS \
+			|USB_CDC_PACKET_TYPE_DIRECTED)
 
 /* we record the state for each of our queued skbs */
 enum skb_state {

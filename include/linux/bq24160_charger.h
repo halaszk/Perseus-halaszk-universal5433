@@ -1,6 +1,10 @@
 #ifndef _BQ24160_CHARGER_H_
 #define _BQ24160_CHARGER_H_
 
+#if defined(CONFIG_MACH_ESPRESSO5433) && defined(CONFIG_FUELGAUGE_S2MG001)
+#include <linux/power/sec_charging_common.h>
+#endif
+
 #define BQ24160_NAME "bq24160"
 
 struct bq24160_platform_data {
@@ -11,6 +15,9 @@ struct bq24160_platform_data {
 	unsigned char support_boot_charging;
 	void (*notify_vbus_drop)(void);
 	int (*gpio_configure)(int);
+#if defined(CONFIG_MACH_ESPRESSO5433) && defined(CONFIG_FUELGAUGE_S2MG001)
+	char *fuelgauge_name;
+#endif
 };
 
 /**

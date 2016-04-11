@@ -176,7 +176,7 @@ void kbase_job_done_slot(kbase_device *kbdev, int s, u32 completion_code, u64 jo
 	KBASE_DEBUG_ASSERT(kbdev);
 
 	if (completion_code != BASE_JD_EVENT_DONE && completion_code != BASE_JD_EVENT_STOPPED)
-		KBASE_DEBUG_PRINT_ERROR(KBASE_JM, "t6xx: GPU fault 0x%02lx from job slot %d\n", (unsigned long)completion_code, s);
+		dev_err(kbdev->osdev.dev, "t6xx: GPU fault 0x%02lx from job slot %d\n", (unsigned long)completion_code, s);
 
 	/* IMPORTANT: this function must only contain work necessary to complete a
 	 * job from a Real IRQ (and not 'fake' completion, e.g. from
@@ -200,7 +200,8 @@ void kbase_job_done_slot(kbase_device *kbdev, int s, u32 completion_code, u64 jo
 	if (completion_code != BASE_JD_EVENT_DONE && completion_code != BASE_JD_EVENT_STOPPED) {
 
 #if KBASE_TRACE_DUMP_ON_JOB_SLOT_ERROR != 0
-		KBASE_TRACE_DUMP(kbdev);
+		/* Remove the rbuf dump because of too many log */
+		/* KBASE_TRACE_DUMP(kbdev); */
 #endif
 	}
 	if (job_tail != 0) {
@@ -1214,7 +1215,7 @@ void kbasep_reset_timeout_worker(struct work_struct *data)
 
 		nr_done = kbasep_jm_nr_jobs_submitted(slot);
 		while (nr_done) {
-			KBASE_DEBUG_PRINT_ERROR(KBASE_JD, "Job stuck in slot %d on the GPU was cancelled", i);
+			dev_err(kbdev->osdev.dev, "Job stuck in slot %d on the GPU was cancelled", i);
 			kbase_job_done_slot(kbdev, i, BASE_JD_EVENT_JOB_CANCELLED, 0, &end_timestamp);
 			nr_done--;
 		}

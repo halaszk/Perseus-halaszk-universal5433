@@ -34,7 +34,7 @@
 #define M2SH(m) ((m) & 0x0F ? ((m) & 0x03 ? ((m) & 0x01 ? 0 : 1) : ((m) & 0x04 ? 2 : 3)) : \
 		((m) & 0x30 ? ((m) & 0x10 ? 4 : 5) : ((m) & 0x40 ? 6 : 7)))
 
-#ifdef CONFIG_VIBETONZ
+#ifdef CONFIG_MOTOR_DRV_MAX77849
 
 #include <linux/battery/sec_charging_common.h>
 
@@ -71,7 +71,7 @@ struct max77849_platform_data {
 
 	int num_regulators;
 	struct max77849_regulator_data *regulators;
-#ifdef CONFIG_VIBETONZ
+#ifdef CONFIG_MOTOR_DRV_MAX77849
 	/* haptic motor data */
 	struct max77849_haptic_platform_data *haptic_data;
 #endif

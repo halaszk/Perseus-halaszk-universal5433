@@ -382,6 +382,7 @@ static int cs5032_lsensor_enable(struct cs5032_data *cs5032_iio)
 
 	pr_info("[SENSOR]: %s\n", __func__);
 	if (cs5032_iio->enabled == SENSOR_DISABLE) {
+		cs5032_iio->count_log_time = 1000;
 		ret = cs5032_set_mode(cs5032_iio , CS5032_SYS_ALS_ENABLE);
 		if (ret < 0) {
 			pr_err("[SENSOR]: %s - can't enable light sensor\n",

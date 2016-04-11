@@ -1,7 +1,7 @@
 /*
  * IP Packet Parser Module.
  *
- * Copyright (C) 1999-2015, Broadcom Corporation
+ * Copyright (C) 1999-2016, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_ip.c 531053 2015-02-02 07:23:56Z $
+ * $Id: dhd_ip.c 575510 2015-07-30 05:14:34Z $
  */
 #include <typedefs.h>
 #include <osl.h>
@@ -307,6 +307,12 @@ static void dhd_tcpack_send(ulong data)
 	flags = dhd_os_tcpacklock(dhdp);
 
 	tcpack_sup_mod = dhdp->tcpack_sup_module;
+	if (!tcpack_sup_mod) {
+		DHD_ERROR(("%s %d: tcpack suppress module NULL!!\n",
+			__FUNCTION__, __LINE__));
+		dhd_os_tcpackunlock(dhdp, flags);
+		return;
+	}
 	pkt = cur_tbl->pkt_in_q;
 	ifidx = cur_tbl->ifidx;
 	if (!pkt) {

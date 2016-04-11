@@ -71,6 +71,7 @@
 			wlf,moisture-det-channel = <1>;
 			wlf,hpdet-channel = <0>;
 			wlf,hpdet-ext-res = <11>;
+			wlf,hs-mic = <3>;
 			wlf,hpdet-short-circuit-imp = <3>;
 			wlf,micd-ranges = <
 				116 226
@@ -777,6 +778,10 @@
 
 	fimc_is_sensor0: fimc_is_sensor@12100000 {
 		actuator_id = <13>;
+	};
+
+	fimc_is@14000000 {
+		vtcam_mipi_lane_num = <1>;
 	};
 
 	pinctrl@14CC0000 {

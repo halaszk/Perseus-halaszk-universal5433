@@ -55,7 +55,8 @@ static void muic_handle_attach(muic_data_t *pmuic,
 		MUIC_DEV_NAME, __func__, pmuic->attached_dev, new_dev, adc, vbvolt);
 
 	if((new_dev == pmuic->attached_dev) &&
-		(new_dev != ATTACHED_DEV_JIG_UART_OFF_MUIC)) {
+		(new_dev != ATTACHED_DEV_JIG_UART_OFF_MUIC) &&
+		(new_dev != ATTACHED_DEV_UNIVERSAL_MMDOCK_MUIC)) {
 		pr_info("%s:%s Duplicated device %d just ignore\n",
 				MUIC_DEV_NAME, __func__,pmuic->attached_dev);
 		return;
@@ -144,7 +145,7 @@ static void muic_handle_attach(muic_data_t *pmuic,
 			pr_warn("%s:%s new(%d)!=attached(%d), assume detach\n",
 					MUIC_DEV_NAME, __func__, new_dev,
 					pmuic->attached_dev);
-			ret = detach_otg_usb(pmuic);
+			pr_warn("%s:%s mmdock pre-detach skipped.\n", MUIC_DEV_NAME, __func__);
 		}
 		break;
 	case ATTACHED_DEV_CHARGING_CABLE_MUIC:
@@ -212,7 +213,8 @@ static void muic_handle_attach(muic_data_t *pmuic,
 		ret = attach_deskdock(pmuic, new_dev);
 		break;
 	case ATTACHED_DEV_UNIVERSAL_MMDOCK_MUIC:
-		ret = attach_otg_usb(pmuic, new_dev);
+		noti_f = vbvolt ? true: false;
+		ret = attach_mmdock(pmuic, new_dev, vbvolt);
 		break;
 	case ATTACHED_DEV_CHARGING_CABLE_MUIC:
 		ret = attach_ps_cable(pmuic, new_dev);
@@ -282,7 +284,7 @@ static void muic_handle_detach(muic_data_t *pmuic)
 		ret = detach_deskdock(pmuic);
 		break;
 	case ATTACHED_DEV_UNIVERSAL_MMDOCK_MUIC:
-		ret = detach_otg_usb(pmuic);
+		ret = detach_mmdock(pmuic);
 		break;
 	case ATTACHED_DEV_AUDIODOCK_MUIC:
 		ret = detach_audiodock(pmuic);

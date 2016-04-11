@@ -196,6 +196,4 @@ source "drivers/irled/Kconfig"
 
 source "drivers/ice40lm/Kconfig"
 
-source "drivers/secfilter/Kconfig"
-
 endmenu

@@ -579,6 +579,121 @@ static void sm5703_set_switching_mode(struct regmap_desc *pdesc, int mode)
 		_REGMAP_TRACE(pdesc, 'w', ret, attr, value);
 }
 
+int sm5703_attach_mmdock(struct regmap_desc *pdesc, int vbus)
+{
+
+	int attr = 0, value = 0, ret = 0;
+
+	pr_info("%s: vbus:%d\n", __func__, vbus);
+
+	do {
+		/* SW_OPEN: 0 */
+		attr = CTRL_SW_OPEN;
+		value = 0;
+		ret = regmap_write_value(pdesc, attr, value);
+		if (ret < 0) {
+			pr_err("%s CTRL_SW_OPEN write fail.\n", __func__);
+			break;
+		}
+
+		_REGMAP_TRACE(pdesc, 'w', ret, attr, value);
+
+		if (vbus) {
+			/* 1. set AP USB path */
+			attr = REG_MANSW1 | _ATTR_OVERWRITE_M;
+			value = _COM_USB_AP;
+			ret = regmap_write_value(pdesc, attr, value);
+			if (ret < 0) {
+				pr_err("%s REG_MANSW1 write fail.\n", __func__);
+				break;
+			}
+
+			_REGMAP_TRACE(pdesc, 'w', ret, attr, value);
+
+			/* 2. set JIG_ON high(high) */
+
+			/* 3. set MANUAL SW mode */
+			attr = CTRL_ManualSW;
+			value = 0; /* manual switching mode */
+			ret = regmap_write_value(pdesc, attr, value);
+			if (ret < 0) {
+				pr_err("%s REG_CTRL write fail.\n", __func__);
+				break;
+			}
+
+			_REGMAP_TRACE(pdesc, 'w', ret, attr, value);
+
+			/* SW_OPEN: 1 */
+			attr = CTRL_SW_OPEN;
+			value = 1;
+			ret = regmap_write_value(pdesc, attr, value);
+			if (ret < 0) {
+				pr_err("%s CTRL_SW_OPEN write fail.\n", __func__);
+				break;
+			}
+
+			_REGMAP_TRACE(pdesc, 'w', ret, attr, value);
+		} else {
+			/* 3. set AUTO SW mode */
+			attr = CTRL_ManualSW;
+			value = 1; /* auto switching mode */
+			ret = regmap_write_value(pdesc, attr, value);
+			if (ret < 0) {
+				pr_err("%s CTRL_ManualSW write fail.\n", __func__);
+				break;
+			}
+		}
+	} while (0);
+
+	return ret;
+}
+
+int sm5703_detach_mmdock(struct regmap_desc *pdesc)
+{
+	int attr = 0, value = 0, ret = 0;
+
+	pr_info("%s\n", __func__);
+
+	do {
+		/* SW_OPEN: 1 */
+		attr = CTRL_SW_OPEN;
+		value = 1;
+		ret = regmap_write_value(pdesc, attr, value);
+		if (ret < 0) {
+			pr_err("%s CTRL_SW_OPEN write fail.\n", __func__);
+			break;
+		}
+
+		_REGMAP_TRACE(pdesc, 'w', ret, attr, value);
+
+		/* Path Open */
+		attr = REG_MANSW1 | _ATTR_OVERWRITE_M;
+		value = _COM_OPEN_WITH_V_BUS;
+		ret = regmap_write_value(pdesc, attr, value);
+		if (ret < 0) {
+			pr_err("%s REG_MANSW1 write fail.\n", __func__);
+			break;
+		}
+
+		_REGMAP_TRACE(pdesc, 'w', ret, attr, value);
+
+		/* set AUTO SW mode */
+		attr = CTRL_ManualSW;
+		value = 1; /* auto switching mode */
+		ret = regmap_write_value(pdesc, attr, value);
+		if (ret < 0) {
+			pr_err("%s REG_CTRL write fail.\n", __func__);
+			break;
+		}
+
+		_REGMAP_TRACE(pdesc, 'w', ret, attr, value);
+
+	} while (0);
+
+	return ret;
+}
+
+
 static void sm5703_get_fromatted_dump(struct regmap_desc *pdesc, char *mesg)
 {
 	muic_data_t *muic = pdesc->muic;
@@ -630,6 +745,8 @@ static struct vendor_ops sm5703_muic_vendor_ops = {
 	.get_adc_scan_mode = sm5703_get_adc_scan_mode,
 	.set_rustproof = sm5703_set_rustproof,
 	.get_vps_data = sm5703_get_vps_data,
+	.attach_mmdock = sm5703_attach_mmdock,
+	.detach_mmdock = sm5703_detach_mmdock,
 };
 
 static struct regmap_desc sm5703_muic_regmap_desc = {

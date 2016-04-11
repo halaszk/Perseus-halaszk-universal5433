@@ -61,6 +61,13 @@ config BCM4334W
 	  This module adds support for wireless adapters based on
 	  Broadcom 4334W chipset.
 
+config BCM43454
+	tristate "Broadcom 43454 wireless cards support"
+	depends on WLAN
+	---help---
+	  This module adds support for wireless adapters based on
+	  Broadcom 43454 chipset.
+
 config BCMDHD_FW_PATH
 	depends on WLAN
 	string "Firmware path"
@@ -99,7 +106,7 @@ config DHD_USE_SCHED_SCAN
 
 config BROADCOM_WIFI_RESERVED_MEM
 	bool "BROADCOM Reserved memory for wifi device"
-	depends on (BCM4330 ||BCM4343 || BCM4334 || BCM4335 || BCM4339 || BCM4354 || BCM43241 || BCM43455)
+	depends on (BCM4330 ||BCM4343 || BCM4334 || BCM4335 || BCM4339 || BCM4354 || BCM43241 || BCM43455 || BCM43454)
 	---help---
 	  This is a configuration for broadcom WLAN driver.
 
@@ -112,13 +119,13 @@ config BCM4335BT
 
 config WIFI_BROADCOM_COB
   bool "BROADCOM COB type chip is enabled"
-  depends on (BCM4330 || BCM4334 || BCM4335 || BCM4339 || BCM4354 || BCM43241 || BCM43455)
+  depends on (BCM4330 || BCM4334 || BCM4335 || BCM4339 || BCM4354 || BCM43241 || BCM43454 || BCM43455)
   ---help---
   This is a configuration for COB type feature.
 	  
 config WLAN_REGION_CODE
 	int "---Region codes for Broadcom WiFi Driver"
-	depends on (BCM4330 || BCM4343 || BCM4334 || BCM4335 || BCM4339 || BCM4354 || BCM43241 || BCM43455)
+	depends on (BCM4330 || BCM4343 || BCM4334 || BCM4335 || BCM4339 || BCM4354 || BCM43241 || BCM43455 || BCM43454)
 	default 100
 	---help---
 		This is a region code for Broadcom Wi-Fi featured functions.

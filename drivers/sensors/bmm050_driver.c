@@ -62,11 +62,11 @@
 #define BMM_DEFAULT_REPETITION_Z BMM_VAL_NAME(REGULAR_REPZ)
 #define BMM_DEFAULT_ODR BMM_VAL_NAME(REGULAR_DR)
 /* generic */
-#define BMM_MAX_RETRY_I2C_XFER (2)
-#define BMM_MAX_RETRY_WAKEUP (1)
+#define BMM_MAX_RETRY_I2C_XFER (100)
+#define BMM_MAX_RETRY_WAKEUP (5)
 #define BMM_MAX_RETRY_WAIT_DRDY (100)
 
-#define BMM_DELAY_MIN (10)
+#define BMM_DELAY_MIN (20)
 #define BMM_DELAY_DEFAULT (200)
 
 #define MAG_VALUE_MAX (32767)
@@ -134,8 +134,6 @@ struct bmm_client_data {
 	struct mutex mutex_odr;
 	struct mutex mutex_rept_xy;
 	struct mutex mutex_rept_z;
-
-	struct mutex mutex_value;
 
 	struct regulator *reg_vio;
 	int place;
@@ -432,30 +430,23 @@ static void bmm_work_func(struct work_struct *work)
 		container_of((struct delayed_work *)work,
 			struct bmm_client_data, work);
 	struct i2c_client *client = client_data->client;
-	unsigned long delay =
-		msecs_to_jiffies(atomic_read(&client_data->delay));
+	long delay = atomic_read(&client_data->delay);
 	struct bmm050_mdata_s32 value = {0,0,0,0,0};
 	struct timespec ts;
-	u64 timestamp_new;
-	u64 timestamp ;
+	u64 timestamp_new, timestamp_end, timestamp_start;
+	u64 timestamp;
 	int time_hi, time_lo;
 
-	int i = 0;
-	mutex_lock(&client_data->mutex_value);
-	while ( i++ < 3)
+	ts = ktime_to_timespec(ktime_get_boottime());
+	timestamp_start = ts.tv_sec * 1000000000ULL + ts.tv_nsec;
+
+	BMM_CALL_API(read_mdataXYZ_s32)(&value);
+	if (value.drdy)
 	{
-		BMM_CALL_API(read_mdataXYZ_s32)(&value);
-		if (value.drdy)
-		{
-			bmm_remap_sensor_data(&value, client_data);
-			client_data->value = value;
-			break;
-		}
-		else
-		{
-			mdelay(1);
-		}
+		bmm_remap_sensor_data(&value, client_data);
+		client_data->value = value;
 	}
+
 	mutex_lock(&client_data->mutex_op_mode);
 	if (BMM_VAL_NAME(NORMAL_MODE) != client_data->op_mode)
 		bmm_set_forced_mode(client);
@@ -464,7 +455,7 @@ static void bmm_work_func(struct work_struct *work)
 
 	ts = ktime_to_timespec(ktime_get_boottime());
 	timestamp_new = ts.tv_sec * 1000000000ULL + ts.tv_nsec;
-	if ((timestamp_new - client_data->old_timestamp) > atomic_read(&client_data->delay)* 1800000LL\
+	if ((timestamp_new - client_data->old_timestamp) > atomic_read(&client_data->delay)* 1500000LL\
 		&& (client_data->old_timestamp != 0))
 	{
 		timestamp = (timestamp_new + client_data->old_timestamp) >>  1;
@@ -472,9 +463,9 @@ static void bmm_work_func(struct work_struct *work)
 		time_hi = (int)((timestamp & TIME_HI_MASK) >> TIME_HI_SHIFT);
 		time_lo = (int)(timestamp & TIME_LO_MASK);
 
-	input_report_rel(client_data->input, REL_X, client_data->value.datax);
-	input_report_rel(client_data->input, REL_Y, client_data->value.datay);
-	input_report_rel(client_data->input, REL_Z, client_data->value.dataz);
+		input_report_rel(client_data->input, REL_X, client_data->value.datax);
+		input_report_rel(client_data->input, REL_Y, client_data->value.datay);
+		input_report_rel(client_data->input, REL_Z, client_data->value.dataz);
 		input_report_rel(client_data->input, REL_RX, time_hi);
 		input_report_rel(client_data->input, REL_RY, time_lo);
 		input_sync(client_data->input);
@@ -492,10 +483,14 @@ static void bmm_work_func(struct work_struct *work)
 
 	client_data->old_timestamp = timestamp_new;
 
-	mutex_unlock(&client_data->mutex_value);
+	ts = ktime_to_timespec(ktime_get_boottime());
+	timestamp_end = ts.tv_sec * 1000000000ULL + ts.tv_nsec;
 
+	delay -= (long)((int)(timestamp_end - timestamp_start) / 1000000);
+	if (delay < 1)
+		delay = 1;
 
-	schedule_delayed_work(&client_data->work, delay);
+	schedule_delayed_work(&client_data->work, msecs_to_jiffies(delay));
 }
 
 
@@ -1569,7 +1564,6 @@ static int bmm_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	mutex_init(&client_data->mutex_odr);
 	mutex_init(&client_data->mutex_rept_xy);
 	mutex_init(&client_data->mutex_rept_z);
-	mutex_init(&client_data->mutex_value);
 
 	/* input device init */
 	err = bmm_input_init(client_data);
@@ -1739,6 +1733,13 @@ static int bmm_resume(struct i2c_client *client)
 
 	mutex_lock(&client_data->mutex_power_mode);
 	err = bmm_restore_hw_cfg(client);
+	usleep_range(4900, 5000); /* BMM_I2C_WRITE_DELAY_TIME */
+
+	/* Set force mode for next sequence: read raw_data */
+	bmm_set_op_mode(client_data, BMM_VAL_NAME(SLEEP_MODE));
+	usleep_range(4900, 5000);
+	bmm_set_forced_mode(client);
+	usleep_range(4900, 5000);
 	/* post resume operation */
 	bmm_post_resume(client);
 

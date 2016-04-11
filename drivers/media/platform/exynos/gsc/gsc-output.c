@@ -48,7 +48,7 @@ void gsc_out_add_active_buf(struct gsc_dev *gsc)
 	if (!list_empty(&gsc->out.pending_buf_q)) {
 		buf = pending_q_pop(&gsc->out);
 		active_q_push(&gsc->out, buf);
-	gsc_hw_set_input_addr_fixed(gsc, &buf->addr);
+		gsc_hw_set_input_addr_fixed(gsc, &buf->addr);
 	}
 	spin_unlock_irqrestore(&gsc->slock, flags);
 }
@@ -612,7 +612,7 @@ static int gsc_output_dqbuf(struct file *file, void *priv,
 	if (list_empty(&vbq->done_list))
 		gsc_info("Done list empty");
 	spin_unlock_irqrestore(&gsc->slock, flags);
- 
+
 	ret = vb2_dqbuf(vbq, buf, file->f_flags & O_NONBLOCK);
 
 	gsc->out.dq_time[gsc->out.dq_cnt % MAX_DEBUG_BUF_CNT] = sched_clock();

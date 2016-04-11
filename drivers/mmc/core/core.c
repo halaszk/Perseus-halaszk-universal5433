@@ -61,7 +61,7 @@
 #define MMC_BKOPS_MAX_TIMEOUT	(4 * 60 * 1000) /* max time to wait in ms */
 
 static struct workqueue_struct *workqueue;
-static const unsigned freqs[] = { 400000 };
+static const unsigned freqs[] = { 400000, 300000 };
 
 /*
  * Enabling software CRCs on the data blocks can be a significant (30%)
@@ -701,7 +701,7 @@ static int mmc_wait_for_data_req_done(struct mmc_host *host,
 				host->ops->request(host, mrq);
 				continue;
 			} else if (!cmd->error || !cmd->retries ||
-			    mmc_card_removed(host->card)) {
+				mmc_card_removed(host->card)) {
 				err = host->areq->err_check(host->card,
 							    host->areq);
 				break; /* return err */

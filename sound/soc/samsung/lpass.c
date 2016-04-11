@@ -819,11 +819,17 @@ static void lpass_update_qos(void)
 		kfc_qos_new = 0;
 		mif_qos_new = 0;
 		int_qos_new = 0;
+#ifdef CONFIG_SCHED_HMP
+		set_hmp_boost(0);
+#endif
 	} else if (lpass.uhqa_on) {
 		cpu_qos_new = AUD_CPU_FREQ_UHQA;
 		kfc_qos_new = AUD_KFC_FREQ_UHQA;
 		mif_qos_new = AUD_MIF_FREQ_UHQA;
 		int_qos_new = AUD_INT_FREQ_UHQA;
+#ifdef CONFIG_SCHED_HMP
+		set_hmp_boost(1);
+#endif
 	} else if (atomic_read(&lpass.stream_cnt) > 1) {
 		cpu_qos_new = AUD_CPU_FREQ_HIGH;
 		kfc_qos_new = AUD_KFC_FREQ_HIGH;

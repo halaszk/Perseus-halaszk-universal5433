@@ -126,6 +126,7 @@ struct idmac_desc {
 #define MAX_RETRY_CNT	2
 #define DRTO		200
 #define DRTO_MON_PERIOD	50
+#define DW_MCI_BUSY_WAIT_TIMEOUT	250
 
 static struct dma_attrs dw_mci_direct_attrs;
 
@@ -999,6 +1000,7 @@ static void dw_mci_translate_sglist(struct dw_mci *host, struct mmc_data *data,
 				DW_MMC_SECTOR_SIZE : DW_MMC_MAX_TRANSFER_SIZE;
 			sector_key = (mq_rq->req->bio->bi_sensitive_data == 1) ?
 				DW_MMC_ENCRYPTION_SECTOR_BEGIN : DW_MMC_BYPASS_SECTOR_BEGIN;
+			mq_rq->req->bio->bi_sensitive_data = 0;
 		}
 	}
 #endif
@@ -1401,7 +1403,7 @@ static void dw_mci_submit_data(struct dw_mci *host, struct mmc_data *data)
 static bool dw_mci_wait_data_busy(struct dw_mci *host, struct mmc_request *mrq)
 {
 	u32 status;
-	unsigned long timeout = jiffies + msecs_to_jiffies(500);
+	unsigned long timeout = jiffies + msecs_to_jiffies(DW_MCI_BUSY_WAIT_TIMEOUT);
 	struct dw_mci_slot *slot = host->cur_slot;
 	int try = 2;
 	u32 clkena;
@@ -1433,7 +1435,7 @@ static bool dw_mci_wait_data_busy(struct dw_mci *host, struct mmc_request *mrq)
 			mci_send_cmd(host->cur_slot,
 				SDMMC_CMD_UPD_CLK | SDMMC_CMD_PRV_DAT_WAIT, 0);
 		}
-		timeout = jiffies + msecs_to_jiffies(500);
+		timeout = jiffies + msecs_to_jiffies(DW_MCI_BUSY_WAIT_TIMEOUT);
 	} while (--try);
 out:
 	if (host->cur_slot) {
@@ -3134,7 +3136,7 @@ static void dw_mci_cmd_interrupt(struct dw_mci *host, u32 status)
 static irqreturn_t dw_mci_interrupt(int irq, void *dev_id)
 {
 	struct dw_mci *host = dev_id;
-	u32 status, pending;
+	u32 status, pending, reg;
 	int i;
 	int ret = IRQ_NONE;
 
@@ -3195,6 +3197,9 @@ static irqreturn_t dw_mci_interrupt(int irq, void *dev_id)
 			if (mci_readl(host, RINTSTS) & SDMMC_INT_HTO) {
 				dev_err(host->dev, "host timeout error\n");
 				dw_mci_reg_dump(host);
+				reg = __raw_readl(host->regs + SDMMC_MPSTAT);
+				if (reg & (BIT(0)))
+					panic("DMA hang Issue !!!!");
 			}
 			/* if there is an error report DATA_ERROR */
 			mci_writel(host, RINTSTS, DW_MCI_DATA_ERROR_FLAGS);
@@ -3786,6 +3791,7 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
 			host->vmmc = NULL;
 		} else {
 			pr_info("%s: vmmc regulator found\n", mmc_hostname(mmc));
+			mdelay(1);
 			ret = regulator_enable(host->vmmc);
 			if (ret) {
 				dev_err(host->dev,
@@ -3989,15 +3995,24 @@ static struct dw_mci_of_quirks {
 
 void (*notify_func_callback)(void *dev_id, int state);
 void *mmc_host_dev = NULL;
+#ifdef CONFIG_MACH_A7LTE
+struct device *mmc_dev_for_wlan = NULL;
+#endif /* CONFIG_MACH_A7LTE */
 static DEFINE_MUTEX(notify_mutex_lock);
 
 static int ext_cd_init_callback(
 	void (*notify_func)(void *dev_id, int state), void *dev_id)
 {
+#ifdef CONFIG_MACH_A7LTE
+	struct dw_mci *host =(struct dw_mci*)dev_id;
+#endif /* CONFIG_MACH_A7LTE */
 	mutex_lock(&notify_mutex_lock);
 	WARN_ON(notify_func_callback);
 	notify_func_callback = notify_func;
 	mmc_host_dev = dev_id;
+#ifdef CONFIG_MACH_A7LTE
+	mmc_dev_for_wlan = host->dev;
+#endif /* CONFIG_MACH_A7LTE */
 	mutex_unlock(&notify_mutex_lock);
 
 	return 0;
@@ -4190,11 +4205,20 @@ static struct dw_mci_board *dw_mci_parse_dt(struct dw_mci *host)
 	if (of_find_property(np, "enable-cmdq", NULL))
 		pdata->caps2 |= MMC_CAP2_CMDQ;
 
+	/* M checklist MMC_CAP2_DETECT_ON_ERR to external SD card only */
+	if (of_find_property(np, "cd-gpio", NULL))
+		pdata->caps2 |= MMC_CAP2_DETECT_ON_ERR;
+
 	if (of_find_property(np, "clock-gate", NULL))
 		pdata->use_gate_clock = true;
- 
+
 	if (of_find_property(np, "enable-cclk-on-suspend", NULL))
 		pdata->enable_cclk_on_suspend = true;
+
+	if (of_property_read_u32(dev->of_node, "cd-type",
+				&pdata->cd_type))
+		pdata->cd_type = DW_MCI_CD_PERMANENT;
+
 	return pdata;
 }
 
@@ -4204,7 +4228,6 @@ static struct dw_mci_board *dw_mci_parse_dt(struct dw_mci *host)
 	return ERR_PTR(-EINVAL);
 }
 #endif /* CONFIG_OF */
-
 
 int dw_mci_probe(struct dw_mci *host)
 {
@@ -4495,6 +4518,10 @@ int dw_mci_probe(struct dw_mci *host)
 		goto err_workqueue;
 	}
 
+	if (drv_data && drv_data->misc_control)
+		drv_data->misc_control(host, CTRL_REQUEST_EXT_IRQ,
+				dw_mci_detect_interrupt);
+
 	if (host->quirks & DW_MCI_QUIRK_IDMAC_DTO)
 		dev_info(host->dev, "Internal DMAC interrupt fix enabled.\n");
 
@@ -4636,8 +4663,6 @@ int dw_mci_suspend(struct dw_mci *host)
 		host->transferred_cnt = 0;
 		host->cmd_cnt = 0;
 	}
-	if (host->vmmc && regulator_is_enabled(host->vmmc))
-		regulator_disable(host->vmmc);
 
 	if (host->pdata->enable_cclk_on_suspend) {
 		host->pdata->on_suspend = true;
@@ -4663,19 +4688,6 @@ int dw_mci_resume(struct dw_mci *host)
 		host->pdata->on_suspend = false;
 
 	host->current_speed = 0;
-
-	if (host->pdata->ext_setpower)
-		host->pdata->ext_setpower(host,
-			DW_MMC_EXT_VMMC_ON | DW_MMC_EXT_VQMMC_ON);
-
-	if (host->vmmc && !regulator_is_enabled(host->vmmc)) {
-		ret = regulator_enable(host->vmmc);
-		if (ret) {
-			dev_err(host->dev,
-				"failed to enable regulator: %d\n", ret);
-			return ret;
-		}
-	}
 
 	mci_writel(host, DDR200_ENABLE_SHIFT, 0x0);
 
@@ -4815,7 +4827,6 @@ EXPORT_SYMBOL(dw_mci_early_resume);
 static int __init dw_mci_init(void)
 {
 	pr_info("Synopsys Designware Multimedia Card Interface Driver\n");
-
 	return 0;
 }
 

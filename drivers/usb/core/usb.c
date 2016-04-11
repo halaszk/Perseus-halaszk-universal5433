@@ -464,6 +464,9 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent,
 			usb_autosuspend_delay * 1000);
 	dev->connect_time = jiffies;
 	dev->active_duration = -jiffies;
+#if defined(CONFIG_LINK_DEVICE_HSIC)
+	dev->remote_wake = 0;
+#endif
 #endif
 	if (root_hub)	/* Root hub always ok [and always wired] */
 		dev->authorized = 1;

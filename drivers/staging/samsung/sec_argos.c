@@ -296,7 +296,7 @@ int argos_task_affinity_apply(int dev_num, bool enable)
 		if (enable) {
 			if (*hotplug_disable == false) {
 #ifdef CONFIG_EXYNOS5_DYNAMIC_CPU_HOTPLUG
-				exynos_dm_hotplug_disable();
+				argos_dm_hotplug_disable();
 #endif
 				*hotplug_disable = true;
 			}
@@ -304,7 +304,7 @@ int argos_task_affinity_apply(int dev_num, bool enable)
 		} else {
 			if (*hotplug_disable == true) {
 #ifdef CONFIG_EXYNOS5_DYNAMIC_CPU_HOTPLUG
-				exynos_dm_hotplug_enable();
+				argos_dm_hotplug_enable();
 #endif
 				*hotplug_disable = false;
 			}
@@ -338,7 +338,7 @@ int argos_irq_affinity_apply(int dev_num, bool enable)
 		if (enable) {
 			if (*hotplug_disable == false) {
 #ifdef CONFIG_EXYNOS5_DYNAMIC_CPU_HOTPLUG
-				exynos_dm_hotplug_disable();
+				argos_dm_hotplug_disable();
 #endif
 				*hotplug_disable = true;
 			}
@@ -346,7 +346,7 @@ int argos_irq_affinity_apply(int dev_num, bool enable)
 		} else {
 			if (*hotplug_disable == true) {
 #ifdef CONFIG_EXYNOS5_DYNAMIC_CPU_HOTPLUG
-				exynos_dm_hotplug_enable();
+				argos_dm_hotplug_enable();
 #endif
 				*hotplug_disable = false;
 			}

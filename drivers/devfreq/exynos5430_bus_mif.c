@@ -2318,6 +2318,20 @@ void exynos5_mif_thermal_call_notifier(int val, enum devfreq_mif_thermal_channel
 	blocking_notifier_call_chain(&mif_thermal_level_notifier, val, &ch);
 }
 
+static void exynos5_devfreq_swtrip(void)
+{
+#ifdef CONFIG_EXYNOS_SWTRIP
+	char tmustate_string[20];
+	char *envp[2];
+
+	snprintf(tmustate_string, sizeof(tmustate_string), "TMUSTATE=%d", 3);
+	envp[0] = tmustate_string;
+	envp[1] = NULL;
+	pr_err("DEVFREQ(MIF) : SW trip by MR4\n");
+	kobject_uevent_env(&data_mif->dev->kobj, KOBJ_CHANGE, envp);
+#endif
+}
+
 static void exynos5_devfreq_thermal_monitor(struct work_struct *work)
 {
 	struct delayed_work *d_work = container_of(work, struct delayed_work, work);
@@ -2375,6 +2389,8 @@ static void exynos5_devfreq_thermal_monitor(struct work_struct *work)
 		thermal_work->polling_period = 100;
 		break;
 	case 6:
+		exynos5_devfreq_swtrip();
+		return;
 	default:
 		pr_err("DEVFREQ(MIF) : can't support memory thermal level\n");
 		return;

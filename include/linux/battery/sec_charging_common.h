@@ -465,6 +465,7 @@ struct sec_battery_platform_data {
 	int swelling_low_temp_block;
 	int swelling_low_temp_recov;
 	int swelling_chg_current;
+	int swelling_topoff_current;
 	unsigned int swelling_normal_float_voltage;
 	unsigned int swelling_drop_float_voltage;
 	unsigned int swelling_high_rechg_voltage;

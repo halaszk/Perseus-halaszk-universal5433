@@ -43,7 +43,7 @@ struct max77888_charger_platform_data {
 };
 #endif
 
-#ifdef CONFIG_VIBETONZ
+#ifdef CONFIG_MOTOR_DRV_MAX77888
 #define MOTOR_LRA			(1<<7)
 #define MOTOR_EN			(1<<6)
 #define EXT_PWM				(0<<5)
@@ -85,7 +85,7 @@ struct max77888_platform_data {
 	int num_regulators;
 	struct max77888_regulator_data *regulators;
 #if 0	//temp
-#ifdef CONFIG_VIBETONZ
+#ifdef CONFIG_MOTOR_DRV_MAX77888
 	/* haptic motor data */
 	struct max77888_haptic_platform_data *haptic_data;
 #endif

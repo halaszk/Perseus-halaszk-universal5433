@@ -510,8 +510,26 @@ static int taos_get_lux(struct taos_data *taos)
 
 static void taos_light_enable(struct taos_data *taos)
 {
+	int adc =0;
+	int retry=3;
 	taos_dbgmsg("starting poll timer, delay %lldns\n",
 	ktime_to_ns(taos->light_poll_delay));
+
+	do {
+		adc = taos_get_lux(taos);
+		if (!adc) {
+			pr_err("%s - Error adc=%d", __func__, adc);
+			usleep_range(1000, 1100);
+		}
+		else
+			break;
+	} while (--retry>=0);
+
+	if(!adc) {
+		taos_chip_off(taos);
+		taos_chip_on(taos);
+		msleep(60); /*more than 58 ms*/
+	}
 	taos_get_lux(taos);
 	hrtimer_start(&taos->timer, taos->light_poll_delay, HRTIMER_MODE_REL);
 }
@@ -1087,6 +1105,15 @@ static ssize_t thresh_low_store(struct device *dev,
 
 	return size;
 }
+
+static ssize_t prox_trim_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct taos_data *taos = dev_get_drvdata(dev);
+
+	return sprintf(buf, "%d\n", taos->pdata->prox_rawdata_trim);
+}
+
 static ssize_t get_vendor_name(struct device *dev,
 	struct device_attribute *attr, char *buf)
 {
@@ -1183,6 +1210,7 @@ static DEVICE_ATTR(thresh_high, 0644, thresh_high_show,
 	thresh_high_store);
 static DEVICE_ATTR(thresh_low, 0644, thresh_low_show,
 	thresh_low_store);
+static DEVICE_ATTR(prox_trim, S_IRUGO, prox_trim_show, NULL);
 static struct device_attribute *prox_sensor_attrs[] = {
 	&dev_attr_state,
 	&dev_attr_prox_avg,
@@ -1194,6 +1222,7 @@ static struct device_attribute *prox_sensor_attrs[] = {
 	&dev_attr_prox_thresh,
 	&dev_attr_thresh_high,
 	&dev_attr_thresh_low,
+	&dev_attr_prox_trim,
 	NULL
 };
 

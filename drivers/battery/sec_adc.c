@@ -28,6 +28,11 @@ static int sec_bat_adc_ap_read(int channel)
 	{
 	case SEC_BAT_ADC_CHANNEL_CABLE_CHECK:
 	case SEC_BAT_ADC_CHANNEL_BAT_CHECK:
+		ret = iio_read_channel_raw(&temp_adc[3], &data);
+		if (ret < 0)
+			pr_info("read channel error[%d]\n", ret);
+		else
+			pr_debug("VF ADC(%d)\n", data);
 		break;
 	case SEC_BAT_ADC_CHANNEL_TEMP:
 	case SEC_BAT_ADC_CHANNEL_TEMP_AMBIENT:

@@ -122,6 +122,17 @@ config SENSORS_SX9310_WIFI_NORMAL_TOUCH_THRESHOLD
 	  This value is the standard of normal touch using
 	  SemTech sx9310 device driver.
 
+config SENSORS_SX9310_WIFI_DEFENCE_CODE_FOR_DAMAGE
+	depends on SENSORS_SX9310_WIFI
+	tristate "SX9310 WIFI Defence code for damage"
+	default n
+	help
+	  Say Y here if you use defence code.
+	  This option enables defence code for damage using
+	  SemTech sx9310 device driver.
+
+	  Say N here if you do not use defence code.
+
 config SENSORS_SX9310_WIFI_DEFENCE_CODE_FOR_TA_NOISE
 	depends on SENSORS_SX9310_WIFI
 	tristate "SX9310 WIFI Defence code for TA noise"

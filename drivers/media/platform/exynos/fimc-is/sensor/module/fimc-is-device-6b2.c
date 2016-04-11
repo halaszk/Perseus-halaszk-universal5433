@@ -92,6 +92,17 @@ static struct fimc_is_sensor_cfg config_6b2[] = {
 #endif
 };
 
+#if defined(CONFIG_CAMERA_VARIABLE_MIPI_LANES)
+static struct fimc_is_sensor_cfg config_6b2_2lane[] = {
+	/* 1936x1090@30fps */
+	FIMC_IS_SENSOR_CFG(1936, 1090, 30, 8, 0),
+	/* 1936x1090@24fps */
+	FIMC_IS_SENSOR_CFG(1936, 1090, 24, 8, 1),
+	/* 1296x730@30fps */
+	FIMC_IS_SENSOR_CFG(1296, 730, 30, 8, 2),
+};
+#endif
+
 static int sensor_6b2_open(struct v4l2_subdev *sd,
 	struct v4l2_subdev_fh *fh)
 {
@@ -739,6 +750,16 @@ int sensor_6b2_probe(struct i2c_client *client,
 	module->cfgs = ARRAY_SIZE(config_6b2);
 	module->cfg = config_6b2;
 	module->private_data = kzalloc(sizeof(struct fimc_is_module_6b2), GFP_KERNEL);
+
+#if defined(CONFIG_CAMERA_VARIABLE_MIPI_LANES)
+	if (core->vtcam_mipi_lane_num == 2) {
+		info("vtcam_mipi_2lane_used");
+		module->lanes = CSI_DATA_LANES_2;
+		module->cfgs = ARRAY_SIZE(config_6b2_2lane);
+		module->cfg = config_6b2_2lane;
+	}
+#endif
+
 	if (!module->private_data) {
 		err("private_data is NULL");
 		ret = -ENOMEM;
@@ -749,7 +770,11 @@ int sensor_6b2_probe(struct i2c_client *client,
 	module->power_setpin = sensor_6b2_power_setpin;
 #endif
 	ext = &module->ext;
+#if defined(CONFIG_CAMERA_VARIABLE_MIPI_LANES)
+	ext->mipi_lane_num = module->lanes + 1;
+#else
 	ext->mipi_lane_num = module->lanes;
+#endif
 	ext->I2CSclk = I2C_L0;
 	ext->sensor_con.product_name = SENSOR_NAME_S5K6B2;
 	ext->sensor_con.peri_type = SE_I2C;

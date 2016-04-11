@@ -190,7 +190,7 @@ static void update_host_wake_locked(int host_wake)
 		 * The chipset deasserts the hostwake lock, when there is no
 		 * more data to send.
 		 */
-		pr_err("[BT] update_host_wake_locked host_wake is deasserted. release wakelock in 1s\n");
+		pr_info("[BT] update_host_wake_locked host_wake is deasserted. release wakelock in 1s\n");
 		wake_lock_timeout(&bt_lpm.host_wake_lock, HZ);
 	}
 }
@@ -263,7 +263,7 @@ static int bcm43455_bluetooth_probe(struct platform_device *pdev)
 #ifdef BT_LPM_ENABLE
 	int ret;
 #endif
-	pr_err("[BT] bcm43455_bluetooth_probe.\n");
+	pr_info("[BT] bcm43455_bluetooth_probe.\n");
 
 	bt_gpio.bt_en = of_get_gpio(pdev->dev.of_node, 0);
 

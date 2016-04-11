@@ -117,6 +117,62 @@ choice
 
 config SOC_EXYNOS5430_REV_1
 	bool "Rev 1.0"
+endchoice
+
+choice
+	prompt "Resolution Type"
+	depends on SOC_EXYNOS5430
+	help
+	  This option selects display resolution type.
+
+config EXYNOS5430_WQHD
+	bool "Resolution WQHD (2560 x 1440)"
+
+config EXYNOS5430_FHD
+	bool "Resolution Full HD (1920 x 1080)"
+
+config EXYNOS5430_HD
+	bool "Resolution HD (1280 x 720)"
+endchoice
+
+menu "Exynos5430 Type"
+	depends on SOC_EXYNOS5430
+
+config SOC_EXYNOS5430_L
+	bool "Exynos5430 L version"
+	help
+	  This option enable exynos5430 lite version
+endmenu
+
+config SOC_EXYNOS5433
+	bool "SAMSUNG EXYNOS5433"
+	default n
+	depends on ARCH_EXYNOS5
+	select PM_GENERIC_DOMAINS if PM
+	select S5P_PM if PM
+	select S5P_SLEEP if SUSPEND
+	select SAMSUNG_DMADEV
+	select EXYNOS_HSI2C_RESET_DURING_DSTOP if CPU_IDLE
+	select EXYNOS_SPI_RESET_DURING_DSTOP if CPU_IDLE
+	select EXYNOS_PWM_RESET_DURING_DSTOP if CPU_IDLE
+	select CAL_SYS_PWRDOWN
+	help
+	  Enable EXYNOS5433 SoC support
+
+config CAL_SYS_PWRDOWN
+	bool
+
+choice
+	prompt "Revision Type"
+	depends on SOC_EXYNOS5433
+	help
+	  This option selects cpu revision number.
+
+config SOC_EXYNOS5433_REV_0
+	bool "Rev 0.0"
+
+config SOC_EXYNOS5433_REV_1
+	bool "Rev 1.0"
 
 endchoice
 
@@ -236,6 +292,64 @@ config EXYNOS_CORESIGHT_MAINTAIN_DBG_REG
 	  save in /restore from memory. If OS-lock is set, debugging to use
 	  trace32 is impossible. So OS-lock must clear when core power is up.
 	  This config must enable only using iTSP program.
+
+menuconfig EXYNOS_SNAPSHOT
+	bool "Enable SnapShot of exynos for debugging"
+	default n
+	depends on ARCH_EXYNOS
+
+config EXYNOS_SNAPSHOT_CALLSTACK
+	int "shown callstack level"
+	depends on EXYNOS_SNAPSHOT
+	range 1 4
+	default 4
+
+config EXYNOS_SNAPSHOT_IRQ_EXIT
+	bool "Enable debugging of interrupt exit event by kevent"
+	depends on EXYNOS_SNAPSHOT
+	default y
+
+config EXYNOS_SNAPSHOT_IRQ_EXIT_THRESHOLD
+	int "threshold of detection(microsecond)"
+	depends on EXYNOS_SNAPSHOT_IRQ_EXIT
+	range 0 1000000
+	default 0
+
+config EXYNOS_SNAPSHOT_IRQ_DISABLED
+	bool "Enable debugging of interrupt disable period by kevent"
+	depends on EXYNOS_SNAPSHOT
+	default y
+
+config EXYNOS_SNAPSHOT_IRQ_DISABLED_THRESHOLD
+	int "threshold of detection(microsecond)"
+	depends on EXYNOS_SNAPSHOT_IRQ_DISABLED
+	range 0 1000000
+	default 30000
+
+config EXYNOS_SNAPSHOT_HRTIMER
+	bool "Enable debugging of hrtimer by kevent"
+	depends on EXYNOS_SNAPSHOT
+	default n
+
+config EXYNOS_SNAPSHOT_SOFTIRQ
+	bool "Enable debugging of softirq by kevent"
+	depends on EXYNOS_SNAPSHOT
+	default n
+
+config EXYNOS_SNAPSHOT_REG
+	bool "Enable debugging of accessing register by kevent"
+	depends on EXYNOS_SNAPSHOT
+	default n
+
+config EXYNOS_SNAPSHOT_HOOK_LOGGER
+	bool "Enable hooking android platform log for ramdump"
+	depends on EXYNOS_SNAPSHOT
+	default y
+
+config EXYNOS_SNAPSHOT_PANIC_REBOOT
+	bool "Enable forced reboot after panic for ramdump"
+	depends on EXYNOS_SNAPSHOT
+	default y
 
 config EXYNOS5_DYNAMIC_CPU_HOTPLUG
 	bool "Dynamic CPU Hotplug support"
@@ -838,8 +952,8 @@ config TIMA_RKP
 
 config RKP_DBLMAP_PROT
 	bool "Page Double Mapping protection"
-	depends on TIMA
-	default y
+	depends on TIMA_RKP
+	default n
 	help
 	Prevents unauthorized cred modification.
 
@@ -869,7 +983,7 @@ config TIMA_RKP_L1_TABLES
 	  TIMA taking over management of L1 tables.
 
 config TIMA_RKP_L2_TABLES
-	bool
+	bool "Enable TIMA RKP L2 Tables"
 	depends on TIMA_RKP
 	default n
 	help
@@ -890,28 +1004,28 @@ config TIMA_RKP_LAZY_MMU
 	  TIMA lazy MMU for L2 pages
 
 config TIMA_IOMMU_OPT
-	bool
+	bool "Enable TIMA IOMMU OPT"
 	depends on TIMA_RKP_L2_TABLES
 	default	n
 	help
 	  TIMA IOMMU optimization for L2 pages
 	
 config TIMA_KMAP_OPT
-	bool
+	bool "Enable TIMA KMAP OPT"
 	depends on TIMA_RKP_L2_TABLES
 	default	n
 	help
 	  TIMA KMAP optimization for L2 pages
 
 config TIMA_DALVIKHEAP_OPT
-	bool
+	bool "Enable TIMA DALVIKHEAP OPT"
 	depends on TIMA_RKP_L2_TABLES
 	default	n 
 	help
 	  TIMA DALVIK HEAP optimization for L2 pages
 
 config TIMA_RKP_DEBUG
-	bool
+	bool "Enable TIMA RKP Debug"
 	depends on TIMA_RKP
 	default n
 	help
@@ -982,3 +1096,31 @@ config SEC_BAT_AUT
 	default n
 	help
 	  Samsung TN Bat Automation Test
+config DISABLE_C2_BOOT
+	bool "Disable C2 Boot"
+	default n
+	help
+	  Support C2 Disable Boot
+
+config EXYNOS5_DYNAMIC_CPU_HOTPLUG_SLEEP_PREPARE
+        int "Activate number of cores when sleep"
+        depends on EXYNOS5_DYNAMIC_CPU_HOTPLUG
+        default 1
+        help
+          When gose to sleep, activate some cores for performace
+          during sleep/wakeup sequence.
+          This config set the number of activate cores.
+          defaut value is "4" to activate all cores in cluster0.
+
+config EXYNOS5433_CORE_FEEDBACK_CHECK_DISABLE
+	bool "Disable checking core feedback"
+	default n
+	help
+	  Disable checking core feedback
+
+config EXYNOS5433_ASV_NEON_WORKAROUND
+	bool "Increase voltage for ATL 900 / 800 / 700"
+	default n
+	help
+	  Increase ATL voltage
+

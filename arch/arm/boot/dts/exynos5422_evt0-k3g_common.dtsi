@@ -1630,4 +1630,8 @@
 		ctlr.integral_cutoff = <0>;
 		ctlr.integral_reset_threshold = <5>;
 	};
+	
+	usb_notifier {
+		samsung,can-disable-usb;
+	};
 };

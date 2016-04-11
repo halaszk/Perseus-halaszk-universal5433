@@ -95,6 +95,8 @@ struct vendor_ops {
 	int (*get_vps_data)(struct regmap_desc *, void *);
 	int (*muic_enable_accdet)(struct regmap_desc *);
 	int (*muic_disable_accdet)(struct regmap_desc *);
+	int (*attach_mmdock)(struct regmap_desc  *, int);
+	int (*detach_mmdock)(struct regmap_desc  *);
 };
 
 struct regmap_desc {

@@ -25,6 +25,10 @@
 	model_info-hw_rev_end = <5>;
 	compatible = "samsung,GTS2 10 LTE 05", "samsung,exynos5433";
 
+	dwmmc0@15540000 {
+		samsung,dw-mshc-ddr200-tx-delay-line = <0x80>;
+	};
+
 	pinctrl@15690000 {
 		sd0_clk: sd0-clk {
 			samsung,pins = "gpr0-0";
@@ -101,6 +105,7 @@
 			wlf,micd-force-micbias;
 			wlf,hpdet-channel = <0>;
 			wlf,hpdet-ext-res = <11>;
+			wlf,hs-mic = <3>;
 			wlf,hpdet-short-circuit-imp = <3>;
 			wlf,micd-ranges = <
 				116 226

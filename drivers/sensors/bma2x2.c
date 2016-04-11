@@ -72,7 +72,13 @@ enum {
 	ON = 1
 };
 
+#define STANDARD_I2C
+#ifdef STANDARD_I2C
+#define I2C_M_WR	0 /* for i2c Write */
+//#define I2c_M_RD	1 /* for i2c Read */
+#endif
 
+#define MAKE_EVENT
 /*!
  * we use a typedef to hide the detail,
  * because this type might be changed
@@ -91,7 +97,6 @@ struct bma2x2_data {
 
 	struct bma2x2_v value;
 	struct bma2x2_v caldata;
-	struct mutex value_mutex;
 	struct mutex enable_mutex;
 	struct mutex mode_mutex;
 	struct delayed_work work;
@@ -118,6 +123,27 @@ static int bma2x2_normal_to_suspend(struct bma2x2_data *bma2x2,
 static int bma2x2_smbus_read_byte(struct i2c_client *client,
 		unsigned char reg_addr, unsigned char *data)
 {
+#ifdef STANDARD_I2C
+	int ret;
+	struct i2c_msg msg[2];
+
+	msg[0].addr = client->addr;
+	msg[0].flags = I2C_M_WR | I2C_M_IGNORE_NAK;
+	msg[0].len = 1;
+	msg[0].buf = &reg_addr;
+
+	msg[1].addr = client->addr;
+	msg[1].flags = I2C_M_RD | I2C_M_IGNORE_NAK;
+	msg[1].len = 1;
+	msg[1].buf = data;
+
+	ret = i2c_transfer(client->adapter, msg, 2);
+	if (ret < 0) {
+		pr_err("[SENSOR]: %s : 0x%02x, i2cstd error %d\n", __func__, client->addr, ret);
+		return ret;
+	}
+#else
+
 	s32 dummy;
 	int retries = 0;
 
@@ -133,6 +159,7 @@ static int bma2x2_smbus_read_byte(struct i2c_client *client,
         }
 
 	*data = dummy & 0x000000ff;
+#endif
 
 	return 0;
 }
@@ -140,11 +167,31 @@ static int bma2x2_smbus_read_byte(struct i2c_client *client,
 static int bma2x2_smbus_write_byte(struct i2c_client *client,
 		unsigned char reg_addr, unsigned char *data)
 {
+#ifdef STANDARD_I2C
+
+	int ret;
+	struct i2c_msg msg;
+	unsigned char w_buf[2];
+
+	w_buf[0] = reg_addr;
+	w_buf[1] = *data;
+
+	msg.addr = client->addr;
+	msg.flags = I2C_M_WR | I2C_M_IGNORE_NAK;
+	msg.len = 2;
+	msg.buf = (char *)w_buf;
+
+	ret = i2c_transfer(client->adapter, &msg, 1);
+	if (ret < 0) {
+		pr_err("[SENSOR]: %s : i2cstd error %d\n", __func__, ret);
+		return ret;
+	}
+#else
 	s32 dummy;
 	int retries = 0;
 
 	do {
-	dummy = i2c_smbus_write_byte_data(client, reg_addr, *data);
+		dummy = i2c_smbus_write_byte_data(client, reg_addr, *data);
 			if (dummy >= 0)
 				break;
 	} while (retries++ < 3);
@@ -155,17 +202,41 @@ static int bma2x2_smbus_write_byte(struct i2c_client *client,
 	}
 
 	udelay(2);
+#endif
+
+
 	return 0;
 }
 
 static int bma2x2_smbus_read_byte_block(struct i2c_client *client,
 		unsigned char reg_addr, unsigned char *data, unsigned char len)
 {
+#ifdef STANDARD_I2C
+	int ret;
+	struct i2c_msg msg[2];
+
+	msg[0].addr = client->addr;
+	msg[0].flags = I2C_M_WR | I2C_M_IGNORE_NAK;
+	msg[0].len = 1;
+	msg[0].buf = &reg_addr;
+
+	msg[1].addr = client->addr;
+	msg[1].flags = I2C_M_RD | I2C_M_IGNORE_NAK;
+	msg[1].len = len;
+	msg[1].buf = data;
+
+	ret = i2c_transfer(client->adapter, msg, 2);
+	if (ret < 0) {
+		pr_err("[SENSOR]: %s : 0x%02x i2cstd error %d\n", __func__, client->addr, ret);
+		return ret;
+	}
+
+#else
 	s32 dummy;
 	int retries = 0;
 
 	do {
-	dummy = i2c_smbus_read_i2c_block_data(client, reg_addr, len, data);
+		dummy = i2c_smbus_read_i2c_block_data(client, reg_addr, len, data);
 			if (dummy >= 0)
 				break;
 	} while (retries++ < 3);
@@ -174,6 +245,7 @@ static int bma2x2_smbus_read_byte_block(struct i2c_client *client,
 		pr_err("[SENSOR]: %s - i2c read error %d\n", __func__, dummy);
 		return dummy;
 	}
+#endif
 
 	return 0;
 }
@@ -583,6 +655,7 @@ static int bma2x2_set_range(struct i2c_client *client, unsigned char Range)
 	} else {
 		comres = -1;
 	}
+	pr_info("%s: range[%x]\n", __func__, Range);
 
 	return comres;
 }
@@ -632,46 +705,42 @@ static int bma2x2_set_mode(struct i2c_client *client, unsigned char mode,
 		if (comres < 0)
 			pr_info("[SENSOR] %s - i2c read error ",__func__);
 
+		pr_info("[SENSOR] %s ##data1: 0x%x, data2: 0x%x\n",__func__, data1, data2);
+
 		switch (mode) {
 		case BMA2X2_MODE_NORMAL:
-				data1  = BMA2X2_SET_BITSLICE(data1,
-						BMA2X2_MODE_CTRL, 0);
-				data2  = BMA2X2_SET_BITSLICE(data2,
-						BMA2X2_LOW_POWER_MODE, 0);
-			comres = bma2x2_smbus_write_byte(client,
-						BMA2X2_MODE_CTRL_REG, &data1);
-			usleep_range(5000, 5100);
-			comres += bma2x2_smbus_write_byte(client,
+			data1  = BMA2X2_SET_BITSLICE(data1,
+					BMA2X2_MODE_CTRL, 0);
+			data2  = BMA2X2_SET_BITSLICE(data2,
+					BMA2X2_LOW_POWER_MODE, 0);
+				comres = bma2x2_smbus_write_byte(client,
+					BMA2X2_MODE_CTRL_REG, &data1);
+				usleep_range(5000, 5100);
+				comres += bma2x2_smbus_write_byte(client,
 					BMA2X2_LOW_NOISE_CTRL_REG, &data2);
-			if (comres < 0)
-				pr_info("[SENSOR]:%s  - i2c write error ",__func__);
-
-			ret = bma2x2_set_range(client, BMA2X2_RANGE_SET);
-			if (ret < 0)
-				pr_info("[SENSOR] %s - Error range setting ",__func__);
-				bma2x2_open_calibration(bma2x2);
-				break;
+			bma2x2_open_calibration(bma2x2);
+			break;
 		case BMA2X2_MODE_LOWPOWER1:
-				data1  = BMA2X2_SET_BITSLICE(data1,
-						BMA2X2_MODE_CTRL, 2);
-				data2  = BMA2X2_SET_BITSLICE(data2,
-						BMA2X2_LOW_POWER_MODE, 0);
-			comres += bma2x2_smbus_write_byte(client,
-						BMA2X2_MODE_CTRL_REG, &data1);
-			usleep_range(5000, 5100);
-			comres += bma2x2_smbus_write_byte(client,
+			data1  = BMA2X2_SET_BITSLICE(data1,
+					BMA2X2_MODE_CTRL, 2);
+			data2  = BMA2X2_SET_BITSLICE(data2,
+					BMA2X2_LOW_POWER_MODE, 0);
+				comres = bma2x2_smbus_write_byte(client,
+					BMA2X2_MODE_CTRL_REG, &data1);
+				usleep_range(5000, 5100);
+				comres += bma2x2_smbus_write_byte(client,
 					BMA2X2_LOW_NOISE_CTRL_REG, &data2);
-				break;
+			break;
 		case BMA2X2_MODE_SUSPEND:
-				data1  = BMA2X2_SET_BITSLICE(data1,
-						BMA2X2_MODE_CTRL, 4);
-				data2  = BMA2X2_SET_BITSLICE(data2,
-						BMA2X2_LOW_POWER_MODE, 0);
+			data1  = BMA2X2_SET_BITSLICE(data1,
+					BMA2X2_MODE_CTRL, 4);
+			data2  = BMA2X2_SET_BITSLICE(data2,
+					BMA2X2_LOW_POWER_MODE, 0);
 			/*aimed at anomaly resolution when switch to suspend*/
 			ret = bma2x2_normal_to_suspend(bma2x2, data1, data2);
 			if (ret < 0)
 				pr_err("[SENSOR]: %s - Error switching to suspend\n",__func__);
-				break;
+			break;
 		}
 	} else {
 		comres = -1;
@@ -1091,79 +1160,143 @@ static int bma2x2_read_accel_xyz(struct i2c_client *client,
 		signed char sensor_type, struct bma2x2_v *acc)
 {
 	int comres = 0;
-	unsigned char data[6];
-	struct bma2x2_data *client_data = i2c_get_clientdata(client);
+	unsigned char data[6] = {0,};
 	int bitwidth;
-	comres = bma2x2_smbus_read_byte_block(client,
-				BMA2X2_ACC_X12_LSB__REG, data, 6);
-	if (comres < 0)
-		pr_err("%s [SENSOR] - i2c read error ",__func__);
+#ifdef CONFIG_SENSORS_RESET_SLAVE
+	unsigned char range = 0;
+	struct bma2x2_data *client_data = i2c_get_clientdata(client);
+#endif
 
 	if (sensor_type >= 4)
 		return -EINVAL;
+	bitwidth = bma2x2_sensor_bitwidth[sensor_type];
+
+	comres = bma2x2_smbus_read_byte_block(client,
+				BMA2X2_ACC_X12_LSB__REG, data, 6);
+	if (comres < 0)
+	{
+		pr_err("%s [SENSOR] - i2cstd error",__func__);
+		return -EINVAL;
+	}
+
 
 	acc->x = (data[1]<<8)|data[0];
 	acc->y = (data[3]<<8)|data[2];
 	acc->z = (data[5]<<8)|data[4];
 
-	bitwidth = bma2x2_sensor_bitwidth[sensor_type];
 
 	acc->x = (acc->x >> (16 - bitwidth));
 	acc->y = (acc->y >> (16 - bitwidth));
 	acc->z = (acc->z >> (16 - bitwidth));
 
+#ifdef CONFIG_SENSORS_RESET_SLAVE
+	comres = bma2x2_smbus_read_byte(client, BMA2X2_RANGE_SEL__REG, &range);
+	  range = BMA2X2_GET_BITSLICE(range, BMA2X2_RANGE_SEL);
+	  if ( range != (unsigned char)BMA2X2_RANGE_SET) {
+		pr_info("[SENSOR]: %s range setting!!: %d \n", __func__, range);
+		bma2x2_set_range(client, BMA2X2_RANGE_SET);
+	 }
 	remap_sensor_data(acc->v, client_data->place);
+#endif
 	return comres;
 }
+
+#if defined(CONFIG_SOC_EXYNOS5430)
+static inline int bma2x2_get_LITTLE_cpu(void)
+{
+	int cpu;
+	for_each_cpu(cpu, cpu_online_mask)
+		if(cpu < 4)
+			return cpu;
+	return WORK_CPU_UNBOUND;
+}
+#else
+static inline int bma2x2_get_LITTLE_cpu(void)
+{
+	return WORK_CPU_UNBOUND;
+}
+#endif
 
 static void bma2x2_work_func(struct work_struct *work)
 {
 	struct bma2x2_data *bma2x2 = container_of((struct delayed_work *)work,
 			struct bma2x2_data, work);
 	static struct bma2x2_v acc;
-	unsigned long delay = msecs_to_jiffies(atomic_read(&bma2x2->delay));
+	long delay = atomic_read(&bma2x2->delay);
 	struct timespec ts = ktime_to_timespec(ktime_get_boottime());
 	u64 timestamp_new = ts.tv_sec * 1000000000ULL + ts.tv_nsec;
-	u64 timestamp ;
+	u64 timestamp_end;
 	int time_hi, time_lo;
 	int ret;
 
 	ret = bma2x2_read_accel_xyz(bma2x2->bma2x2_client, bma2x2->sensor_type, &acc);
 	if (ret < 0) {
 		pr_err("%s [SENSOR] - i2c read error!!! ",__func__);
+                bma2x2->old_timestamp = timestamp_new;
+		delay = 1;
 		goto exit;
 	}
 	bma2x2->value.x = acc.x - bma2x2->caldata.x;
 	bma2x2->value.y = acc.y - bma2x2->caldata.y;
 	bma2x2->value.z = acc.z - bma2x2->caldata.z;
 
-	if (((timestamp_new - bma2x2->old_timestamp) > atomic_read(&bma2x2->delay)*1800000LL)\
+#ifdef MAKE_EVENT
+	if (((timestamp_new - bma2x2->old_timestamp) > atomic_read(&bma2x2->delay)*1500000LL)\
 		&& (bma2x2->old_timestamp != 0))
 	{
+		u64 timestamp;
 	        timestamp = (timestamp_new + bma2x2->old_timestamp) >>  1;
 		time_hi = (int)((timestamp & TIME_HI_MASK) >> TIME_HI_SHIFT);
 		time_lo = (int)(timestamp & TIME_LO_MASK);
 
-	input_report_rel(bma2x2->input, REL_X, acc.x);
-	input_report_rel(bma2x2->input, REL_Y, acc.y);
-	input_report_rel(bma2x2->input, REL_Z, acc.z);
+		input_report_rel(bma2x2->input, REL_X, bma2x2->value.x);
+		input_report_rel(bma2x2->input, REL_Y, bma2x2->value.y);
+		input_report_rel(bma2x2->input, REL_Z, bma2x2->value.z);
 		input_report_rel(bma2x2->input, REL_DIAL, time_hi);
 		input_report_rel(bma2x2->input, REL_MISC, time_lo);
-	input_sync(bma2x2->input);
-}
+		input_sync(bma2x2->input);
+	}
+#endif
 	time_hi = (int)((timestamp_new & TIME_HI_MASK) >> TIME_HI_SHIFT);
 	time_lo = (int)(timestamp_new & TIME_LO_MASK);
 
-	input_report_rel(bma2x2->input, REL_X, acc.x);
-	input_report_rel(bma2x2->input, REL_Y, acc.y);
-	input_report_rel(bma2x2->input, REL_Z, acc.z);
+	input_report_rel(bma2x2->input, REL_X, bma2x2->value.x);
+	input_report_rel(bma2x2->input, REL_Y, bma2x2->value.y);
+	input_report_rel(bma2x2->input, REL_Z, bma2x2->value.z);
 	input_report_rel(bma2x2->input, REL_DIAL, time_hi);
 	input_report_rel(bma2x2->input, REL_MISC, time_lo);
 	input_sync(bma2x2->input);
 
 	bma2x2->old_timestamp = timestamp_new;
+	ts = ktime_to_timespec(ktime_get_boottime());
+	timestamp_end = ts.tv_sec * 1000000000ULL + ts.tv_nsec;
+	delay -= (long)((int)(timestamp_end - timestamp_new) / 1000000);
+	if (delay < 1)
+		delay = 1;
 
 	exit:
+
+#ifdef CONFIG_SENSORS_RESET_SLAVE
+	if( ((bma2x2->value.x==-1) || (bma2x2->value.x== 0)) && ((bma2x2->value.y==-1) ||
+		(bma2x2->value.y== 0)) && ((bma2x2->value.z==-1) || (bma2x2->value.z== 0)))
+	{
+		pr_info("[SENSOR]: %s - x = %d, y = %d, z = %d \n",
+				__func__, bma2x2->value.x, bma2x2->value.y,
+							bma2x2->value.z);
+		bma2x2_set_mode(bma2x2->bma2x2_client,
+				BMA2X2_MODE_NORMAL, BMA_ENABLED_INPUT);
+		msleep(10);
+		bma2x2_soft_reset(bma2x2->bma2x2_client);
+		msleep(20);
+		ret = bma2x2_set_range(bma2x2->bma2x2_client, BMA2X2_RANGE_SET);
+		if (ret < 0)
+			pr_info("[SENSOR] %s - Error range setting ",__func__);
+		ret = bma2x2_set_bandwidth(bma2x2->bma2x2_client, BMA2X2_BW_SET);
+		if (ret < 0)
+			pr_info("[SENSOR] %s - Error bandwidth setting ",__func__);
+	}
+#endif
+
 	if ((atomic_read(&bma2x2->delay) * bma2x2->time_count)
 		>= (ACCEL_LOG_TIME * MSEC_PER_SEC)) {
 			pr_info("[SENSOR]: %s - x = %d, y = %d, z = %d \n",
@@ -1174,7 +1307,7 @@ static void bma2x2_work_func(struct work_struct *work)
 		bma2x2->time_count++;
 	}
 
-	schedule_delayed_work(&bma2x2->work, delay);
+	schedule_delayed_work_on(bma2x2_get_LITTLE_cpu(),&bma2x2->work, msecs_to_jiffies(delay));
 }
 
 static ssize_t bma2x2_raw_data_read(struct device *dev,
@@ -1189,7 +1322,7 @@ static ssize_t bma2x2_raw_data_read(struct device *dev,
 				BMA2X2_MODE_NORMAL, BMA_ENABLED_INPUT);
 
 		msleep(20);
-	bma2x2_read_accel_xyz(bma2x2->bma2x2_client, bma2x2->sensor_type,
+		bma2x2_read_accel_xyz(bma2x2->bma2x2_client, bma2x2->sensor_type,
 								&acc_value);
 
 		bma2x2_set_mode(bma2x2->bma2x2_client,
@@ -1244,7 +1377,7 @@ static ssize_t bma2x2_delay_store(struct device *dev,
 	switch (data) {
 		case 0:
 		case 1:
-	case 5:
+		case 5:
 		case 10:
 		bw = 0x0b; /*100Hz*/
 			break;
@@ -1262,8 +1395,18 @@ static ssize_t bma2x2_delay_store(struct device *dev,
 			break;
 	}
 	if (bw >= 0x08) {
-		if (bma2x2_set_bandwidth(bma2x2->bma2x2_client,
-					(unsigned char) bw) < 0) {
+		int enabled = atomic_read(&bma2x2->enable);
+
+		mutex_lock(&bma2x2->enable_mutex);
+		if(enabled)
+			cancel_delayed_work_sync(&bma2x2->work);
+		error = bma2x2_set_bandwidth(bma2x2->bma2x2_client,
+					(unsigned char) bw);
+		if(enabled)
+			schedule_delayed_work_on(bma2x2_get_LITTLE_cpu(),&bma2x2->work,
+				msecs_to_jiffies(data));
+		mutex_unlock(&bma2x2->enable_mutex);
+		if (error < 0) {
 			pr_info("[SENSOR]: %s failed to set bandwidth\n", __func__);
 			return -EINVAL;
 		}
@@ -1283,6 +1426,7 @@ static ssize_t bma2x2_enable_show(struct device *dev,
 
 }
 
+
 static void bma2x2_set_enable(struct device *dev, int enable)
 {
 	struct i2c_client *client = to_i2c_client(dev);
@@ -1297,7 +1441,7 @@ static void bma2x2_set_enable(struct device *dev, int enable)
 			bma2x2->old_timestamp = 0LL;
 			bma2x2_set_mode(bma2x2->bma2x2_client,
 					BMA2X2_MODE_NORMAL, BMA_ENABLED_INPUT);
-			schedule_delayed_work(&bma2x2->work,
+			schedule_delayed_work_on(bma2x2_get_LITTLE_cpu(), &bma2x2->work,
 				msecs_to_jiffies(atomic_read(&bma2x2->delay)));
 			atomic_set(&bma2x2->enable, 1);
 			pr_info("[SENSOR] %s enable: [%d] \n", __func__, atomic_read(&bma2x2->enable));
@@ -1815,7 +1959,6 @@ static int bma2x2_probe(struct i2c_client *client,
 		goto kfree_exit;
 	}
 
-	mutex_init(&data->value_mutex);
 	mutex_init(&data->mode_mutex);
 	mutex_init(&data->enable_mutex);
 	bma2x2_set_bandwidth(client, BMA2X2_BW_SET);
@@ -1972,7 +2115,7 @@ static int bma2x2_resume(struct device *dev)
 	if (atomic_read(&data->enable) == 1) {
 		bma2x2_set_mode(data->bma2x2_client,
 			BMA2X2_MODE_NORMAL, BMA_ENABLED_INPUT);
-		schedule_delayed_work(&data->work,
+		schedule_delayed_work_on(bma2x2_get_LITTLE_cpu(),&data->work,
 				msecs_to_jiffies(atomic_read(&data->delay)));
 	}
 	mutex_unlock(&data->enable_mutex);

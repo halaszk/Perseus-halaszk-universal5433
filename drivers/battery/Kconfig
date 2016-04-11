@@ -7,6 +7,13 @@ config BATTERY_SAMSUNG
 	 To see battery-related functions,
 	 refer to sec_charging_common.h
 
+config CHARGING_VZWCONCEPT
+	tristate "VZW concept about the charging"
+	default n
+	depends on BATTERY_SAMSUNG
+	help
+	 Say Y to include support for the VZW concepts.
+
 config BATTERY_SWELLING
 	bool "prevent battery swellin "
 	help
@@ -172,6 +179,14 @@ config FUELGAUGE_SM5703
 	  Say Y to include support SM5703 FUELGAUGE.
 	  Using coulomb counting.
 
+config SM5703_OCV_TRACKING
+	bool "SM5703 OCV Tracking"
+	default n
+	depends on FUELGAUGE_SM5703
+	help
+	  Say Y here to enable support for SM5703 OCV Tracking
+	  You have to define FUELGAUGE_SM5703
+
 config FUELGAUGE_MAX77849_VOLTAGE_TRACKING
 	tristate "use MAX77849 fuel gauge only as voltage tracking"
 	default n
@@ -198,6 +213,13 @@ config PREVENT_SOC_JUMP
 	depends on BATTERY_SAMSUNG
 	help
 	 Say Y to prevent soc jump
+
+config DUAL_BATTERY
+	tristate "Support dual battery"
+	default n
+	depends on BATTERY_SAMSUNG
+	help
+	 Say Y Support dual battery.
 
 # Charger
 
@@ -342,14 +364,6 @@ config CHARGER_SM5703
 	  Say Y here to enable support for the SM5703 charger
 	  SM5703 incluse led, flash driver.
 	  You have to define MFD_SM5703
-	  
-config CHARGER_SM5703_SOFT_START_CHARGING
-	bool "SM5703 soft step charging"
-	default n
-	depends on CHARGER_SM5703
-	help
-	  Say Y here to enable support for SM5703 soft step charging
-	  You have to define CHARGER_SM5703
 
 config AFC_CHARGER_MODE
 	bool "afc charging support in sec battery driver"
@@ -385,7 +399,6 @@ config DISABLE_SAVE_CAPACITY_MAX
 	  capacity_max is restored after boot up
 	  You can find the code in healthd
 
-
 config EN_OOPS
 	bool "enable oops filter"
 	default n
@@ -397,3 +410,9 @@ config FAKE_CAPACITY
 	default n
 	help
 	  fake battery level to 50%
+
+config STORE_MODE
+       bool "enable store mode"
+       default n
+       help
+	 Say Y to enable CONFIG_STORE_MODE

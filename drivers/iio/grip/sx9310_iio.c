@@ -80,6 +80,14 @@
 #define DEFENCE_CODE_FOR_DEVICE_DAMAGE
 #define SX9310_CPS_CTRL0_REG_VAL	0x10
 
+#ifdef CONFIG_SENSORS_SX9310_DEFENCE_CODE_FOR_TA_NOISE
+#ifdef CONFIG_SENSORS_GTS210_COMMON
+#define SX9310_NORMAL_TOUCH_CABLE_THRESHOLD	208
+#else
+#define SX9310_NORMAL_TOUCH_CABLE_THRESHOLD	232
+#endif
+#endif
+
 struct sx9310_p {
 	struct i2c_client *client;
 	struct device *factory_device;
@@ -141,7 +149,6 @@ static const struct iio_chan_spec sx9310_channels[] = {
 
 #ifdef CONFIG_SENSORS_SX9310_DEFENCE_CODE_FOR_TA_NOISE
 #include <linux/power_supply.h>
-#define SX9310_NORMAL_TOUCH_CABLE_THRESHOLD	208
 
 static int check_ta_state(void)
 {
@@ -439,8 +446,7 @@ static int sx9310_save_caldata(struct sx9310_p *data)
 	set_fs(KERNEL_DS);
 
 	cal_filp = filp_open(CALIBRATION_FILE_PATH,
-			O_CREAT | O_TRUNC | O_WRONLY | O_SYNC,
-			S_IRUGO | S_IWUSR | S_IWGRP);
+			O_CREAT | O_TRUNC | O_WRONLY | O_SYNC, 0660);
 	if (IS_ERR(cal_filp)) {
 		pr_err("[SX9310]: %s - Can't open calibration file\n",
 			__func__);
@@ -472,8 +478,7 @@ static void sx9310_open_caldata(struct sx9310_p *data)
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
 
-	cal_filp = filp_open(CALIBRATION_FILE_PATH, O_RDONLY,
-			S_IRUGO | S_IWUSR | S_IWGRP);
+	cal_filp = filp_open(CALIBRATION_FILE_PATH, O_RDONLY, 0);
 	if (IS_ERR(cal_filp)) {
 		ret = PTR_ERR(cal_filp);
 		if (ret != -ENOENT)

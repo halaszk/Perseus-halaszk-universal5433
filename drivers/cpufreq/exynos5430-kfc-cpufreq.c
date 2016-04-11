@@ -515,8 +515,13 @@ static bool exynos5430_is_alive_CA7(void)
 static void set_boot_kfc_qos_freq(struct exynos_dvfs_info *info, int lv_idx)
 {
 #ifdef CONFIG_SEC_FACTORY
-	if (lv_idx < L12)
+#ifdef CONFIG_SEC_FACTORY_BOOT_CLOCK_LIMIT_1G /* booting frequency is 1GHz when factory mode */
+	if (lv_idx < L10)
+		lv_idx = L10;
+#else
+	if (lv_idx < L12)                /* booting frequency is 800MHz when factory mode */
 		lv_idx = L12;
+#endif
 	info->boot_cpu_min_qos_timeout = 360 * USEC_PER_SEC;
 	info->boot_cpu_max_qos_timeout = 360 * USEC_PER_SEC;
 #endif

@@ -1,7 +1,7 @@
 /*
  * Broadcom Dongle Host Driver (DHD), RTT
  *
- * Copyright (C) 1999-2015, Broadcom Corporation
+ * Copyright (C) 1999-2016, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -200,7 +200,7 @@ dhd_rtt_start(dhd_pub_t *dhd)
 	rtt_status = GET_RTTSTATE(dhd);
 	NULL_CHECK(rtt_status, "rtt_status is NULL", err);
 	/* turn off mpc in case of non-associted */
-	if (!dhd_is_associated(dhd, NULL, NULL)) {
+	if (!dhd_is_associated(dhd, 0, NULL)) {
 		err = dhd_iovar(dhd, 0, "mpc", (char *)&mpc, sizeof(mpc), 1);
 		if (err < 0) {
 			DHD_ERROR(("%s : failed to set proxd_tune\n", __FUNCTION__));

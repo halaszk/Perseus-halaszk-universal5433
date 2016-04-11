@@ -174,12 +174,16 @@ static long tzic_ioctl(struct file *file, unsigned cmd, unsigned long arg)
 
 		case TZIC_IOCTL_GET_FUSE_REQ:
 			LOG(KERN_INFO "[oemflag]get_fuse\n");
+			if(!access_ok(VERIFY_WRITE, (void *)arg, sizeof((void *)arg))) {
+				LOG(KERN_INFO "Address is not in user space");
+				return -1;
+			}
 			exynos_smc_read_oemflag(0x80010001, (u32 *) arg);
 			goto return_default;
 		break;
 
 		case TZIC_IOCTL_SET_FUSE_REQ_NEW:
-			LOG(KERN_INFO "[oemflag]set_fuse\n");
+			LOG(KERN_INFO "[oemflag]set_fuse_new\n");
 			ret=copy_from_user( &param, (void *)arg, sizeof(param) );
 			if(ret) {
 				LOG(KERN_INFO "[oemflag]ERROR copy from user\n");
@@ -197,7 +201,7 @@ static long tzic_ioctl(struct file *file, unsigned cmd, unsigned long arg)
 		break;
 
 		case TZIC_IOCTL_GET_FUSE_REQ_NEW:
-			LOG(KERN_INFO "[oemflag]get_fuse\n");
+			LOG(KERN_INFO "[oemflag]get_fuse_new\n");
 			ret=copy_from_user( &param, (void *)arg, sizeof(param) );
 			if(ret) {
 				LOG(KERN_INFO "[oemflag]ERROR copy from user\n");

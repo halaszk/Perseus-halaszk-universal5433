@@ -1339,7 +1339,7 @@ int s5p_mipi_dsi_disable(struct mipi_dsim_device *dsim)
 
 	/* make CLK/DATA Lane as LP00 */
 	s5p_mipi_dsi_enable_lane(dsim, DSIM_LANE_CLOCK, 0);
-        s5p_mipi_dsi_enable_lane(dsim, dsim->data_lane, 0);
+	s5p_mipi_dsi_enable_lane(dsim, dsim->data_lane, 0);
 
 	s5p_mipi_dsi_set_clock(dsim, dsim->dsim_config->e_byte_clk, 0);
 
@@ -1606,6 +1606,13 @@ int create_mipi_dsi_controller(struct platform_device *pdev)
 	s5p_mipi_dsi_set_data_transfer_mode(dsim, 0);
 	s5p_mipi_dsi_set_display_mode(dsim, dsim->dsim_config);
 	s5p_mipi_dsi_set_hs_enable(dsim);
+
+	/*
+	 * dsim sfr access function must be called after s5p_mipi_dsi_init_dsim
+	 * function. Because dsim sw reset function in s5p_mipi_dsi_init_dsim
+	 * initializes all dsim sfr
+	 */
+	s5p_mipi_dsi_set_interrupt(dsim, true);
 
 	dsim->dsim_lcd_drv->probe(dsim);
 	dsim->dsim_lcd_drv->displayon(dsim);

@@ -479,6 +479,9 @@ static void exynos5430_set_asv_info_arm(struct asv_info *asv_inform, bool show_v
 #else
 			asv_inform->asv_volt[i].asv_value = arm_asv_volt_info_v10[i][target_asv_grp_nr + 1];
 #endif
+			/* add 50mv temporally */
+			asv_inform->asv_volt[i].asv_value += 50000;
+
 			asv_inform->asv_abb[i].asv_freq = arm_asv_volt_info_v10[i][0];
 			if (asv_ref_info.is_fs_abb)
 				asv_inform->asv_abb[i].asv_value = egl_fused_info.fs_abb;
@@ -712,6 +715,9 @@ static void exynos5430_set_asv_info_kfc(struct asv_info *asv_inform, bool show_v
 #else
 			asv_inform->asv_volt[i].asv_value = kfc_asv_volt_info_v10[i][target_asv_grp_nr + 1];
 #endif
+			/* add 50mv temporally */
+			asv_inform->asv_volt[i].asv_value += 50000;
+
 			asv_inform->asv_abb[i].asv_freq = kfc_asv_volt_info_v10[i][0];
 			if (asv_ref_info.is_fs_abb)
 				asv_inform->asv_abb[i].asv_value = kfc_fused_info.fs_abb;
@@ -1176,6 +1182,9 @@ static void exynos5430_set_asv_info_mif(struct asv_info *asv_inform, bool show_v
 #else
 			asv_inform->asv_volt[i].asv_value = mif_asv_volt_info_v10[i][target_asv_grp_nr + 1];
 #endif
+			/* add 50mv temporally */
+			asv_inform->asv_volt[i].asv_value += 50000;
+
 			asv_inform->asv_abb[i].asv_freq = mif_asv_volt_info_v10[i][0];
 			if (asv_ref_info.is_fs_abb)
 				asv_inform->asv_abb[i].asv_value = mif_fused_info.fs_abb;

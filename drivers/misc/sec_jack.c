@@ -462,6 +462,21 @@ void sec_jack_buttons_work(struct work_struct *work)
 	pr_warn("%s: key is skipped. ADC value is %d\n", __func__, adc);
 }
 
+static int sec_jack_get_button_type(int arg)
+{
+	switch(arg) {
+	case 1:
+		return KEY_VOLUMEUP;
+	case 2:
+		return KEY_VOLUMEDOWN;
+	case 3:
+		return KEY_VOICECOMMAND;
+	case 0:
+	default:
+		return KEY_MEDIA;
+	}
+}
+
 static struct sec_jack_platform_data *sec_jack_populate_dt_pdata(struct device *dev)
 {
 	struct sec_jack_platform_data *pdata;
@@ -503,10 +518,10 @@ static struct sec_jack_platform_data *sec_jack_populate_dt_pdata(struct device *
 				__func__, args.args_count, args.args[0],
 				args.args[1], args.args[2],args.args[3]);
 	}
-	for( i=0; i<3; i++)
+	for( i=0; i<4; i++)
 	{
 		of_parse_phandle_with_args(dev->of_node, "but-zones-list","#list-but-cells", i, &args);
-		pdata->jack_buttons_zones[i].code = args.args[0]==0?KEY_MEDIA:args.args[0]==1?KEY_VOLUMEUP:KEY_VOLUMEDOWN;
+		pdata->jack_buttons_zones[i].code = sec_jack_get_button_type(args.args[0]);
 		pdata->jack_buttons_zones[i].adc_low = args.args[1];
 		pdata->jack_buttons_zones[i].adc_high = args.args[2];
 		pr_info("%s : %d, %d, %d, %d\n",

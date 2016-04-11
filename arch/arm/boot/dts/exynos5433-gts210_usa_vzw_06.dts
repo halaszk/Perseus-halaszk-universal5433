@@ -68,8 +68,11 @@
 			wlf,micd-dbtime = <0x1>;
 			wlf,micd-timeout = <1000>;
 			wlf,micd-force-micbias;
+			wlf,hpdet-moisture-imp = <2000>;
+			wlf,moisture-det-channel = <1>;
 			wlf,hpdet-channel = <0>;
 			wlf,hpdet-ext-res = <11>;
+			wlf,hs-mic = <3>;
 			wlf,hpdet-short-circuit-imp = <3>;
 			wlf,micd-ranges = <
 				116 226

@@ -1719,13 +1719,22 @@ static irqreturn_t s5p_mfc_irq(int irq, void *priv)
 	case S5P_FIMV_R2H_CMD_FIELD_DONE_RET:
 	case S5P_FIMV_R2H_CMD_FRAME_DONE_RET:
 	case S5P_FIMV_R2H_CMD_COMPLETE_SEQ_RET:
+	case S5P_FIMV_R2H_CMD_ENC_BUFFER_FULL_RET:
 		if (ctx->type == MFCINST_DECODER) {
 			s5p_mfc_handle_frame(ctx, reason, err);
 		} else if (ctx->type == MFCINST_ENCODER) {
 			if (reason == S5P_FIMV_R2H_CMD_SLICE_DONE_RET) {
 				dev->preempt_ctx = ctx->num;
+				enc->buf_full = 0;
 				enc->in_slice = 1;
+			} else if (reason == S5P_FIMV_R2H_CMD_ENC_BUFFER_FULL_RET) {
+				mfc_err_ctx("stream buffer size(%d) isn't enough\n",
+						s5p_mfc_get_enc_strm_size());
+				dev->preempt_ctx = ctx->num;
+				enc->buf_full = 1;
+				enc->in_slice = 0;
 			} else {
+				enc->buf_full = 0;
 				enc->in_slice = 0;
 			}
 
@@ -1818,8 +1827,16 @@ static irqreturn_t s5p_mfc_irq(int irq, void *priv)
 		goto irq_cleanup_hw;
 		break;
 	case S5P_FIMV_R2H_CMD_NAL_ABORT_RET:
-		ctx->state = MFCINST_ABORT;
-		clear_work_bit(ctx);
+		if (ctx->type == MFCINST_ENCODER && enc->buf_full) {
+			ctx->state = MFCINST_RUNNING_BUF_FULL;
+			enc->buf_full = 0;
+			if (ctx->c_ops->post_frame_start)
+				if (ctx->c_ops->post_frame_start(ctx))
+					mfc_err_ctx("post_frame_start() failed\n");
+		} else {
+			ctx->state = MFCINST_ABORT;
+			clear_work_bit(ctx);
+		}
 		if (clear_hw_bit(ctx) == 0)
 			BUG();
 		goto irq_cleanup_hw;
@@ -2293,10 +2310,6 @@ err_no_device:
 	return ret;
 }
 
-#define need_to_wait_frame_start(ctx)		\
-	(((ctx->state == MFCINST_FINISHING) ||	\
-	  (ctx->state == MFCINST_RUNNING)) &&	\
-	 test_bit(ctx->num, &ctx->dev->hw_lock))
 /* Release MFC context */
 static int s5p_mfc_release(struct file *file)
 {
@@ -2326,6 +2339,13 @@ static int s5p_mfc_release(struct file *file)
 			s5p_mfc_cleanup_timeout(ctx);
 	}
 
+	if (need_to_wait_nal_abort(ctx)) {
+		ctx->state = MFCINST_ABORT;
+		if (s5p_mfc_wait_for_done_ctx(ctx,
+				S5P_FIMV_R2H_CMD_NAL_ABORT_RET))
+			s5p_mfc_cleanup_timeout(ctx);
+	}
+
 	if (ctx->type == MFCINST_ENCODER) {
 		enc = ctx->enc_priv;
 		if (!enc) {
@@ -2334,7 +2354,7 @@ static int s5p_mfc_release(struct file *file)
 			return -EINVAL;
 		}
 
-		if (enc->in_slice) {
+		if (enc->in_slice || enc->buf_full) {
 			ctx->state = MFCINST_ABORT_INST;
 			spin_lock_irq(&dev->condlock);
 			set_bit(ctx->num, &dev->ctx_work_bits);
@@ -2345,6 +2365,7 @@ static int s5p_mfc_release(struct file *file)
 				s5p_mfc_cleanup_timeout(ctx);
 
 			enc->in_slice = 0;
+			enc->buf_full = 0;
 		}
 	}
 

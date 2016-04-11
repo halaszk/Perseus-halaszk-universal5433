@@ -12,5 +12,7 @@
 #
 #
 
-
 obj-$(CONFIG_MALI_T6XX) += kbase/
+ifeq ($(CONFIG_MALI_T6XX_R7P0),y)
+	obj-y += r7p0/
+endif

@@ -335,7 +335,7 @@ int s5p_mipi_dsi_rd_data(struct mipi_dsim_device *dsim, u32 data_id,
 	struct display_driver *dispdrv = get_display_driver();
 
 	if (dsim->enabled == false || dsim->state != DSIM_STATE_HSCLKEN) {
-		dev_dbg(dsim->dev, "MIPI DSIM is not ready.\n");
+		dev_info(dsim->dev, "MIPI DSIM is not ready.\n");
 		return -EINVAL;
 	}
 
@@ -390,6 +390,8 @@ int s5p_mipi_dsi_rd_data(struct mipi_dsim_device *dsim, u32 data_id,
 		rx_size = (rx_fifo & 0x00ffff00) >> 8;
 		dev_info(dsim->dev, "rx fifo : %8x, response : %x, rx_size : %d\n",
 				rx_fifo, rx_fifo & 0xff, rx_size);
+		if (rx_size != count)
+			goto rx_error;
 		/* Read data from RX packet payload */
 		for (i = 0; i < rx_size >> 2; i++) {
 			rx_fifo = readl(dsim->reg_base + DSIM_RXFIFO);
@@ -436,6 +438,13 @@ clear_rx_fifo:
 	goto exit;
 
 rx_error:
+	dev_info(dsim->dev, "STATUS 0x%08X, INTSRC 0x%08X, INTMASK 0x%08X, \
+			FIFOCTRL 0x%08X, MULTI_PKT 0x%08X\n",
+			readl(dsim->reg_base + DSIM_STATUS),
+			readl(dsim->reg_base + DSIM_INTSRC),
+			readl(dsim->reg_base + DSIM_INTMSK),
+			readl(dsim->reg_base + DSIM_FIFOCTRL),
+			readl(dsim->reg_base + DSIM_MULTI_PKT));
 	dsim_reg_force_dphy_stop_state(1);
 	usleep_range(3000, 4000);
 	dsim_reg_force_dphy_stop_state(0);

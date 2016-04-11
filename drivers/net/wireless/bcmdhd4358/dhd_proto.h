@@ -4,7 +4,7 @@
  * Provides type definitions and function prototypes used to link the
  * DHD OS, bus, and protocol modules.
  *
- * Copyright (C) 1999-2015, Broadcom Corporation
+ * Copyright (C) 1999-2016, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -24,7 +24,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_proto.h 514471 2014-11-11 05:53:29Z $
+ * $Id: dhd_proto.h 601938 2015-11-24 14:40:22Z $
  */
 
 #ifndef _dhd_proto_h_
@@ -45,6 +45,12 @@
 #ifndef MFG_IOCTL_RESP_TIMEOUT
 #define MFG_IOCTL_RESP_TIMEOUT  20000  /* In milli second default value for MFG FW */
 #endif /* MFG_IOCTL_RESP_TIMEOUT */
+
+#define DEFAULT_D3_ACK_RESP_TIMEOUT	4000
+#ifndef D3_ACK_RESP_TIMEOUT
+#define D3_ACK_RESP_TIMEOUT		DEFAULT_D3_ACK_RESP_TIMEOUT
+#endif /* D3_ACK_RESP_TIMEOUT */
+
 #define IOCTL_DISABLE_TIMEOUT 0
 
 /*

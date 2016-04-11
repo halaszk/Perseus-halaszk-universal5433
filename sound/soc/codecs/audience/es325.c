@@ -206,6 +206,8 @@ static int es325_load_firmware(struct es325_data *es325)
 		}
 		size -= MAX_CMD_SEND_SIZE;
 		i2c_cmds += MAX_CMD_SEND_SIZE;
+
+		usleep_range(10, 20);
 	}
 
 	dev_info(es325->dev, "%s:--\n", __func__);

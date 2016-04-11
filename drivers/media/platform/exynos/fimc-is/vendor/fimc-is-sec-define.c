@@ -63,6 +63,7 @@ static char cal_buf_front[FIMC_IS_MAX_CAL_SIZE_FRONT];
 #endif
 static struct fimc_is_from_info sysfs_finfo_front;
 bool is_final_cam_module_front = false;
+bool is_latest_cam_module_front = false;
 
 static char cal_buf[FIMC_IS_MAX_CAL_SIZE];
 char loaded_fw[FIMC_IS_HEADER_VER_SIZE + 1] = {0, };
@@ -1282,6 +1283,17 @@ crc_retry:
 		} else {
 			crc32_check_factory_front = false;
 		}
+
+		if (!core->use_module_check) {
+			is_latest_cam_module_front = true;
+		} else {
+			if (finfo->header_ver[10] >= CAMERA_MODULE_ES_VERSION) {
+				is_latest_cam_module_front = true;
+			} else {
+				is_latest_cam_module_front = false;
+			}
+		}
+
 		if (core->use_module_check) {
 			if (finfo->header_ver[10] == FIMC_IS_LATEST_FROM_VERSION_M) {
 				is_final_cam_module_front = true;
@@ -1313,7 +1325,7 @@ crc_retry:
 
 		if (!core->use_module_check) {
 				is_final_cam_module = true;
-	} else {
+		} else {
 			if (sysfs_finfo.header_ver[10] == FIMC_IS_LATEST_FROM_VERSION_M) {
 				is_final_cam_module = true;
 			} else {
@@ -1371,6 +1383,7 @@ int fimc_is_sec_readcal_otprom(struct device *dev, int position)
 	char *buf = NULL;
 	int retry = FIMC_IS_CAL_RETRY_CNT;
 	struct fimc_is_core *core = dev_get_drvdata(dev);
+	struct exynos_platform_fimc_is *core_pdata = NULL;
 	struct fimc_is_from_info *finfo = NULL;
 	int cal_size = 0;
 	struct i2c_client *client = NULL;
@@ -1379,6 +1392,12 @@ int fimc_is_sec_readcal_otprom(struct device *dev, int position)
 	mm_segment_t old_fs;
 	loff_t pos = 0;
 	char selected_page[2] = {0,};
+
+	core_pdata = dev_get_platdata(fimc_is_dev);
+	if (!core_pdata) {
+		err("core->pdata is null");
+		return -EINVAL;
+	}
 
 	if (position == SENSOR_POSITION_FRONT) {
 #if defined(CONFIG_CAMERA_OTPROM_SUPPORT_FRONT)
@@ -1505,7 +1524,7 @@ crc_retry:
 		} else {
 			crc32_check_factory_front = false;
 		}
-		if (core->use_module_check) {
+		if (core_pdata->use_module_check) {
 			if (finfo->header_ver[10] == FIMC_IS_LATEST_FROM_VERSION_M) {
 				is_final_cam_module_front = true;
 			} else {
@@ -1522,7 +1541,7 @@ crc_retry:
 		}
 
 
-		if (!core->use_module_check) {
+		if (!core_pdata->use_module_check) {
 			is_latest_cam_module = true;
 		} else {
 			if (sysfs_finfo.header_ver[10] >= CAMERA_MODULE_ES_VERSION) {
@@ -1532,7 +1551,7 @@ crc_retry:
 			}
 		}
 
-		if (!core->use_module_check) {
+		if (!core_pdata->use_module_check) {
 			is_final_cam_module = true;
 		} else {
 			if (sysfs_finfo.header_ver[10] == FIMC_IS_LATEST_FROM_VERSION_M) {

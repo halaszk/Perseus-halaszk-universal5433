@@ -130,6 +130,7 @@ int secos_booster_start(enum secos_boost_policy policy)
 {
 	int ret = 0;
 	int freq;
+	int i;
 
 	current_core = mc_active_core();
 
@@ -150,17 +151,22 @@ int secos_booster_start(enum secos_boost_policy policy)
 		freq = 0;
 	pm_qos_update_request(&secos_booster_qos, freq); /* KHz */
 
-	if (!cpu_online(DEFAULT_BIG_CORE)) {
-		pr_debug("%s: %d core is offline\n", __func__, DEFAULT_BIG_CORE);
-		udelay(100);
-		if (!cpu_online(DEFAULT_BIG_CORE)) {
-			pr_debug("%s: %d core is offline\n", __func__, DEFAULT_BIG_CORE);
-			pm_qos_update_request(&secos_booster_qos, 0);
-			ret = -EPERM;
-			goto error;
-		}
-		pr_debug("%s: %d core is online\n", __func__, DEFAULT_BIG_CORE);
+	for (i = 0; i < SECOS_BOOST_RETRY_MAX; i++) {
+		if (!cpu_online(DEFAULT_BIG_CORE))
+			msleep(SECOS_BOOST_RETRY_MS);
+		else
+			break;
 	}
+
+	if (i == SECOS_BOOST_RETRY_MAX) {
+		pr_err("%s: %d core is offline\n", __func__, DEFAULT_BIG_CORE);
+		pm_qos_update_request(&secos_booster_qos, 0);
+		ret = -EPERM;
+		goto error;
+	}
+
+	pr_debug("%s: %d core is online\n", __func__, DEFAULT_BIG_CORE);
+
 	ret = mc_switch_core(DEFAULT_BIG_CORE);
 	if (ret) {
 		pr_err("%s: mc switch failed : err:%d\n", __func__, ret);
@@ -184,9 +190,10 @@ int secos_booster_stop(void)
 {
 	int ret = 0;
 
+	hrtimer_cancel(&timer);
 	pr_debug("%s: mc switch to little core \n", __func__);
-	mc_set_schedule_policy(current_core);
 
+	mc_set_schedule_policy(DEFAULT_LITTLE_CORE);
 	ret = mc_switch_core(current_core);
 	if (ret)
 		pr_err("%s: mc switch core failed. err:%d\n", __func__, ret);

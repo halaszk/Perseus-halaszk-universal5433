@@ -274,6 +274,9 @@ static struct platform_driver i2c_gpio_driver = {
 		.name	= "i2c-gpio",
 		.owner	= THIS_MODULE,
 		.of_match_table	= of_match_ptr(i2c_gpio_dt_ids),
+#ifdef CONFIG_MULTITHREAD_PROBE
+		.multithread_probe = 1,
+#endif
 	},
 	.probe		= i2c_gpio_probe,
 	.remove		= i2c_gpio_remove,

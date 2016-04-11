@@ -254,11 +254,9 @@ static int mxr_streamer_put(struct mxr_device *mdev, struct v4l2_subdev *sd)
 	struct media_pad *pad;
 	struct sub_mxr_device *sub_mxr;
 	struct mxr_layer *layer;
-	struct v4l2_subdev *hdmi_sd;
 	struct v4l2_subdev *gsc_sd;
 	struct exynos_entity_data *md_data;
 	struct s5p_mxr_platdata *pdata = mdev->pdata;
-	struct v4l2_control ctrl;
 
 	mutex_lock(&mdev->s_mutex);
 	--mdev->n_streamer;
@@ -301,24 +299,6 @@ static int mxr_streamer_put(struct mxr_device *mdev, struct v4l2_subdev *sd)
 
 	if ((mdev->n_streamer == 0 && local == 1) ||
 	    (mdev->n_streamer == 1 && local == 2)) {
-		for (i = MXR_PAD_SOURCE_GSCALER; i < MXR_PADS_NUM; ++i) {
-			pad = &sd->entity.pads[i];
-
-			/* find sink pad of output via enabled link*/
-			pad = media_entity_remote_source(pad);
-			if (pad)
-				if (media_entity_type(pad->entity)
-						== MEDIA_ENT_T_V4L2_SUBDEV)
-					break;
-
-			if (i == MXR_PAD_SOURCE_GRP1) {
-				ret = -ENODEV;
-				goto out;
-			}
-		}
-
-		hdmi_sd = media_entity_to_v4l2_subdev(pad->entity);
-
 		mxr_reg_streamoff(mdev);
 		/* vsync applies Mixer setup */
 		ret = mxr_reg_wait4update(mdev);
@@ -326,35 +306,6 @@ static int mxr_streamer_put(struct mxr_device *mdev, struct v4l2_subdev *sd)
 			mxr_err(mdev, "failed to get vsync (%d) from output\n",
 					ret);
 			goto out;
-		}
-
-		/* stop hdmi */
-		ctrl.id = V4L2_CID_TV_HDMI_STATUS;
-		ret = v4l2_subdev_call(hdmi_sd, core, g_ctrl, &ctrl);
-		if (ret) {
-			mxr_err(mdev, "failed to get output %s status for stop\n",
-					hdmi_sd->name);
-			goto out;
-		}
-		/*
-		 * HDMI should be turn off only when not in use.
-		 * 1. cable out
-		 * 2. suspend (blank is called at suspend)
-		 */
-		if (ctrl.value == (HDMI_STREAMING | HPD_LOW) || mdev->blank) {
-			ret = v4l2_subdev_call(hdmi_sd, video, s_stream, 0);
-			if (ret) {
-				mxr_err(mdev, "stopping stream failed for output %s\n",
-						hdmi_sd->name);
-				goto out;
-			}
-			ret = v4l2_subdev_call(hdmi_sd, core, s_power, 0);
-			if (ret) {
-				mxr_err(mdev, "failed to put power for output %s\n",
-						hdmi_sd->name);
-				goto out;
-			}
-			mdev->blank = 0;
 		}
 	}
 	/* disable mixer clock */
@@ -375,6 +326,45 @@ out:
 #endif
 	mutex_unlock(&mdev->s_mutex);
 	mxr_reg_dump(mdev);
+
+	return ret;
+}
+
+int mxr_hdmi_blank(struct mxr_device *mdev, int blank)
+{
+	struct v4l2_control ctrl;
+	int ret = 0;
+
+	/* stop hdmi */
+	ctrl.id = V4L2_CID_TV_HDMI_STATUS;
+	ret = v4l2_subdev_call(to_outsd(mdev), core, g_ctrl, &ctrl);
+	if (ret) {
+		mxr_err(mdev, "failed to get output %s status for stop\n",
+				to_outsd(mdev)->name);
+		return ret;
+	}
+
+	/*
+	 * HDMI should be turn off only when not in use.
+	 * 1. cable out
+	 * 2. suspend (V4L2_CID_TV_BLANK is called at suspend)
+	 */
+	if (ctrl.value != (HDMI_STREAMING | HPD_LOW) && !blank)
+		mxr_warn(mdev, "invalid blank condition. ctrl(%#x), blank(%d)\n",
+				ctrl.value, blank);
+
+	ret = v4l2_subdev_call(to_outsd(mdev), video, s_stream, 0);
+	if (ret) {
+		mxr_err(mdev, "stopping stream failed for output %s\n",
+				to_outsd(mdev)->name);
+		return ret;
+	}
+	ret = v4l2_subdev_call(to_outsd(mdev), core, s_power, 0);
+	if (ret) {
+		mxr_err(mdev, "failed to put power for output %s\n",
+				to_outsd(mdev)->name);
+		return ret;
+	}
 
 	return ret;
 }
@@ -722,9 +712,6 @@ static int mxr_s_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 		break;
 	case V4L2_CID_TV_SET_COLOR_RANGE:
 		mdev->color_range = v;
-		break;
-	case V4L2_CID_TV_BLANK:
-		mdev->blank = v;
 		break;
 	default:
 		mxr_err(mdev, "invalid control id\n");

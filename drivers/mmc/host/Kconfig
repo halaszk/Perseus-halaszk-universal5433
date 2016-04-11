@@ -601,7 +601,7 @@ config MMC_DW_SKIP_CACHE_OP
 	help
 	  This selects support for skipping operations for cache coherency
 	  to reduce I/O overhead if file system layer do same thing.
- 
+
 config MMC_DW_PCI
 	tristate "Synopsys Designware MCI support on PCI bus"
 	depends on MMC_DW && PCI

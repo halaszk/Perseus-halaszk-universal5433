@@ -463,14 +463,9 @@ static ssize_t store_led_r(struct device *dev,
 {
 	struct max77828_rgb *max77828_rgb = dev_get_drvdata(dev);
 	unsigned int brightness;
-	char buff[10] = {0,};
-	int cnt, ret;
+	int ret;
 
-	cnt = count;
-	cnt = (buf[cnt-1] == '\n') ? cnt-1 : cnt;
-	memcpy(buff, buf, cnt);
-	buff[cnt] = '\0';
-	ret = kstrtouint(buff, 0, &brightness);
+	ret = kstrtouint(buf, 0, &brightness);
 	if (ret != 0) {
 		dev_err(dev, "fail to get brightness.\n");
 		goto out;
@@ -490,14 +485,9 @@ static ssize_t store_led_g(struct device *dev,
 {
 	struct max77828_rgb *max77828_rgb = dev_get_drvdata(dev);
 	unsigned int brightness;
-	char buff[10] = {0,};
-	int cnt, ret;
+	int ret;
 
-	cnt = count;
-	cnt = (buf[cnt-1] == '\n') ? cnt-1 : cnt;
-	memcpy(buff, buf, cnt);
-	buff[cnt] = '\0';
-	ret = kstrtouint(buff, 0, &brightness);
+	ret = kstrtouint(buf, 0, &brightness);
 	if (ret != 0) {
 		dev_err(dev, "fail to get brightness.\n");
 		goto out;
@@ -517,14 +507,9 @@ static ssize_t store_led_b(struct device *dev,
 {
 	struct max77828_rgb *max77828_rgb = dev_get_drvdata(dev);
 	unsigned int brightness;
-	char buff[10] = {0,};
-	int cnt, ret;
+	int ret;
 
-	cnt = count;
-	cnt = (buf[cnt-1] == '\n') ? cnt-1 : cnt;
-	memcpy(buff, buf, cnt);
-	buff[cnt] = '\0';
-	ret = kstrtouint(buff, 0, &brightness);
+	ret = kstrtouint(buf, 0, &brightness);
 	if (ret != 0) {
 		dev_err(dev, "fail to get brightness.\n");
 		goto out;

@@ -54,6 +54,9 @@ struct gpio_button_data {
 	bool disabled;
 	bool key_pressed;
 	bool key_state;
+#ifdef CONFIG_KEYBOARD_FORCE_REPORT_PRESS_EVENT
+	bool flag_pressed;
+#endif
 };
 
 struct gpio_keys_drvdata {
@@ -437,17 +440,20 @@ static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 	if ((button->code == KEY_POWER)) {
 		printk(KERN_INFO "GPIO-KEY : PWR key is %s[%d]\n",
 					state ? "pressed" : "released", irqd_is_wakeup_set(&desc->irq_data));
-	}
-
-	if ((button->code == KEY_HOMEPAGE)) {
+	} else if ((button->code == KEY_HOMEPAGE)) {
 		printk(KERN_INFO "GPIO-KEY : HOME key is %s[%d]\n",
+					state ? "pressed" : "released", irqd_is_wakeup_set(&desc->irq_data));
+	} else if ((button->code == KEY_VOLUMEUP)) {
+		printk(KERN_INFO "GPIO-KEY : VOL_UP key is %s[%d]\n",
+					state ? "pressed" : "released", irqd_is_wakeup_set(&desc->irq_data));
+	} else if ((button->code == KEY_VOLUMEDOWN)) {
+		printk(KERN_INFO "GPIO-KEY : VOL_DOWN key is %s[%d]\n",
 					state ? "pressed" : "released", irqd_is_wakeup_set(&desc->irq_data));
 	}
 #else
 	if ((button->code == KEY_POWER) && !!state) {
 		printk(KERN_INFO "GPIO-KEY : key is pressed!!\n");
-	}
-	if ((button->code == KEY_HOMEPAGE) && !!state) {
+	} else if ((button->code == KEY_HOMEPAGE) && !!state) {
 		printk(KERN_INFO "GPIO-KEY : key is pressed!\n");
 	}
 #endif
@@ -461,8 +467,26 @@ static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 /* If AP wake up time(Press button~Start Kernel) is over 50ms,
   * Make Press event for waking up device(LCD ON).
   */
+
+#ifdef CONFIG_KEYBOARD_FORCE_REPORT_PRESS_EVENT
+		if((!bdata->flag_pressed) && (irqd_is_wakeup_set(&desc->irq_data))) {
+			if(state)
+				bdata->flag_pressed = true;
+			else {
+				printk(KERN_INFO"GPIO-KEY : key_pressed is false. but state of %d keycode is 'release'. Enforce input_event with press.\n", button->code);
+				input_event(input, type, button->code, 1);
+				bdata->flag_pressed = false;
+			}
+		}
+#endif
+
+#ifdef CONFIG_KEYBOARD_FORCE_REPORT_PRESS_EVENT
+
+		input_event(input, type, button->code, !!state);
+#else
 		input_event(input, type, button->code,
 				irqd_is_wakeup_set(&desc->irq_data) ? 1 : !!state);
+#endif
 	}
 
 	input_sync(input);
@@ -1047,6 +1071,9 @@ static int gpio_keys_suspend(struct device *dev)
 			struct gpio_button_data *bdata = &ddata->data[i];
 			if (bdata->button->wakeup)
 				enable_irq_wake(bdata->irq);
+#ifdef CONFIG_KEYBOARD_FORCE_REPORT_PRESS_EVENT
+			bdata->flag_pressed = false;
+#endif
 		}
 	} else {
 		mutex_lock(&input->mutex);

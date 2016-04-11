@@ -243,7 +243,6 @@ static int wait_tcon_rdy(struct device *dev)
 	int timeout = 30;
 	int gpio, ret = 0;
 	static int retry_count = 1;
-	extern unsigned int lcdtype;
 
 	gpio = of_get_named_gpio(dev->of_node, "gpio-tcon-rdy", 0);
 	if (gpio < 0) {
@@ -263,10 +262,6 @@ static int wait_tcon_rdy(struct device *dev)
 	if (timeout <= 22 && timeout >= 0) {
 		ret = retry_count ? -ETIMEDOUT : 0;
 		retry_count = !retry_count;
-		if (!timeout && (lcdtype & 0x4000)) {
-			ret = 0;
-			retry_count = 1;
-		}
 	} else {
 		ret = 0;
 		retry_count = 1;

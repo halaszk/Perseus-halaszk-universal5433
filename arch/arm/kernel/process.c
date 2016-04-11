@@ -41,6 +41,8 @@
 #include <asm/stacktrace.h>
 #include <asm/mach/time.h>
 
+#include <mach/exynos-ss.h>
+
 #ifdef CONFIG_CC_STACKPROTECTOR
 #include <linux/stackprotector.h>
 unsigned long __stack_chk_guard __read_mostly;
@@ -384,6 +386,14 @@ void __show_regs_without_extra(struct pt_regs *regs)
 	unsigned long flags;
 	char buf[64];
 
+	exynos_ss_save_context(regs);
+	/*
+	 *  If you want to see more kernel events after panic,
+	 *  you should modify exynos_ss_set_enable's function 2nd parameter
+	 *  to true.
+	 */
+	exynos_ss_set_enable("log_kevents", false);
+	exynos_ss_early_dump();
 	show_regs_print_info(KERN_DEFAULT);
 
 	print_symbol("PC is at %s\n", instruction_pointer(regs));
@@ -427,7 +437,7 @@ void __show_regs_without_extra(struct pt_regs *regs)
 			    "mrc p15, 0, %1, c3, c0\n"
 			    : "=r" (transbase), "=r" (dac));
 			snprintf(buf, sizeof(buf), "  Table: %08x  DAC: %08x",
-			  	transbase, dac);
+				transbase, dac);
 		}
 #endif
 		asm("mrc p15, 0, %0, c1, c0\n" : "=r" (ctrl));

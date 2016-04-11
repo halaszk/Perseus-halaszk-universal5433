@@ -145,6 +145,7 @@ struct sec_platform_data {
 	bool				g3d_en;
 	bool				smpl_warn_en;
 	bool				dvs_en;
+
 	bool				ap_buck_avp_en;
 	bool				sub_buck_avp_en;
 	unsigned int                    smpl_warn_vth;

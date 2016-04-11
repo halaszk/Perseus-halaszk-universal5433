@@ -981,6 +981,7 @@ void exynos4_restart(char mode, const char *cmd)
 }
 
 #define INFORM_NONE		0x0
+#define INFORM_RAMDUMP		0xd
 #define INFORM_RECOVERY		0xf
 
 void exynos5_restart(char mode, const char *cmd)
@@ -1010,6 +1011,8 @@ void exynos5_restart(char mode, const char *cmd)
 	if (cmd) {
 		if (!strcmp((char *)cmd, "recovery"))
 			restart_inform = INFORM_RECOVERY;
+		else if(!strcmp((char *)cmd, "ramdump"))
+			restart_inform = INFORM_RAMDUMP;
 	}
 	__raw_writel(restart_inform, EXYNOS_INFORM4);
 

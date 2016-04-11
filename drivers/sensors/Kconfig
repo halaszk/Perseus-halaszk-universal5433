@@ -182,6 +182,13 @@ config SENSORS_BMA2X2
 	  If you say yes here you get support for Bosch Sensortec's
 	  acceleration sensors BMA255/BMA250E/BMA222E/BMA280.
 
+config SENSORS_RESET_SLAVE
+	tristate "BMA2X2 acceleration sensor interrupt INT1 support"
+	depends on SENSORS_BMA2X2
+	help
+	  If you say yes here you get chip possition for device tree for Bosch Sensortec's
+	  acceleration sensors BMA255/BMA250E/BMA222E/BMA280.
+
 config SENSORS_BMA2X2_ENABLE_INT1
 	tristate "BMA2X2 acceleration sensor interrupt INT1 support"
 	depends on SENSORS_BMA2X2

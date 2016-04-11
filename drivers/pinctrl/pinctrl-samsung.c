@@ -806,6 +806,72 @@ static int samsung_gpio_direction_input(struct gpio_chip *gc, unsigned offset)
 	return pinctrl_gpio_direction_input(gc->base + offset);
 }
 
+/* gpiolib gpio_set callback function */
+static void samsung_gpio_set_value(struct gpio_chip *gc, unsigned offset, int value)
+{
+	struct samsung_pin_bank *bank = gc_to_pin_bank(gc);
+	struct samsung_pin_bank_type *type = bank->type;
+	void __iomem *reg;
+	void __iomem *reg_ext_base = (bank->eint_ext_offset) ?
+		bank->drvdata->virt_ext_base : bank->drvdata->virt_base;
+	u32 data;
+
+	reg = reg_ext_base + bank->pctl_offset;
+
+	data = readl(reg + type->reg_offset[PINCFG_TYPE_DAT]);
+	data &= ~(1 << offset);
+	if (value)
+		data |= 1 << offset;
+
+	if (bank->drvdata->ctrl->gpio_type == EXYNOS_GPIO_TYPE_DAT_CLEAR)
+		data &= bank->dat_mask;
+
+	writel(data, reg + type->reg_offset[PINCFG_TYPE_DAT]);
+
+}
+
+static int samsung_gpio_set_direction(struct samsung_pin_bank *bank,
+		unsigned offset, bool input)
+{
+	struct samsung_pin_bank_type *type;
+	struct samsung_pinctrl_drv_data *drvdata;
+	void __iomem *reg;
+	void __iomem *reg_ext_base;
+	u32 data, mask, shift;
+
+	drvdata = bank->drvdata;
+	type = bank->type;
+	reg_ext_base = bank->eint_ext_offset ?
+			drvdata->virt_ext_base : drvdata->virt_base;
+
+	reg = reg_ext_base + bank->pctl_offset +
+				type->reg_offset[PINCFG_TYPE_FUNC];
+
+	mask = (1 << type->fld_width[PINCFG_TYPE_FUNC]) - 1;
+	shift = offset * type->fld_width[PINCFG_TYPE_FUNC];
+	if (shift >= 32) {
+		/* Some banks have two config registers */
+		shift -= 32;
+		reg += 4;
+	}
+
+	data = readl(reg);
+	data &= ~(mask << shift);
+
+	if (!input)
+		data |= FUNC_OUTPUT << shift;
+
+	if (drvdata->ctrl->gpio_type == EXYNOS_GPIO_TYPE_DAT_CLEAR) {
+		if (!input)
+			bank->dat_mask |= 1 << offset;
+		else
+			bank->dat_mask &= ~(1 <<offset);
+	}
+	writel(data, reg);
+
+	return 0;
+}
+
 /*
  * gpiolib gpio_direction_output callback function. The setting of the pin
  * mux function as 'gpio output' will be handled by the pinctrl susbsystem
@@ -815,12 +881,17 @@ static int samsung_gpio_direction_output(struct gpio_chip *gc, unsigned offset,
 							int value)
 {
 	struct samsung_pin_bank *bank = gc_to_pin_bank(gc);
+	unsigned long flags;
 
 	if (bank->drvdata->ctrl->gpio_type == EXYNOS_GPIO_TYPE_DAT_CLEAR)
 		bank->dat_mask |= 1 << offset;
 
-	samsung_gpio_set(gc, offset, value);
-	return pinctrl_gpio_direction_output(gc->base + offset);
+	spin_lock_irqsave(&bank->slock, flags);
+	samsung_gpio_set_value(gc, offset, value);
+	samsung_gpio_set_direction(bank, offset, false);
+	spin_unlock_irqrestore(&bank->slock, flags);
+
+	return 0;
 }
 
 /*

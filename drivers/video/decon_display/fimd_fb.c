@@ -1055,6 +1055,9 @@ static void s3c_fb_activate_window_dma(struct s3c_fb *sfb, unsigned int index)
 
 	writel(0, sfb->regs + WINxMAP(index));
 
+#ifdef CONFIG_FB_I80_COMMAND_MODE
+	s3c_fb_hw_trigger_set(sfb, TRIG_UNMASK);
+#endif
 	data = readl(sfb->regs + VIDCON0);
 	data |= VIDCON0_ENVID | VIDCON0_ENVID_F;
 	writel(data, sfb->regs + VIDCON0);
@@ -4377,6 +4380,11 @@ int create_decon_display_controller(struct platform_device *pdev)
 	dev_err(dev, "failed to request an external interrupt for TE signal\n");
 		goto err_pm_runtime;
 	}
+
+	s5p_mipi_dsi_wr_data(dsim_for_decon, MIPI_DSI_DCS_SHORT_WRITE,
+		0x29, 0);
+
+	msleep(12);
 #endif
 #ifdef CONFIG_ION_EXYNOS
 	s3c_fb_wait_for_vsync(sfb, 32);
@@ -4386,6 +4394,8 @@ int create_decon_display_controller(struct platform_device *pdev)
 		goto err_iovmm;
 	}
 #endif
+
+	s3c_fb_activate_window(sfb, default_win);
 
 	dev_dbg(sfb->dev, "about to register framebuffer\n");
 
@@ -4715,7 +4725,7 @@ static int s3c_fb_enable(struct s3c_fb *sfb)
 #endif
 
 #ifdef CONFIG_FB_I80_COMMAND_MODE
-		s3c_fb_hw_trigger_set(sfb, TRIG_MASK);
+	s3c_fb_hw_trigger_set(sfb, TRIG_UNMASK);
 #endif
 
 	reg = readl(sfb->regs + VIDCON0);
@@ -4876,6 +4886,7 @@ int s3c_fb_resume(struct device *dev)
 #endif
 
 #ifdef CONFIG_FB_I80_COMMAND_MODE
+	msleep(12);
 	s3c_fb_hw_trigger_set(sfb, TRIG_MASK);
 #endif
 
@@ -5056,6 +5067,7 @@ int s3c_fb_hibernation_power_off(struct display_driver *dispdrv)
 #if defined(CONFIG_FIMD_USE_BUS_DEVFREQ)
 	pm_qos_update_request(&exynos5_fimd_mif_qos, 0);
 #elif defined(CONFIG_FIMD_USE_WIN_OVERLAP_CNT)
+	bts_scen_update(TYPE_LAYERS, 0);
 	exynos5_update_media_layers(TYPE_FIMD1, 0);
 	prev_overlap_cnt = 0;
 #endif

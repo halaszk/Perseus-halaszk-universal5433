@@ -327,6 +327,9 @@ struct fimc_is_core {
 #endif /* CONFIG_OIS_USE */
 	bool					use_ois_hsi2c;
 	bool					use_module_check;
+#ifdef CONFIG_CAMERA_VARIABLE_MIPI_LANES
+	u32					vtcam_mipi_lane_num;
+#endif
 #ifdef USE_ION_ALLOC
 	struct ion_client    *fimc_ion_client;
 #endif

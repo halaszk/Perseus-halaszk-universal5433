@@ -75,7 +75,11 @@ u32 notify_fcount_sen1_fw;
 u32 notify_fcount_sen2_fw;
 u32 notify_fcount_dummy;
 
+#ifdef BINNING_CLOSEST
+#define BINNING(x, y) DIV_ROUND_CLOSEST((x) * 1000 / (y), 500) * 500
+#else
 #define BINNING(x, y) roundup((x) * 1000 / (y), 250)
+#endif
 
 int fimc_is_sensor_read8(struct i2c_client *client,
 	u16 addr, u8 *val)

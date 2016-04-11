@@ -24,7 +24,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_msgbuf.c 539963 2015-03-10 12:42:38Z $
+ * $Id: dhd_msgbuf.c 601802 2015-11-24 07:05:07Z $
  */
 #include <typedefs.h>
 #include <osl.h>
@@ -317,11 +317,12 @@ dhd_prot_d2h_sync_livelock(dhd_pub_t *dhd, uint32 seqnum, uint32 tries,
 		dhd, seqnum, seqnum% D2H_EPOCH_MODULO, tries,
 		dhd->prot->d2h_sync_wait_max, dhd->prot->d2h_sync_wait_tot));
 	prhex("D2H MsgBuf Failure", (uchar *)msg, msglen);
-#if defined(SUPPORT_LINKDOWN_RECOVERY)
-#if defined(CONFIG_ARCH_MSM)
-	dhd->bus->islinkdown = TRUE;
+#ifdef SUPPORT_LINKDOWN_RECOVERY
+#ifdef CONFIG_ARCH_MSM
+	dhd->bus->no_cfg_restore = TRUE;
 #endif /* CONFIG_ARCH_MSM */
-	dhd_os_check_hang(dhd, 0, -ETIMEDOUT);
+	dhd->hang_reason = HANG_REASON_MSGBUF_LIVELOCK;
+	dhd_os_send_hang_message(dhd);
 #endif /* SUPPORT_LINKDOWN_RECOVERY */
 }
 
@@ -913,7 +914,7 @@ dhd_pktid_map_fini(dhd_pktid_map_handle_t *handle)
 		return;
 
 	map = (dhd_pktid_map_t *)handle;
-	flags =  DHD_PKTID_LOCK(map->pktid_lock);
+	flags = DHD_PKTID_LOCK(map->pktid_lock);
 
 	osh = map->osh;
 	dhd_pktid_map_sz = DHD_PKTID_MAP_SZ(map->items);
@@ -933,15 +934,15 @@ dhd_pktid_map_fini(dhd_pktid_map_handle_t *handle)
 			{
 				if (!PHYSADDRISZERO(locker->physaddr)) {
 					/* This could be a callback registered with dhd_pktid_map */
-				DMA_UNMAP(osh, locker->physaddr, locker->len,
-				          locker->dma, 0, 0);
+					DMA_UNMAP(osh, locker->physaddr, locker->len,
+						locker->dma, 0, 0);
 #if defined(CONFIG_DHD_USE_STATIC_BUF) && defined(DHD_USE_STATIC_CTRLBUF)
 					if (locker->buf_type == BUFF_TYPE_IOCTL_RX ||
 						locker->buf_type == BUFF_TYPE_EVENT_RX) {
-					PKTFREE_STATIC(osh, (ulong*)locker->pkt, FALSE);
-				} else {
+						PKTFREE_STATIC(osh, (ulong*)locker->pkt, FALSE);
+					} else {
 #endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_CTRLBUF */
-					PKTFREE(osh, (ulong*)locker->pkt, FALSE);
+						PKTFREE(osh, (ulong*)locker->pkt, FALSE);
 #if defined(CONFIG_DHD_USE_STATIC_BUF) && defined(DHD_USE_STATIC_CTRLBUF)
 					}
 #endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_CTRLBUF */
@@ -958,8 +959,8 @@ dhd_pktid_map_fini(dhd_pktid_map_handle_t *handle)
 					}
 #endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_CTRLBUF */
 				}
-				}
 			}
+		}
 #if defined(DHD_PKTID_AUDIT_ENABLED)
 		else {
 			DHD_PKTID_AUDIT(map, nkey, DHD_TEST_IS_FREE);
@@ -1002,7 +1003,7 @@ dhd_pktid_map_clear(dhd_pktid_map_handle_t *handle)
 		return;
 
 	map = (dhd_pktid_map_t *)handle;
-	flags  = DHD_PKTID_LOCK(map->pktid_lock);
+	flags = DHD_PKTID_LOCK(map->pktid_lock);
 
 	osh = map->osh;
 	map->failures = 0;
@@ -1033,17 +1034,17 @@ dhd_pktid_map_clear(dhd_pktid_map_handle_t *handle)
 
 			DHD_TRACE(("%s free id%d\n", __FUNCTION__, nkey));
 			if (!PHYSADDRISZERO(locker->physaddr)) {
-			DMA_UNMAP(osh, locker->physaddr, locker->len,
-				locker->dma, 0, 0);
+				DMA_UNMAP(osh, locker->physaddr, locker->len,
+					locker->dma, 0, 0);
 #if defined(CONFIG_DHD_USE_STATIC_BUF) && defined(DHD_USE_STATIC_CTRLBUF)
 				if (locker->buf_type == BUFF_TYPE_IOCTL_RX ||
 					locker->buf_type == BUFF_TYPE_EVENT_RX) {
-				PKTFREE_STATIC(osh, (ulong*)locker->pkt, FALSE);
-			} else {
+					PKTFREE_STATIC(osh, (ulong*)locker->pkt, FALSE);
+				} else {
 #endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_CTRLBUF */
-				PKTFREE(osh, (ulong*)locker->pkt, FALSE);
+					PKTFREE(osh, (ulong*)locker->pkt, FALSE);
 #if defined(CONFIG_DHD_USE_STATIC_BUF) && defined(DHD_USE_STATIC_CTRLBUF)
-			}
+				}
 #endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_CTRLBUF */
 			} else {
 				DHD_ERROR(("%s: Invalid phyaddr 0\n", __FUNCTION__));
@@ -1238,7 +1239,7 @@ dhd_pktid_map_alloc(dhd_pktid_map_handle_t *handle, void *pkt,
  */
 static void * BCMFASTPATH
 dhd_pktid_map_free(dhd_pktid_map_handle_t *handle, uint32 nkey,
-                   dmaaddr_t *physaddr, uint32 *len, uint8 buf_type)
+	dmaaddr_t *physaddr, uint32 *len, uint8 buf_type)
 {
 	dhd_pktid_map_t *map;
 	dhd_pktid_item_t *locker;
@@ -1252,6 +1253,11 @@ dhd_pktid_map_free(dhd_pktid_map_handle_t *handle, uint32 nkey,
 	flags = DHD_PKTID_LOCK(map->pktid_lock);
 
 	ASSERT((nkey != DHD_PKTID_INVALID) && (nkey <= DHD_PKIDMAP_ITEMS(map->items)));
+
+	if ((nkey == DHD_PKTID_INVALID) || (nkey > DHD_PKIDMAP_ITEMS(map->items))) {
+		DHD_ERROR(("%s: PKTID %d is invalid\n", __FUNCTION__, nkey));
+		return NULL;
+	}
 
 	locker = &map->lockers[nkey];
 
@@ -1877,15 +1883,15 @@ dhd_prot_packet_free(dhd_pub_t *dhd, uint32 pktid, uint8 buf_type)
 	if (PKTBUF) {
 		if (!PHYSADDRISZERO(pa)) {
 			if (buf_type == BUFF_TYPE_DATA_TX) {
-		DMA_UNMAP(dhd->osh, pa, (uint) pa_len, DMA_TX, 0, 0);
+				DMA_UNMAP(dhd->osh, pa, (uint) pa_len, DMA_TX, 0, 0);
 			} else {
 				DMA_UNMAP(dhd->osh, pa, (uint) pa_len, DMA_RX, 0, 0);
 			}
 #if defined(CONFIG_DHD_USE_STATIC_BUF) && defined(DHD_USE_STATIC_CTRLBUF)
 			if (buf_type == BUFF_TYPE_IOCTL_RX ||
 				buf_type == BUFF_TYPE_EVENT_RX) {
-			PKTFREE_STATIC(dhd->osh, PKTBUF, FALSE);
-		} else {
+				PKTFREE_STATIC(dhd->osh, PKTBUF, FALSE);
+			} else {
 #endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_CTRLBUF */
 				PKTFREE(dhd->osh, PKTBUF, FALSE);
 #if defined(CONFIG_DHD_USE_STATIC_BUF) && defined(DHD_USE_STATIC_CTRLBUF)
@@ -1899,7 +1905,7 @@ dhd_prot_packet_free(dhd_pub_t *dhd, uint32 pktid, uint8 buf_type)
 				PKTINVALIDATE_STATIC(dhd->osh, PKTBUF);
 			} else {
 #endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_CTRLBUF */
-			PKTFREE(dhd->osh, PKTBUF, FALSE);
+				PKTFREE(dhd->osh, PKTBUF, FALSE);
 #if defined(CONFIG_DHD_USE_STATIC_BUF) && defined(DHD_USE_STATIC_CTRLBUF)
 			}
 #endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_CTRLBUF */
@@ -1920,8 +1926,8 @@ dhd_prot_packet_get(dhd_pub_t *dhd, uint32 pktid, uint8 buf_type)
 			if (buf_type == BUFF_TYPE_DATA_TX) {
 				DMA_UNMAP(dhd->osh, pa, (uint) pa_len, DMA_TX, 0, 0);
 			} else {
-		DMA_UNMAP(dhd->osh, pa, (uint) pa_len, DMA_RX, 0, 0);
-	}
+				DMA_UNMAP(dhd->osh, pa, (uint) pa_len, DMA_RX, 0, 0);
+			}
 		} else {
 			DHD_ERROR(("%s: Invalid phyaddr 0\n", __FUNCTION__));
 #if defined(CONFIG_DHD_USE_STATIC_BUF) && defined(DHD_USE_STATIC_CTRLBUF)
@@ -2120,9 +2126,9 @@ dhd_prot_rxbufpost_ctrl(dhd_pub_t *dhd, bool event_buf)
 	}
 
 #if defined(CONFIG_DHD_USE_STATIC_BUF) && defined(DHD_USE_STATIC_CTRLBUF)
-		p = PKTGET_STATIC(dhd->osh, pktsz, FALSE);
+	p = PKTGET_STATIC(dhd->osh, pktsz, FALSE);
 #else
-		p = PKTGET(dhd->osh, pktsz, FALSE);
+	p = PKTGET(dhd->osh, pktsz, FALSE);
 #endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_CTRLBUF */
 
 	if (p == NULL) {
@@ -2203,9 +2209,9 @@ dhd_prot_rxbufpost_ctrl(dhd_pub_t *dhd, bool event_buf)
 
 free_pkt_return:
 #if defined(CONFIG_DHD_USE_STATIC_BUF) && defined(DHD_USE_STATIC_CTRLBUF)
-		PKTFREE_STATIC(dhd->osh, p, FALSE);
+	PKTFREE_STATIC(dhd->osh, p, FALSE);
 #else
-		PKTFREE(dhd->osh, p, FALSE);
+	PKTFREE(dhd->osh, p, FALSE);
 #endif /* CONFIG_DHD_USE_STATIC_BUF && DHD_USE_STATIC_CTRLBUF */
 
 	return -1;

@@ -349,6 +349,17 @@ extern bool wf_chspec_valid(chanspec_t chanspec);
  */
 extern uint8 wf_chspec_ctlchan(chanspec_t chspec);
 
+/*
+ * Return the bandwidth string.
+ *
+ * This function returns the bandwidth string for the passed chanspec.
+ *
+ * @param	chspec    input chanspec
+ *
+ * @return Returns the bandwidth string
+ */
+extern char * wf_chspec_to_bw_str(chanspec_t chspec);
+
 /**
  * Return the primary (control) chanspec.
  *

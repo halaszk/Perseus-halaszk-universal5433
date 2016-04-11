@@ -59,8 +59,8 @@ config BCM4358_A3
 	depends on BROADCOM_WIFI
 	---help---
 	  This module adds support for wireless adapters based on
-	  Broadcom 4358 chipset.	  
-	  
+	  Broadcom 4358 chipset.
+
 config BCM43241
 	tristate "Broadcom 43241 wireless cards support"
 	depends on BROADCOM_WIFI
@@ -140,3 +140,9 @@ config BCMDHD_DEBUG_PAGEALLOC
 	depends on (BCM4354 || BCM4358)
 	---help---
 	  Enable Memory Pagealloc Debugging
+
+config BCMDHD_PREALLOC_MEMDUMP
+	bool "BROADCOM PCIE specific memory reserved for MEMDUMP"
+	depends on BROADCOM_WIFI_RESERVED_MEM
+	---help---
+	  Preallocated memory support for dongle memory dump

@@ -429,8 +429,6 @@ struct mxr_device {
 
 	/** RGB Quantization range and Colorimetry */
 	enum s5p_mixer_rgb color_range;
-	/** TV suspend */
-	int blank;
 };
 
 #if defined(CONFIG_VIDEOBUF2_CMA_PHYS)
@@ -572,6 +570,7 @@ void mxr_reg_s_output(struct mxr_device *mdev, int cookie);
 void mxr_reg_streamon(struct mxr_device *mdev);
 void mxr_reg_streamoff(struct mxr_device *mdev);
 int mxr_reg_wait4update(struct mxr_device *mdev);
+int mxr_hdmi_blank(struct mxr_device *mdev, int blank);
 void mxr_reg_set_mbus_fmt(struct mxr_device *mdev,
 	struct v4l2_mbus_framefmt *fmt, u32 dvi_mode);
 void mxr_reg_local_path_set(struct mxr_device *mdev);

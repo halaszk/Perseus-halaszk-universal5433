@@ -204,15 +204,6 @@ static void rt5033_enable_charger_switch(struct rt5033_charger_data *charger,
 		charger->full_charged = false;
 		pr_info("%s: turn on charger\n", __func__);
 
-		if (charger->rev_id >= 6) {
-			rt5033_lock_regulator(iic);
-			msleep(1);
-			/* Turn off SafeLDO temporarily */
-			rt5033_clr_bits(iic, RT5033_REGULATOR_REG_OUTPUT_EN,
-					RT5033_REGULATOR_EN_MASK_LDO_SAFE);
-			msleep(1);
-		}
-
 #ifdef CONFIG_FLED_RT5033
 		if (charger->fled_info == NULL)
 			charger->fled_info = rt_fled_get_info_by_name(NULL);
@@ -233,13 +224,6 @@ static void rt5033_enable_charger_switch(struct rt5033_charger_data *charger,
 		/* After enabled the charger, we will disable RESET circuit */
 		if (charger->rev_id >= 6) {
 			rt5033_clr_bits(iic, 0x47, 1 << 3);
-
-			msleep(1);
-			/* Turn on SafeLDO */
-			rt5033_set_bits(iic, RT5033_REGULATOR_REG_OUTPUT_EN,
-					RT5033_REGULATOR_EN_MASK_LDO_SAFE);
-			msleep(1);
-			rt5033_unlock_regulator(iic);
 		}
 	} else if (onoff == 0) {
 		psy_do_property("battery", get,

@@ -95,6 +95,12 @@ config CAMERA_SUPPORT_MULTI_EEPROM
         default n
         help
           Enable for support multi eeprom.
+config CAMERA_VARIABLE_MIPI_LANES
+        bool "Enable for support variable MIPI lanes"
+        depends on VIDEO_EXYNOS_FIMC_IS
+        default n
+        help
+          Enable for support variable MIPI lanes.
 config CAMERA_TBE
         bool "This camera is TBE Project"
         depends on VIDEO_EXYNOS_FIMC_IS

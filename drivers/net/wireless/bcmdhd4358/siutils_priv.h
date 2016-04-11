@@ -1,7 +1,7 @@
 /*
  * Include file private to the SOC Interconnect support files.
  *
- * Copyright (C) 1999-2015, Broadcom Corporation
+ * Copyright (C) 1999-2016, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: siutils_priv.h 474902 2014-05-02 18:31:33Z $
+ * $Id: siutils_priv.h 571881 2015-07-16 09:49:56Z $
  */
 
 #ifndef	_siutils_priv_h_
@@ -114,6 +114,7 @@ typedef struct si_info {
 	void *cores_info;
 	gci_gpio_item_t	*gci_gpio_head;	/* gci gpio interrupts head */
 	uint	chipnew;		/* new chip number */
+	uint second_bar0win;		/* Backplane region */
 } si_info_t;
 
 

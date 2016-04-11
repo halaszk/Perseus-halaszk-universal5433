@@ -1176,6 +1176,7 @@ int fimc_is_video_dqbuf(struct file *file,
 	bool blocking;
 	struct fimc_is_queue *queue;
 	struct fimc_is_framemgr *framemgr;
+	struct fimc_is_device_sensor *device;
 
 	BUG_ON(!file);
 	BUG_ON(!vctx);
@@ -1184,6 +1185,7 @@ int fimc_is_video_dqbuf(struct file *file,
 	blocking = file->f_flags & O_NONBLOCK;
 	queue = GET_VCTX_QUEUE(vctx, buf);
 	framemgr = &queue->framemgr;
+	device = vctx->device;
 
 	if (!queue->vbq) {
 		merr("vbq is NULL", vctx);
@@ -1220,7 +1222,12 @@ int fimc_is_video_dqbuf(struct file *file,
 	ret = vb2_dqbuf(queue->vbq, buf, blocking);
 
 p_err:
-	return ret;
+	/* skip err log when changing mode like as 'stop preview and start recording' */
+	if (!test_bit(FIMC_IS_SENSOR_BACK_START, &device->state)
+		&& !test_bit(FIMC_IS_SENSOR_FRONT_START, &device->state) && (ret == -EINVAL))
+		return 0;
+	else
+		return ret;
 }
 
 int fimc_is_video_streamon(struct file *file,

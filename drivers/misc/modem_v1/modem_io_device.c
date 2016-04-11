@@ -377,7 +377,6 @@ static int rx_demux(struct link_device *ld, struct sk_buff *skb)
 	if (atomic_read(&iod->opened) <= 0) {
 		mif_err_limited("%s: ERR! %s is not opened\n",
 				ld->name, iod->name);
-		modemctl_notify_event(MDM_EVENT_CP_ABNORMAL_RX);
 		return -ENODEV;
 	}
 
@@ -914,7 +913,6 @@ static int io_dev_recv_net_skb_from_link_dev(struct io_device *iod,
 		struct modem_ctl *mc = iod->mc;
 		mif_err_limited("%s: %s<-%s: ERR! %s is not opened\n",
 				ld->name, iod->name, mc->name, iod->name);
-		modemctl_notify_event(MDM_EVENT_CP_ABNORMAL_RX);
 		return -ENODEV;
 	}
 
@@ -990,7 +988,7 @@ static int misc_open(struct inode *inode, struct file *filp)
 		if (IS_CONNECTED(iod, ld) && ld->init_comm) {
 			ret = ld->init_comm(ld, iod);
 			if (ret < 0) {
-				mif_err("%s<->%s: ERR! init_comm fail(%d)\n",
+				mif_debug("%s<->%s: ERR! init_comm fail(%d)\n",
 					iod->name, ld->name, ret);
 				atomic_dec(&iod->opened);
 				return ret;
@@ -1836,7 +1834,6 @@ int sipc5_init_io_device(struct io_device *iod)
 
 		iod->miscdev.minor = MISC_DYNAMIC_MINOR;
 		iod->miscdev.name = iod->name;
-		iod->miscdev.fops = &misc_io_fops;
 
 		ret = misc_register(&iod->miscdev);
 		if (ret)

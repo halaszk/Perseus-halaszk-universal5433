@@ -778,6 +778,7 @@ static int exynos_pd_cam1_power_off_pre(struct exynos_pm_domain *pd)
 	unsigned int reg;
 
 	DEBUG_PRINT_INFO("%s is preparing power-off sequence.\n", pd->name);
+	pr_info(PM_DOMAIN_PREFIX "%s try to power off\n", pd->name);
 	reg = __raw_readl(EXYNOS5430_ENABLE_IP_CAM11);
 	reg |= (1 << 19 | 1 << 18 | 1 << 16 | 1 << 15 | 1 << 14 | 1 << 13);
 	__raw_writel(reg, EXYNOS5430_ENABLE_IP_CAM11);

@@ -30,6 +30,7 @@
 #ifdef CONFIG_EXYNOS_CORESIGHT_PC_INFO
 #include <mach/coresight.h>
 #endif
+#include <mach/exynos-ss.h>
 
 #define PANIC_TIMER_STEP 100
 #define PANIC_BLINK_SPD 18
@@ -139,6 +140,7 @@ void panic(const char *fmt, ...)
 	show_exynos_cmu();
 #endif
 
+	exynos_ss_early_dump();
 	sysrq_sched_debug_show();
 
 	/*

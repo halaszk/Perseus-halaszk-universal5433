@@ -108,5 +108,24 @@
 	hsi2c@14E70000 {
 		/delete-node/ es325@3e;
 	};
+	
+	i2c@14E30000 {
+		audio_codec: rt5659@1b {
+			compatible = "realtek,rt5659";
+			reg = <0x1b>;
+			realtek,in1-differential = "true";
+		};
+	};
 
+	serial@14C20000 {
+		pinctrl-0 = <&uart1_rx>;
+	};
+
+	pinctrl@14CC0000 {
+		uart1_rx: uart1-bus_2 {
+			samsung,pins = "gpd1-0";
+			samsung,pin-function = <2>;
+			samsung,pin-pud = <1>;
+		};
+	};
 };

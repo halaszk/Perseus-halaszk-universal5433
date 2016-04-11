@@ -51,6 +51,7 @@
 #include <linux/sec_debug.h>
 
 #include "workqueue_internal.h"
+#include <mach/exynos-ss.h>
 
 enum {
 	/*
@@ -2156,8 +2157,10 @@ __acquires(&pool->lock)
 	lock_map_acquire_read(&pwq->wq->lockdep_map);
 	lock_map_acquire(&lockdep_map);
 	trace_workqueue_execute_start(work);
+	exynos_ss_work(worker, work, worker->current_func, ESS_FLAG_IN);
 	sec_debug_work_log(worker, work, worker->current_func, 1);
 	worker->current_func(work);
+	exynos_ss_work(worker, work, worker->current_func, ESS_FLAG_OUT);
 	sec_debug_work_log(worker, work, worker->current_func, 2);
 	/*
 	 * While we must be careful to not use "work" after this, the trace

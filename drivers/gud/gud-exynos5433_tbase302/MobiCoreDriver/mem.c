@@ -607,16 +607,14 @@ int mc_free_mmu_table(struct mc_instance *instance, uint32_t handle)
 		goto err_unlock;
 	}
 
-	/*
-	 * Clean-up in the case of fake L1 table:
+	/* clean-up in the case of fake L1 table:
 	 * we need to unmap all sub-tables and
 	 * the buffer referred by the fake table
 	 */
 	if (table->type&MC_MMU_TABLE_TYPE_WSM_FAKE_L1) {
 		int i = 0;
 		uint64_t *va;
-		/*
-		 * first and only record of the fake table
+		/* first and only record of the fake table
 		 * contains physical address of the buffer
 		 */
 #ifdef LPAE_SUPPORT

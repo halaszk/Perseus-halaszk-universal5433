@@ -32,17 +32,17 @@
 
 #define	EPI_RC_NUMBER		64
 
-#define	EPI_INCREMENTAL_NUMBER	29
+#define	EPI_INCREMENTAL_NUMBER	59
 
 #define	EPI_BUILD_NUMBER	0
 
-#define	EPI_VERSION		1, 141, 64, 29
+#define	EPI_VERSION		1, 141, 64, 59
 
-#define	EPI_VERSION_NUM		0x018d401d
+#define	EPI_VERSION_NUM		0x018d403b
 
 #define EPI_VERSION_DEV		1.141.64
 
 /* Driver Version String, ASCII, 32 chars max */
-#define	EPI_VERSION_STR		"1.141.64.29 (r)"
+#define	EPI_VERSION_STR		"1.141.64.59 (security_patch)"
 
 #endif /* _epivers_h_ */

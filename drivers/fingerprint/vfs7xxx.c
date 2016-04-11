@@ -99,6 +99,16 @@ static struct of_device_id vfsspi_match_table[] = {
 #define vfsspi_match_table NULL
 #endif
 
+/* using for awake the samsung FP daemon */
+bool fp_lockscreen_mode = false;
+/* input/Keyboard/gpio_keys.c */
+#ifdef ENABLE_SENSORS_FPRINT_SECURE
+#ifdef CONFIG_SENSORS_FP_LOCKSCREEN_MODE
+extern bool wakeup_by_key(void);
+/* export variable for signaling */
+EXPORT_SYMBOL(fp_lockscreen_mode);
+#endif
+#endif
 
 /*
  * vfsspi_devData - The spi driver private structure
@@ -414,7 +424,7 @@ static int vfsspi_rw_spi_message(struct vfsspi_device_data *vfsspi_device,
 		return -ENOMEM;
 
 	if (copy_from_user(dup, (void *)arg,
-		sizeof(struct vfsspi_ioctl_transfer)) != 0) {
+			sizeof(struct vfsspi_ioctl_transfer)) != 0) {
 		kfree(dup);
 		return -EFAULT;
 	} else {
@@ -598,10 +608,6 @@ static int vfsspi_set_clk(struct vfsspi_device_data *vfsspi_device,
 			if (spi_info != NULL) {
 				pr_info("%s ENABLE_SPI_CLOCK\n", __func__);
 
-				/* System LSI W/A Code */
-				/* This is for Exynos7420 */
-				//exynos7_update_media_scenario(TYPE_SPDMA, 1, 0);
-
 				spi_info->speed = spidev->max_speed_hz;
 				ret_val = vfsspi_sec_spi_prepare(spi_info, spidev);
 				if (ret_val < 0)
@@ -652,10 +658,6 @@ static int vfsspi_ioctl_disable_spi_clock(
 		wake_unlock(&vfsspi_device->fp_spi_lock);
 #endif
 		vfsspi_device->enabled_clk = false;
-
-		/* System LSI W/A Code */
-		/* This is for Exynos7420 */
-		//exynos7_update_media_scenario(TYPE_SPDMA, 0, 0);
 	}
 	return ret_val;
 }
@@ -665,7 +667,6 @@ static int vfsspi_register_drdy_signal(struct vfsspi_device_data *vfsspi_device,
 				       unsigned long arg)
 {
 	struct vfsspi_ioctl_register_signal usr_signal;
-
 	if (copy_from_user(&usr_signal, (void *)arg, sizeof(usr_signal)) != 0) {
 		pr_err("%s Failed copy from user.\n", __func__);
 		return -EFAULT;
@@ -691,34 +692,34 @@ static int vfsspi_register_drdy_signal(struct vfsspi_device_data *vfsspi_device,
 static int vfsspi_enableIrq(struct vfsspi_device_data *vfsspi_device)
 {
 	pr_info("%s\n", __func__);
-
+	spin_lock_irq(&vfsspi_device->irq_lock);
 	if (atomic_read(&vfsspi_device->irq_enabled)
 		== DRDY_IRQ_ENABLE) {
+		spin_unlock_irq(&vfsspi_device->irq_lock);
 		pr_err("%s DRDY irq already enabled\n", __func__);
 		return -EINVAL;
 	}
-	spin_lock(&vfsspi_device->irq_lock);
 	vfsspi_pin_control(vfsspi_device, true);
 	enable_irq(gpio_irq);
 	atomic_set(&vfsspi_device->irq_enabled, DRDY_IRQ_ENABLE);
-	spin_unlock(&vfsspi_device->irq_lock);
+	spin_unlock_irq(&vfsspi_device->irq_lock);
 	return 0;
 }
 
 static int vfsspi_disableIrq(struct vfsspi_device_data *vfsspi_device)
 {
 	pr_info("%s\n", __func__);
-
+	spin_lock_irq(&vfsspi_device->irq_lock);
 	if (atomic_read(&vfsspi_device->irq_enabled)
 		== DRDY_IRQ_DISABLE) {
+		spin_unlock_irq(&vfsspi_device->irq_lock);
 		pr_err("%s DRDY irq already disabled\n", __func__);
 		return -EINVAL;
 	}
-	spin_lock(&vfsspi_device->irq_lock);
 	disable_irq_nosync(gpio_irq);
 	atomic_set(&vfsspi_device->irq_enabled, DRDY_IRQ_DISABLE);
 	vfsspi_pin_control(vfsspi_device, false);
-	spin_unlock(&vfsspi_device->irq_lock);
+	spin_unlock_irq(&vfsspi_device->irq_lock);
 	return 0;
 }
 
@@ -733,26 +734,17 @@ static irqreturn_t vfsspi_irq(int irq, void *context)
 	Therefore, we are checking DRDY GPIO pin state to make sure
 	if the interrupt handler has been called actually by DRDY
 	interrupt and it's not a previous interrupt re-play */
-	if (gpio_get_value(vfsspi_device->drdy_pin) != DRDY_ACTIVE_STATUS) {
-		pr_err("%s, DRDY is Low.\n", __func__);
-		return IRQ_HANDLED;
-	}
-
-#ifdef ENABLE_SENSORS_FPRINT_SECURE
-	if ((atomic_read(&vfsspi_device->irq_enabled)
+	if ((gpio_get_value(vfsspi_device->drdy_pin) == DRDY_ACTIVE_STATUS)
+		 && (atomic_read(&vfsspi_device->irq_enabled)
 		== DRDY_IRQ_ENABLE)) {
-		vfsspi_disableIrq(vfsspi_device);
+		spin_lock(&vfsspi_device->irq_lock);
+		disable_irq_nosync(gpio_irq);
+		atomic_set(&vfsspi_device->irq_enabled, DRDY_IRQ_DISABLE);
+		vfsspi_pin_control(vfsspi_device, false);
+		spin_unlock(&vfsspi_device->irq_lock);
 		vfsspi_send_drdy_signal(vfsspi_device);
-	} else {
-		pr_err("%s, irq is not enabled\n", __func__);
-		return IRQ_HANDLED;
+		pr_info("%s disableIrq\n", __func__);
 	}
-#else
-	vfsspi_disableIrq(vfsspi_device);
-	vfsspi_send_drdy_signal(vfsspi_device);
-#endif
-	pr_info("%s\n", __func__);
-
 	return IRQ_HANDLED;
 }
 
@@ -775,6 +767,7 @@ static int vfsspi_set_drdy_int(struct vfsspi_device_data *vfsspi_device,
 			  device.*/
 			if (gpio_get_value(vfsspi_device->drdy_pin) ==
 				DRDY_ACTIVE_STATUS) {
+				pr_info("%s drdy pin is already active atatus\n", __func__);
 				vfsspi_send_drdy_signal(vfsspi_device);
 			}
 	}
@@ -870,7 +863,8 @@ static long vfsspi_ioctl(struct file *filp, unsigned int cmd,
 	struct vfsspi_device_data *vfsspi_device = NULL;
 #ifdef ENABLE_SENSORS_FPRINT_SECURE
 	unsigned int onoff = 0;
-	unsigned int type_check;
+	unsigned int type_check = -1;
+	unsigned int lockscreen_mode = 0;
 #endif
 	pr_debug("%s\n", __func__);
 
@@ -893,8 +887,12 @@ static long vfsspi_ioctl(struct file *filp, unsigned int cmd,
 		break;
 #ifndef ENABLE_SENSORS_FPRINT_SECURE
 	case VFSSPI_IOCTL_RW_SPI_MESSAGE:
-		pr_debug("%s VFSSPI_IOCTL_RW_SPI_MESSAGE", __func__);
+		pr_debug("%s VFSSPI_IOCTL_RW_SPI_MESSAGE\n", __func__);
 		ret_val = vfsspi_rw_spi_message(vfsspi_device, arg);
+		if (ret_val) {
+			pr_err("%s : VFSSPI_IOCTL_RW_SPI_MESSAGE error %d\n",
+				__func__, ret_val);
+		}
 		break;
 #endif
 	case VFSSPI_IOCTL_SET_CLK:
@@ -929,23 +927,19 @@ static long vfsspi_ioctl(struct file *filp, unsigned int cmd,
 		break;
 	case VFSSPI_IOCTL_CPU_SPEEDUP:
 		if (copy_from_user(&onoff, (void *)arg,
-			sizeof(unsigned int)) != 0)
+			sizeof(unsigned int)) != 0) {
+			pr_err("%s Failed copy from user.(CPU_SPEEDUP)\n", __func__);
+			mutex_unlock(&vfsspi_device->buffer_mutex);
 			return -EFAULT;
+		}
 		if (onoff) {
-			u8 retry_cnt = 0;
-			pr_info("%s VFSSPI_IOCTL_CPU_SPEEDUP ON:%d, retry: %d\n",
-				__func__, onoff, retry_cnt);
+			pr_info("%s VFSSPI_IOCTL_CPU_SPEEDUP ON:%d\n",
+				__func__, onoff);
 #if defined(CONFIG_SECURE_OS_BOOSTER_API)
-			do {
-				ret_val = secos_booster_start(onoff - 1);
-				retry_cnt++;
-				if (ret_val) {
-					pr_err("%s: booster start failed. (%d) retry: %d\n"
-						, __func__, ret_val, retry_cnt);
-					if (retry_cnt < 7)
-						usleep_range(500, 510);
-				}
-			} while (ret_val && retry_cnt < 7);
+			ret_val = secos_booster_start(onoff - 1);
+			if (ret_val)
+				pr_err("%s: booster start failed. (%d)\n"
+					, __func__, ret_val);
 #endif
 		} else {
 			pr_info("%s VFSSPI_IOCTL_CPU_SPEEDUP OFF\n", __func__);
@@ -959,11 +953,31 @@ static long vfsspi_ioctl(struct file *filp, unsigned int cmd,
 		break;
 	case VFSSPI_IOCTL_SET_SENSOR_TYPE:
 		if (copy_from_user(&type_check, (void *)arg,
-					sizeof(unsigned int)) != 0)
-					return -EFAULT;
-		vfsspi_device->sensortype = (int)type_check;
-		pr_info("%s VFSSPI_IOCTL_SET_SENSOR_TYPE :%d \n",
-				__func__, vfsspi_device->sensortype);
+			sizeof(unsigned int)) != 0) {
+			pr_err("%s Failed copy from user.(SET_SENSOR_TYPE)\n", __func__);
+			mutex_unlock(&vfsspi_device->buffer_mutex);
+			return -EFAULT;
+		}
+		if ((int)type_check >= SENSOR_UNKNOWN && (int)type_check < (SENSOR_STATUS_SIZE - 1)) {
+			vfsspi_device->sensortype = (int)type_check;
+			pr_info("%s VFSSPI_IOCTL_SET_SENSOR_TYPE :%s\n",
+					__func__, sensor_status[g_data->sensortype + 1]);
+		} else {
+			pr_err("%sVFSSPI_IOCTL_SET_SENSOR_TYPE : invalid value %d\n",
+					__func__, (int)type_check);
+			vfsspi_device->sensortype = SENSOR_UNKNOWN;
+		}
+		break;
+	case VFSSPI_IOCTL_SET_LOCKSCREEN:
+		if (copy_from_user(&lockscreen_mode,
+				(void *)arg,sizeof(unsigned int)) != 0) {
+			pr_err("%s Failed copy from user.(SET_LOCKSCREEN_MODE)\n", __func__);
+			mutex_unlock(&vfsspi_device->buffer_mutex);
+			return -EFAULT;
+		}
+		lockscreen_mode?(fp_lockscreen_mode=true):(fp_lockscreen_mode=false);
+		pr_info("%s VFSSPI_IOCTL_SET_LOCKSCREEN :%s \n",
+				__func__, fp_lockscreen_mode?"ON":"OFF");
 		break;
 #endif
 	case VFSSPI_IOCTL_GET_SENSOR_ORIENT:
@@ -979,6 +993,7 @@ static long vfsspi_ioctl(struct file *filp, unsigned int cmd,
 		break;
 
 	default:
+		pr_info("%s default error. %u\n", __func__, cmd);
 		ret_val = -EFAULT;
 		break;
 	}
@@ -1102,7 +1117,6 @@ static int vfsspi_platformInit(struct vfsspi_device_data *vfsspi_device)
 		gpio_direction_output(vfsspi_device->ocp_en, 0);
 		pr_info("%s ocp off\n", __func__);
 	}
-
 	if (vfsspi_device->ldo_pin) {
 		status = gpio_request(vfsspi_device->ldo_pin, "vfsspi_ldo_en");
 		if (status < 0) {
@@ -1185,7 +1199,8 @@ vfsspi_platformInit_drdy_failed:
 vfsspi_platformInit_ldo2_failed:
 	gpio_free(vfsspi_device->ldo_pin);
 vfsspi_platformInit_ldo_failed:
-	gpio_free(vfsspi_device->ocp_en);
+	if (vfsspi_device->ocp_en)
+		gpio_free(vfsspi_device->ocp_en);
 vfsspi_platformInit_ocpen_failed:
 	pr_info("%s : platformInit failed!\n", __func__);
 	return status;
@@ -1243,18 +1258,18 @@ static int vfsspi_parse_dt(struct device *dev,
 		pr_info("%s: drdyPin=%d\n",
 			__func__, data->drdy_pin);
 	}
-
 	if (!of_find_property(np, "vfsspi-ocpen", NULL)) {
-		pr_err("%s: not set ocp_en in dts\n", __func__);
+		pr_info("%s: not set ocp_en in dts\n", __func__);
 	} else {
 		gpio = of_get_named_gpio(np, "vfsspi-ocpen", 0);
 		if (gpio < 0)
 			pr_err("%s: fail to get ocp_en\n", __func__);
-		else
+		else {
 			data->ocp_en = gpio;
+				pr_info("%s: ocp_en=%d\n",
+					__func__, data->ocp_en);
+		}
 	}
-	pr_info("%s: ocp_en=%d\n",
-				__func__, data->ocp_en);
 
 	gpio = of_get_named_gpio(np, "vfsspi-ldoPin", 0);
 	if (gpio < 0) {
@@ -1266,7 +1281,7 @@ static int vfsspi_parse_dt(struct device *dev,
 			__func__, data->ldo_pin);
 	}
 	if (!of_find_property(np, "vfsspi-ldoPin2", NULL)) {
-		pr_err("%s: not set ldo2 in dts\n", __func__);
+		pr_info("%s: not set ldo2 in dts\n", __func__);
 		data->ldo_pin2 = 0;
 	} else {
 		gpio = of_get_named_gpio(np, "vfsspi-ldoPin2", 0);
@@ -1379,7 +1394,6 @@ static struct device_attribute *fp_attrs[] = {
 };
 #endif
 
-
 static void vfsspi_work_func_debug(struct work_struct *work)
 {
 	u8 ldo_value = 0;
@@ -1391,13 +1405,23 @@ static void vfsspi_work_func_debug(struct work_struct *work)
 					| gpio_get_value(g_data->ldo_pin);
 	}
 
-	pr_info("%s ocpen: %d, ldo: %d,"
-		" sleep: %d, irq: %d, tz: %d, type: %s\n",
-		__func__, gpio_get_value(g_data->ocp_en),
-		ldo_value, gpio_get_value(g_data->sleep_pin),
-		gpio_get_value(g_data->drdy_pin),
-		g_data->tz_mode,
-		sensor_status[g_data->sensortype + 1]);
+	if (g_data->ocp_en) {
+		pr_info("%s ocpen: %d, ldo: %d,"
+			" sleep: %d, irq: %d, tz: %d, type: %s\n",
+			__func__, gpio_get_value(g_data->ocp_en),
+			ldo_value, gpio_get_value(g_data->sleep_pin),
+			gpio_get_value(g_data->drdy_pin),
+			g_data->tz_mode,
+			sensor_status[g_data->sensortype + 1]);
+	} else {
+		pr_info("%s ldo: %d,"
+			" sleep: %d, irq: %d, tz: %d, type: %s\n",
+			__func__, ldo_value,
+			gpio_get_value(g_data->sleep_pin),
+			gpio_get_value(g_data->drdy_pin),
+			g_data->tz_mode,
+			sensor_status[g_data->sensortype + 1]);
+	}
 }
 
 static void vfsspi_enable_debug_timer(void)
@@ -1566,6 +1590,29 @@ type_check_exit:
 #endif /* ENABLE_SENSORS_FPRINT_SECURE */
 	vfsspi_regulator_onoff(vfsspi_device, false);
 
+	return 0;
+}
+#endif
+
+#ifdef ENABLE_SENSORS_FPRINT_SECURE
+static int vfsspi_wakeup_daemon(struct vfsspi_device_data *vfsspi_device)
+{
+#ifdef CONFIG_SENSORS_FP_LOCKSCREEN_MODE
+	if (fp_lockscreen_mode) {
+		if (vfsspi_device->signal_id) {
+			if (wakeup_by_key() == true && 
+				atomic_read(&vfsspi_device->irq_enabled) == DRDY_IRQ_DISABLE) {
+				vfsspi_send_drdy_signal(vfsspi_device);
+				pr_info("%s send signal done!\n", __func__);
+			} else {
+				pr_err("%s send signal failed by wakeup(%d)\n",
+					__func__, wakeup_by_key());
+			}
+		} else {
+			pr_err("%s fingerprint has no signal_id\n", __func__);
+		}
+	}
+#endif
 	return 0;
 }
 #endif
@@ -1804,18 +1851,15 @@ static int vfsspi_pm_suspend(struct device *dev)
 #if defined(ENABLE_SENSORS_FPRINT_SECURE) && !defined(CONFIG_SOC_EXYNOS5430)
 	int ret;
 #endif
-
 	if (g_data != NULL) {
 		vfsspi_disable_debug_timer();
-#if defined(ENABLE_SENSORS_FPRINT_SECURE)
 		vfsspi_ioctl_power_off(g_data);
-#if !defined(CONFIG_SOC_EXYNOS5430)
+#if defined(ENABLE_SENSORS_FPRINT_SECURE) && !defined(CONFIG_SOC_EXYNOS5430)
 		ret = exynos_smc(MC_FC_FP_PM_SUSPEND, 0, 0, 0);
-		pr_info("%s: suspend smc ret = %d\n", __func__, ret);
+		pr_debug("%s: suspend smc ret = %d\n", __func__, ret);
 #endif
-#endif
+		pr_info("%s\n", __func__);
 	}
-	pr_info("%s\n", __func__);
 	return 0;
 }
 
@@ -1824,18 +1868,18 @@ static int vfsspi_pm_resume(struct device *dev)
 #if defined(ENABLE_SENSORS_FPRINT_SECURE) && !defined(CONFIG_SOC_EXYNOS5430)
 	int ret;
 #endif
-
 	if (g_data != NULL) {
 #if defined(ENABLE_SENSORS_FPRINT_SECURE)
+		vfsspi_wakeup_daemon(g_data);
 #if !defined(CONFIG_SOC_EXYNOS5430)
 		ret = exynos_smc(MC_FC_FP_PM_RESUME, 0, 0, 0);
-		pr_info("%s: resume smc ret = %d\n", __func__, ret);
+		pr_debug("%s: resume smc ret = %d\n", __func__, ret);
+#endif
 #endif
 		vfsspi_ioctl_power_on(g_data);
-#endif
 		vfsspi_enable_debug_timer();
+		pr_info("%s\n", __func__);
 	}
-	pr_info("%s\n", __func__);
 	return 0;
 }
 
@@ -1844,7 +1888,7 @@ static const struct dev_pm_ops vfsspi_pm_ops = {
 	.resume = vfsspi_pm_resume
 };
 
-static struct spi_driver vfsspi_spi = {
+struct spi_driver vfsspi_spi = {
 	.driver = {
 		.name  = VALIDITY_PART_NAME,
 		.owner = THIS_MODULE,

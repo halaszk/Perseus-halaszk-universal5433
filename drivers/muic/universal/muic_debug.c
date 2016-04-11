@@ -47,6 +47,7 @@
 
 #define MAX_LOG 25
 
+extern bool muic_is_online(void);
 static u8 muic_log_cnt;
 static u8 muic_log[MAX_LOG][3];
 
@@ -91,16 +92,22 @@ void muic_print_reg_dump(muic_data_t *pmuic)
 	pr_info("%s:%s\n", __func__, mesg);
 }
 
+
 void muic_show_debug_info(struct work_struct *work)
 {
-	muic_data_t *pmuic =
-		container_of(work, muic_data_t, usb_work.work);
+	muic_data_t *pmuic;
+
+	if (!muic_is_online()) {
+		pr_err("%s: muic is offline\n", __func__);
+		return;
+	}
+
+	pmuic = container_of(work, muic_data_t, usb_work.work);
 
 	mutex_lock(&pmuic->muic_mutex);
 	muic_print_reg_log();
 	muic_print_reg_dump(pmuic);
 	mutex_unlock(&pmuic->muic_mutex);
 
-	INIT_DELAYED_WORK(&pmuic->usb_work, muic_show_debug_info);
 	schedule_delayed_work(&pmuic->usb_work, msecs_to_jiffies(60000));
 }

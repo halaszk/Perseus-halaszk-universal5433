@@ -502,8 +502,7 @@ int st_lsm6ds3_acc_open_calibration(struct lsm6ds3_data *cdata)
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
 
-	cal_filp = filp_open(CALIBRATION_FILE_PATH, O_RDONLY,
-		S_IRUGO | S_IWUSR | S_IWGRP);
+	cal_filp = filp_open(CALIBRATION_FILE_PATH, O_RDONLY, 0);
 	if (IS_ERR(cal_filp)) {
 		set_fs(old_fs);
 		ret = PTR_ERR(cal_filp);
@@ -520,6 +519,11 @@ int st_lsm6ds3_acc_open_calibration(struct lsm6ds3_data *cdata)
 	ret = cal_filp->f_op->read(cal_filp, (char *)&cdata->accel_cal_data,
 		3 * sizeof(s16), &cal_filp->f_pos);
 	if (ret != 3 * sizeof(s16)) {
+
+		cdata->accel_cal_data[0] = 0;
+		cdata->accel_cal_data[1] = 0;
+		cdata->accel_cal_data[2] = 0;
+
 		pr_err("%s: - Can't read the cal data\n", __func__);
 		ret = -EIO;
 	}
@@ -550,7 +554,7 @@ int st_lsm6ds3_gyro_open_calibration(struct lsm6ds3_data *cdata)
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
 
-	cal_filp = filp_open(GYRO_CALIBRATION_FILE_PATH, O_RDONLY, 0666);
+	cal_filp = filp_open(GYRO_CALIBRATION_FILE_PATH, O_RDONLY, 0);
 	if (IS_ERR(cal_filp)) {
 		set_fs(old_fs);
 		ret = PTR_ERR(cal_filp);
@@ -567,6 +571,11 @@ int st_lsm6ds3_gyro_open_calibration(struct lsm6ds3_data *cdata)
 	ret = cal_filp->f_op->read(cal_filp, (char *)&cdata->gyro_cal_data,
 		3 * sizeof(s16), &cal_filp->f_pos);
 	if (ret != 3 * sizeof(s16)) {
+
+		cdata->gyro_cal_data[0] = 0;
+		cdata->gyro_cal_data[1] = 0;
+		cdata->gyro_cal_data[2] = 0;
+
 		pr_err("%s: - Can't read the cal data\n", __func__);
 		ret = -EIO;
 	}
@@ -600,7 +609,7 @@ static int st_lsm6ds3_gyro_save_calibration(struct lsm6ds3_data *cdata,
 	set_fs(KERNEL_DS);
 
 	cal_filp = filp_open(GYRO_CALIBRATION_FILE_PATH,
-				O_CREAT | O_TRUNC | O_WRONLY, 0666);
+				O_CREAT | O_TRUNC | O_WRONLY, 0660);
 	if (IS_ERR(cal_filp)) {
 		set_fs(old_fs);
 		ret = PTR_ERR(cal_filp);
@@ -1180,12 +1189,23 @@ static int st_lsm6ds3_set_odr(struct lsm6ds3_sensor_data *sdata,
 	if (i == ST_LSM6DS3_ODR_LIST_NUM)
 		return -EINVAL;
 
+#if (LSM6DS3_HRTIMER_TRIGGER > 0)
+	if (sdata->c_odr == st_lsm6ds3_odr_table.odr_avl[i].hz)
+		goto exit;
+
+	if (sdata->hr_timer_en > 0)
+		hrtimer_cancel(&sdata->hr_timer);
+#endif
+
 	sdata->c_odr = st_lsm6ds3_odr_table.odr_avl[i].hz;
 	sdata->poll_delay = MSEC_PER_SEC / sdata->c_odr;
 
 #if (LSM6DS3_HRTIMER_TRIGGER > 0)
 	sdata->ktime = ktime_set(0, st_lsm6ds3_odr_table.odr_avl[i].ns);
 
+	if (sdata->hr_timer_en > 0)
+		hrtimer_start(&sdata->hr_timer, sdata->ktime, HRTIMER_MODE_REL);
+exit:
 	dev_info(sdata->cdata->dev, "%s (%d) hz = %d, ns = %lld\n",
 		__func__, sdata->sindex, sdata->c_odr, sdata->ktime.tv64);
 #else
@@ -3115,7 +3135,7 @@ static int st_acc_do_calibrate(struct lsm6ds3_data *cdata, int enable)
 	set_fs(KERNEL_DS);
 
 	cal_filp = filp_open(CALIBRATION_FILE_PATH,
-		O_CREAT | O_TRUNC | O_WRONLY, S_IRUGO | S_IWUSR | S_IWGRP);
+		O_CREAT | O_TRUNC | O_WRONLY, 0660);
 	if (IS_ERR(cal_filp)) {
 		pr_err("%s - Can't open calibration file\n", __func__);
 		set_fs(old_fs);

@@ -319,9 +319,10 @@
 		dmas = <&adma 5 &adma 6>;
 		dma-names = "tx", "rx";
 		interrupts = <0 67 0>;
-		pinctrl-names = "default", "idle";
+		pinctrl-names = "default", "idle", "lpm";
 		pinctrl-0 = <&uart_aud_bus>;
 		pinctrl-1 = <&uart_aud_bus_idle>;
+		pinctrl-2 = <&uart_aud_bus_lpm>;
 		clocks = <&clock 4156>, <&clock 2004>;
 		clock-names = "sclk_uart3", "gate_uart3";
 		samsung,lpass-subip;
@@ -1411,6 +1412,7 @@
 		clock-names = "usbhost";
 		usb-phy = <&usb2_phy>;
 		status = "ok";
+		l2-retention = <1>;
 	};
 
 	usb2_phy: usb2phy@15530000 {

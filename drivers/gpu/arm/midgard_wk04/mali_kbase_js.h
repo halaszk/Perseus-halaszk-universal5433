@@ -473,7 +473,12 @@ void kbasep_js_try_run_next_job_nolock(kbase_device *kbdev);
  * be used internally.
  *
  */
-void kbasep_js_try_schedule_head_ctx(kbase_device *kbdev);
+/**
+ * MALI_SEC_INTEGRATION
+ * To check the exceptional case such as dying context or full context,
+ * make the return value to notify the result to the caller.
+ */
+int kbasep_js_try_schedule_head_ctx(kbase_device *kbdev);
 
 /**
  * @brief Schedule in a privileged context

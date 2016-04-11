@@ -36,6 +36,7 @@
 			realtek,in4-differential = "true";
 
 			realtek,push_button_range_def = <0xa324>;
+			realtek,push_button_range_def_factory = <0xc324>;
 			vdd-io-supply = <&ldo18_reg>;
 			vdd-micio-supply = <&ldo40_reg>;
 

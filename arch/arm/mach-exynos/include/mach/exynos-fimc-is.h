@@ -292,6 +292,9 @@ struct exynos_platform_fimc_is {
 #endif /* CONFIG_OIS_USE */
 	bool use_ois_hsi2c;
 	bool use_module_check;
+#ifdef CONFIG_CAMERA_VARIABLE_MIPI_LANES
+	u32 vtcam_mipi_lane_num;
+#endif
 	bool skip_cal_loading;
 #ifdef CONFIG_CAMERA_SYSFS_V2
 	int total_camera_num;

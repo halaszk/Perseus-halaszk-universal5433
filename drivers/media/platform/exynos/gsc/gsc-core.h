@@ -399,6 +399,8 @@ struct gsc_output_device {
 	unsigned long long	isr_time[MAX_DEBUG_BUF_CNT];
 	unsigned long long	src_time[MAX_DEBUG_BUF_CNT];
 	unsigned long long	dst_time[MAX_DEBUG_BUF_CNT];
+	unsigned long long	enable_time;
+	unsigned long long	disable_time;
 
 	u32			q_cnt;
 	u32			dq_cnt;
@@ -598,6 +600,7 @@ struct gsc_dev {
 	void __iomem			*sysreg_disp;
 	void __iomem			*sysreg_gscl;
 	struct timer_list		op_timer;
+	unsigned long long		pending_isr_time;
 };
 
 /**

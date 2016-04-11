@@ -135,11 +135,7 @@ static int exynos_dm_hotplug_disabled(void)
 {
 	return dm_hotplug_disable;
 }
-#ifdef CONFIG_ARGOS
-void exynos_dm_hotplug_enable(void)
-#else
 static void exynos_dm_hotplug_enable(void)
-#endif
 {
 	mutex_lock(&dm_hotplug_lock);
 	if (!exynos_dm_hotplug_disabled()) {
@@ -153,11 +149,8 @@ static void exynos_dm_hotplug_enable(void)
 		disable_dm_hotplug_before_suspend--;
 	mutex_unlock(&dm_hotplug_lock);
 }
-#ifdef CONFIG_ARGOS
-void exynos_dm_hotplug_disable(void)
-#else
+
 static void exynos_dm_hotplug_disable(void)
-#endif
 {
 	mutex_lock(&dm_hotplug_lock);
 	dm_hotplug_disable++;
@@ -165,6 +158,23 @@ static void exynos_dm_hotplug_disable(void)
 		disable_dm_hotplug_before_suspend++;
 	mutex_unlock(&dm_hotplug_lock);
 }
+
+#ifdef CONFIG_ARGOS
+void argos_dm_hotplug_enable(void)
+{
+	exynos_dm_hotplug_enable();
+#if defined(CONFIG_SCHED_HMP)
+	if (big_hotpluged)
+		dynamic_hotplug(CMD_BIG_OUT);
+#endif
+}
+void argos_dm_hotplug_disable(void)
+{
+	if (!dynamic_hotplug(CMD_NORMAL))
+			prev_cmd = CMD_NORMAL;
+	exynos_dm_hotplug_disable();
+}
+#endif
 
 #ifdef CONFIG_PM
 static ssize_t show_enable_dm_hotplug(struct kobject *kobj,

@@ -678,9 +678,7 @@ void show_exynos_pmu(void)
 
 int __init exynos5430_pmu_init(void)
 {
-	unsigned int tmp;
-	int ret;
-
+	unsigned int tmp, ret;
 	/*
 	 * Set measure power on/off duration
 	 * Use SC_USE_FEEDBACK

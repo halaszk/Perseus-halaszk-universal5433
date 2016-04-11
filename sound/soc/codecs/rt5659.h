@@ -1157,13 +1157,13 @@
 #define RT5659_I2S_BP_SFT			8
 #define RT5659_I2S_BP_NOR			(0x0 << 8)
 #define RT5659_I2S_BP_INV			(0x1 << 8)
-#define RT5659_I2S_DL_MASK			(0x3 << 2)
-#define RT5659_I2S_DL_SFT			2
-#define RT5659_I2S_DL_16			(0x0 << 2)
-#define RT5659_I2S_DL_20			(0x1 << 2)
-#define RT5659_I2S_DL_24			(0x2 << 2)
-#define RT5659_I2S_DL_8				(0x3 << 2)
-#define RT5659_I2S_DF_MASK			(0x3)
+#define RT5659_I2S_DL_MASK			(0x3 << 4)
+#define RT5659_I2S_DL_SFT			4
+#define RT5659_I2S_DL_16			(0x0 << 4)
+#define RT5659_I2S_DL_20			(0x1 << 4)
+#define RT5659_I2S_DL_24			(0x2 << 4)
+#define RT5659_I2S_DL_8				(0x3 << 4)
+#define RT5659_I2S_DF_MASK			(0x7)
 #define RT5659_I2S_DF_SFT			0
 #define RT5659_I2S_DF_I2S			(0x0)
 #define RT5659_I2S_DF_LEFT			(0x1)
@@ -1764,20 +1764,33 @@ struct rt5659_pll_code {
 	int k_code;
 };
 
+struct rt5659_cal_data {
+	unsigned short hp_cal_l[0x20];
+	unsigned short hp_cal_r[0x20];
+	unsigned short mono_cal[0xd];
+};
+
+#define CODEC_EFS_CLASS_NAME	"audio"
+#define CODEC_EFS_DEV_NAME		"codec"
+#define CAL_DATA_EFS			"/efs/.rt5659_cal.dat"
+#define EFS_CAL_BUF_SIZE		200
+
 struct rt5659_priv {
 	struct snd_soc_codec *codec;
 	struct rt5659_platform_data pdata;
 	struct regmap *regmap;
 	struct i2c_client *i2c;
 	struct delayed_work i2s_switch_slave_work[RT5659_AIFS];
+	struct delayed_work calibrate_work;
+	wait_queue_head_t waitqueue_cal;
+	struct mutex calibrate_mutex;
 
-	int aif_pu;	
+	int aif_pu;
 	int sysclk;
 	int sysclk_src;
 	int lrck[RT5659_AIFS];
 	int bclk[RT5659_AIFS];
 	int master[RT5659_AIFS];
-	int v_id;
 
 	int pll_src;
 	int pll_in;
@@ -1788,7 +1801,8 @@ struct rt5659_priv {
 	int jack_type;
 	int dmic_en;
 	bool do_impedance_sensing;
-	bool dac1_en;
+	bool dac1_en, dac2_en;
+	bool hp_en, rcv_en, sto_adc_en, mono_adcl_en, mono_adcr_en;
 	unsigned int impedance_value;
 
 	unsigned int adb_reg_addr[0x100];

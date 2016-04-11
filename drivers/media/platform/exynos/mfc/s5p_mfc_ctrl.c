@@ -455,8 +455,10 @@ int mfc_init_hw(struct s5p_mfc_dev *dev, enum mfc_buf_usage_type buf_type)
 			s5p_mfc_clock_off(dev);
 			dev->curr_ctx_drm = curr_ctx_backup;
 			s5p_mfc_clock_on_with_base(dev, MFCBUF_NORMAL);
-		} else if (buf_type == MFCBUF_NORMAL && curr_ctx_backup) {
-			s5p_mfc_init_memctrl(dev, MFCBUF_DRM);
+		} else if (buf_type == MFCBUF_NORMAL) {
+			s5p_mfc_clock_off(dev);
+			dev->curr_ctx_drm = 1;
+			s5p_mfc_clock_on_with_base(dev, MFCBUF_DRM);
 		}
 	}
 #endif
@@ -474,6 +476,10 @@ int s5p_mfc_init_hw(struct s5p_mfc_dev *dev)
 {
 	int ret;
 
+/*
+ * mfc_init_hw(NORMAL) has to be called in advance of mfc_init_hw(DRM).
+ * Because the base address is changed to DRM in the end of mfc_init_hw(NORMAL).
+ */
 	ret = mfc_init_hw(dev, MFCBUF_NORMAL);
 	if (ret)
 		return ret;
@@ -577,6 +583,7 @@ err_mfc_sleep:
 		}
 	}
 
+
 	mfc_debug_leave();
 
 	return ret;
@@ -584,7 +591,7 @@ err_mfc_sleep:
 
 int s5p_mfc_wakeup(struct s5p_mfc_dev *dev)
 {
-	enum mfc_buf_usage_type buf_type;	
+	enum mfc_buf_usage_type buf_type;
 	int ret;
 
 	mfc_debug_enter();

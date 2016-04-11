@@ -292,4 +292,12 @@ config CMA_AREAS
 
 endif
 
+config MULTITHREAD_PROBE
+	bool "Multi-threaded probe (EXPERIMENTAL)"
+	default n
+	help
+	  A new kernel thread will be created when the probe() function for the
+	  driver is called, if the multithread_probe bit is set in the driver
+	  saying it can support this kind of operation.
+
 endmenu

@@ -1,4 +1,3 @@
-comment "Samsung Mobile Modem Driver (SVNET2) V1 for Memory-type Interface"
 menuconfig SEC_MODEM_V1
 	bool "Samsung Mobile Modem Driver (SVNET2) V1 for Memory-type Interface"
 	default n
@@ -125,7 +124,6 @@ config UMTS_MODEM_SS333
 	select LINK_DEVICE_SPI
 	select LINK_DEVICE_LLI
 	select LINK_POWER_MANAGEMENT_WITH_FSM
-	select LINK_CONTROL_MSG_COMMAND
 
 config SEC_MODEM_XMM7260_CAT6
 	bool "IMC XMM7260 modem"

@@ -51,6 +51,7 @@
 
 #include <asm/uaccess.h>
 
+#include <mach/exynos-ss.h>
 #include <trace/events/timer.h>
 #include <linux/sec_debug.h>
 
@@ -1276,8 +1277,10 @@ static void __run_hrtimer(struct hrtimer *timer, ktime_t *now)
 	 */
 	raw_spin_unlock(&cpu_base->lock);
 	trace_hrtimer_expire_entry(timer, now);
+	exynos_ss_hrtimer(timer, &now->tv64, fn, ESS_FLAG_IN);
 	sec_debug_timer_log(1111, (void *)fn);
 	restart = fn(timer);
+	exynos_ss_hrtimer(timer, &now->tv64, fn, ESS_FLAG_OUT);
 	sec_debug_timer_log(2222, (void *)fn);
 	trace_hrtimer_expire_exit(timer);
 	raw_spin_lock(&cpu_base->lock);

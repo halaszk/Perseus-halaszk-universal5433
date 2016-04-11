@@ -171,7 +171,3 @@ obj-$(CONFIG_MOBICORE_DRIVER)   += gud/
 obj-$(CONFIG_SENSORS_FINGERPRINT)	+= fingerprint/
 obj-$(CONFIG_SENSORS_SSP)		+= sensorhub/
 obj-$(CONFIG_SENSORS_CORE)	+= sensors/
-
-# SecFilter Driver
-obj-$(CONFIG_SEC_NET_FILTER)	+= secfilter/
-

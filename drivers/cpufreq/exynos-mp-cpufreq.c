@@ -993,7 +993,11 @@ static int exynos_cpufreq_pm_notifier(struct notifier_block *notifier,
 
 		volt = max(get_boot_volt(CA15),
 				get_freq_volt(CA15, freqCA15));
-		BUG_ON(volt <= 0);
+		if ( volt <= 0) {
+			printk("oops, strange voltage CA15 -> boot volt:%d, get_freq_volt:%d, freqCA15:%d \n",
+				get_boot_volt(CA15), get_freq_volt(CA15, freqCA15), freqCA15);
+			BUG_ON(volt <= 0);
+		}
 		volt = get_limit_voltage(volt);
 
 		set_abb_first_than_volt = false;

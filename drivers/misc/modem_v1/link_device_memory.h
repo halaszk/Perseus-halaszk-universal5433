@@ -281,6 +281,11 @@ enum mem_ipc_mode {
 };
 #endif
 
+#ifdef CONFIG_LINK_POWER_MANAGEMENT
+#define	REFCNT_SBD	0x01
+#define	REFCNT_IOSM	0x02
+#endif
+
 /**
 @brief		the structure for a memory-type link device
 */
@@ -383,12 +388,6 @@ struct mem_link_device {
 	void (*debug_info)(void);
 	void (*cmd_handler)(struct mem_link_device *mld, u16 cmd);
 
-#ifdef DEBUG_MODEM_IF
-	/* for logging MEMORY dump */
-	struct work_struct dump_work;
-	char dump_path[MIF_MAX_PATH_LEN];
-#endif
-
 #ifdef CONFIG_LINK_POWER_MANAGEMENT
 #ifdef CONFIG_LINK_POWER_MANAGEMENT_WITH_FSM
 	unsigned int gpio_ap_wakeup;		/* CP-to-AP wakeup GPIO */
@@ -421,10 +420,13 @@ struct mem_link_device {
 	unsigned int gpio_ipc_int2cp;		/* AP-to-CP send signal GPIO */
 	spinlock_t sig_lock;
 
+	wait_queue_head_t wq;
+
 	void (*start_pm)(struct mem_link_device *mld);
 	void (*stop_pm)(struct mem_link_device *mld);
-	void (*forbid_cp_sleep)(struct mem_link_device *mld);
-	void (*permit_cp_sleep)(struct mem_link_device *mld);
+	void (*forbid_cp_sleep)(struct mem_link_device *mld, int flag);
+	bool (*forbid_cp_sleep_wait)(struct mem_link_device *mld, int flag);
+	void (*permit_cp_sleep)(struct mem_link_device *mld, int flag);
 	bool (*link_active)(struct mem_link_device *mld);
 #endif
 
@@ -1003,6 +1005,7 @@ void print_res_ack(struct mem_link_device *mld, struct mem_snapshot *mst,
 void print_mem_snapshot(struct mem_link_device *mld, struct mem_snapshot *mst);
 void print_dev_snapshot(struct mem_link_device *mld, struct mem_snapshot *mst,
 			struct mem_ipc_device *dev);
+
 /**
 @}
 */

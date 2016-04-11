@@ -51,7 +51,7 @@ struct sec_jack_platform_data {
 	bool	send_end_active_high;
 	struct qpnp_vadc_chip		*vadc_dev;
 	struct sec_jack_zone jack_zones[4];
-	struct sec_jack_buttons_zone jack_buttons_zones[3];
+	struct sec_jack_buttons_zone jack_buttons_zones[4];
 	struct pinctrl *jack_pinctrl;
 };
 

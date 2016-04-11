@@ -1,11 +1,6 @@
 #
 #
 #
-menuconfig VIBETONZ
-	tristate "Vibetonz"
-	help
-	  Say Y to enable Vibetonz support.
-
 config MOTOR_DRV_MAX77804
 	tristate "Maxim MAX77804 motor"
 	default n
@@ -100,8 +95,3 @@ config MOTOR_BLDC
 	  If you say yes here you will get support for the
 	  BLDC Vibrator.
 
-config HAPTIC
-	tristate "Immersion TouchSense"
-	default n
-	help
-	  Say Y to enable Immersion TouchSense.

@@ -33,6 +33,8 @@
 #include <linux/delay.h>
 #include <linux/sec_sysfs.h>
 
+#define MAX_INTENSITY		10000
+
 struct isa1000a_vibrator_data {
     struct device* dev;
 	struct isa1000a_vibrator_platform_data *pdata;
@@ -42,10 +44,12 @@ struct isa1000a_vibrator_data {
 #endif
 	struct timed_output_dev tout_dev;
 	struct hrtimer timer;
-	unsigned int timeout;
 	struct work_struct work;
 	spinlock_t lock;
 	bool running;
+	u32 intensity;
+	u32 timeout;
+	int duty;
 };
 
 static struct device *motor_dev;
@@ -65,6 +69,53 @@ static int haptic_get_time(struct timed_output_dev *tout_dev)
 	} else
 		return 0;
 }
+
+static ssize_t intensity_store(struct device *dev,
+	struct device_attribute *devattr, const char *buf, size_t count)
+{
+	struct timed_output_dev *tdev = dev_get_drvdata(dev);
+	struct isa1000a_vibrator_data *drvdata
+		= container_of(tdev, struct isa1000a_vibrator_data, tout_dev);
+	int duty = drvdata->pdata->period >> 1;
+	int intensity = 0, ret = 0;
+
+	ret = kstrtoint(buf, 0, &intensity);
+
+	if (intensity < 0 || MAX_INTENSITY < intensity) {
+		pr_err("out of rage\n");
+		return -EINVAL;
+	}
+
+	if (MAX_INTENSITY == intensity)
+		duty = drvdata->pdata->duty;
+	else if (0 != intensity) {
+		long long tmp = drvdata->pdata->duty >> 1;
+
+		do_div(intensity, 100);
+		tmp *= intensity;
+		do_div(tmp, 100);
+		duty += (int)tmp;
+	}
+
+	drvdata->intensity = intensity;
+	drvdata->duty = duty;
+
+	pwm_config(drvdata->pwm, duty, drvdata->pdata->period);
+
+	return count;
+}
+
+static ssize_t intensity_show(struct device *dev,
+			struct device_attribute *attr, char *buf)
+{
+	struct timed_output_dev *tdev = dev_get_drvdata(dev);
+	struct isa1000a_vibrator_data *drvdata
+		= container_of(tdev, struct isa1000a_vibrator_data, tout_dev);
+
+	return sprintf(buf, "intensity: %u\n", drvdata->intensity);
+}
+
+static DEVICE_ATTR(intensity, 0660, intensity_show, intensity_store);
 
 static void haptic_enable(struct timed_output_dev *tout_dev, int value)
 {
@@ -101,45 +152,6 @@ static enum hrtimer_restart haptic_timer_func(struct hrtimer *timer)
 	return HRTIMER_NORESTART;
 }
 
-static int vibetonz_clk_on(struct device *dev, bool en)
-{
-	struct clk *vibetonz_clk = NULL;
-#if defined(CONFIG_OF)
-	struct device_node *np;
-	np = of_find_node_by_name(NULL,"pwm");
-	if (np == NULL) {
-		pr_err("[VIB] %s : pwm error to get dt node\n", __func__);
-		return -EINVAL;
-	}
-	vibetonz_clk = of_clk_get_by_name(np, "gate_timers");
-	if (!vibetonz_clk) {
-		pr_err("[VIB] %s : fail to get the vibetonz_clk\n", __func__);
-		return -EINVAL;
-	}
-#else
-	vibetonz_clk = clk_get(dev, "timers");
-#endif
-	pr_info("[VIB] %s : DEV NAME %s %lu\n", __func__,
-		 dev_name(dev), clk_get_rate(vibetonz_clk));
-
-	if (IS_ERR(vibetonz_clk)) {
-		pr_err("[VIB] %s : failed to get clock for the motor\n", __func__);
-		goto err_clk_get;
-	}
-
-	if (en)
-		clk_enable(vibetonz_clk);
-	else
-		clk_disable(vibetonz_clk);
-
-	clk_put(vibetonz_clk);
-	return 0;
-
-err_clk_get:
-	clk_put(vibetonz_clk);
-	return -EINVAL;
-}
-
 static void haptic_work(struct work_struct *work)
 {
 	struct isa1000a_vibrator_data *hap_data
@@ -161,7 +173,7 @@ static void haptic_work(struct work_struct *work)
 	} else {
 		if (hap_data->running)
 			return;
-		pwm_config(hap_data->pwm, hap_data->pdata->duty,
+		pwm_config(hap_data->pwm, hap_data->duty,
 			   hap_data->pdata->period);
 		pwm_enable(hap_data->pwm);
 #ifndef CONFIG_SKIP_MOTOR_REGULATOR_CONTROL
@@ -180,79 +192,6 @@ error_reg_enable :
 	pr_err("[VIB] %s : Failed to enable vdd.\n", __func__);
 #endif
 }
-
-#ifdef CONFIG_VIBETONZ
-void vibtonz_en(bool en)
-{
-#ifndef CONFIG_SKIP_MOTOR_REGULATOR_CONTROL
-	int ret;
-#endif
-	pr_info("[VIB] %s %s\n", __func__, en ? "on" : "off");
-
-	if (g_hap_data == NULL) {
-		pr_err("[VIB] %s : the motor is not ready!!!", __func__);
-		return ;
-	}
-	if (en) {
-		if (g_hap_data->running)
-			return;
-
-		pwm_config(g_hap_data->pwm, prev_duty, g_hap_data->pdata->period);
-		pwm_enable(g_hap_data->pwm);
-#ifndef CONFIG_SKIP_MOTOR_REGULATOR_CONTROL
-		ret = regulator_enable(g_hap_data->regulator);
-		if (ret)
-			goto error_reg_enable;
-#endif
-#ifdef CONFIG_MOTOR_DRV_ISA1000A_WITH_MOTOR_EN
-		gpio_set_value(g_hap_data->pdata->en, 1);
-#endif
-		g_hap_data->running = true;
-	} else {
-		if (!g_hap_data->running)
-			return;
-#ifdef CONFIG_MOTOR_DRV_ISA1000A_WITH_MOTOR_EN
-		gpio_set_value(g_hap_data->pdata->en, 0);
-#endif
-#ifndef CONFIG_SKIP_MOTOR_REGULATOR_CONTROL
-		regulator_disable(g_hap_data->regulator);
-#endif
-		pwm_disable(g_hap_data->pwm);
-		g_hap_data->running = false;
-	}
-	return;
-#ifndef CONFIG_SKIP_MOTOR_REGULATOR_CONTROL
-error_reg_enable :
-	pr_err("[VIB] %s: Failed to enable vdd.\n", __func__);
-#endif
-}
-EXPORT_SYMBOL(vibtonz_en);
-
-void vibtonz_pwm(int nForce)
-{
-	int pwm_period = 0, pwm_duty = 0;
-
-	if (g_hap_data == NULL) {
-		pr_err("[VIB] %s : the motor is not ready!!!", __func__);
-		return ;
-	}
-
-	pwm_period = g_hap_data->pdata->period;
-	pwm_duty = pwm_period / 2 + ((pwm_period / 2 - 2) * nForce) / 127;
-
-	if (pwm_duty > g_hap_data->pdata->duty)
-		pwm_duty = g_hap_data->pdata->duty;
-	else if (pwm_period - pwm_duty > g_hap_data->pdata->duty)
-		pwm_duty = pwm_period - g_hap_data->pdata->duty;
-
-	/* add to avoid the glitch issue */
-	if (prev_duty != pwm_duty) {
-		prev_duty = pwm_duty;
-		pwm_config(g_hap_data->pwm, pwm_duty, pwm_period);
-	}
-}
-EXPORT_SYMBOL(vibtonz_pwm);
-#endif
 
 #if defined(CONFIG_OF)
 static int of_isa1000a_vibrator_dt(struct isa1000a_vibrator_platform_data *pdata)
@@ -469,7 +408,6 @@ static int isa1000a_vibrator_probe(struct platform_device *pdev)
 	pwm_config(hap_data->pwm, hap_data->pdata->period / 2, hap_data->pdata->period);
 	prev_duty = hap_data->pdata->period / 2;
 
-	vibetonz_clk_on(&pdev->dev, true);
 #ifndef CONFIG_SKIP_MOTOR_REGULATOR_CONTROL
 	hap_data->regulator
 			= regulator_get(NULL, hap_data->pdata->regulator_name);
@@ -483,6 +421,7 @@ static int isa1000a_vibrator_probe(struct platform_device *pdev)
 	/* hrtimer init */
 	hrtimer_init(&hap_data->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	hap_data->timer.function = haptic_timer_func;
+	hap_data->duty = 8000;
 
 	/* timed_output_dev init*/
 	hap_data->tout_dev.name = "vibrator";
@@ -509,6 +448,13 @@ static int isa1000a_vibrator_probe(struct platform_device *pdev)
 	if (error < 0) {
 		pr_err("[VIB] %s : Failed to register timed_output : %d\n", __func__, error);
 		error = -EFAULT;
+		goto err_timed_output_register;
+	}
+
+	error = sysfs_create_file(&hap_data->tout_dev.dev->kobj,
+				&dev_attr_intensity.attr);
+	if (error < 0) {
+		pr_err("[VIB] %s : Failed to register sysfs : %d\n", __func__, error);
 		goto err_timed_output_register;
 	}
 
@@ -562,14 +508,13 @@ static int isa1000a_vibrator_suspend(struct platform_device *pdev,
 		cancel_work_sync(&g_hap_data->work);
 		hrtimer_cancel(&g_hap_data->timer);
 	}
-	vibetonz_clk_on(&pdev->dev, false);
+
 	return 0;
 }
 
 static int isa1000a_vibrator_resume(struct platform_device *pdev)
 {
 	pr_info("[VIB] %s\n", __func__);
-	vibetonz_clk_on(&pdev->dev, true);
 	return 0;
 }
 

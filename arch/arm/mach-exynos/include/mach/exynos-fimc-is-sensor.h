@@ -202,6 +202,9 @@ struct sensor_open_extended {
 	struct sensor_protocol from_con;
 	struct sensor_companion companion_con;
 	struct sensor_protocol ois_con;
+#ifdef CONFIG_CAMERA_VARIABLE_MIPI_LANES
+	struct sensor_protocol reserved[4];
+#endif
 
 	u32 mclk;
 	u32 mipi_lane_num;

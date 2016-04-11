@@ -188,7 +188,7 @@ static void update_host_wake_locked(int host_wake)
 		 * The chipset deasserts the hostwake lock, when there is no
 		 * more data to send.
 		 */
-		pr_err("[BT] update_host_wake_locked host_wake is deasserted. release wakelock in 1s\n");
+		pr_info("[BT] update_host_wake_locked host_wake is deasserted. release wakelock in 1s\n");
 		wake_lock_timeout(&bt_lpm.host_wake_lock, HZ/2);
 	}
 }

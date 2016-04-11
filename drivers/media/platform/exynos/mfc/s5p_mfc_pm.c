@@ -191,67 +191,6 @@ int s5p_mfc_set_clock_parent(struct s5p_mfc_dev *dev)
 	return 0;
 }
 
-#ifdef CONFIG_MFC_USE_BUS_DEVFREQ
-
-/* int_div_lock is only needed for EXYNOS5410 */
-#ifdef CONFIG_ARM_EXYNOS5410_BUS_DEVFREQ
-extern spinlock_t int_div_lock;
-#endif
-
-static int s5p_mfc_clock_set_rate(struct s5p_mfc_dev *dev, unsigned long rate)
-{
-	struct clk *clk_child = NULL;
-
-#if defined(CONFIG_SOC_EXYNOS5430)
-	if (dev->id == 0) {
-		clk_child = clk_get(dev->device, "dout_aclk_mfc0_333");
-		if (IS_ERR(clk_child)) {
-			pr_err("failed to get %s clock\n", __clk_get_name(clk_child));
-			return PTR_ERR(clk_child);
-		}
-
-	} else if (dev->id == 1) {
-		clk_child = clk_get(dev->device, "dout_aclk_mfc1_333");
-		if (IS_ERR(clk_child)) {
-			pr_err("failed to get %s clock\n", __clk_get_name(clk_child));
-			return PTR_ERR(clk_child);
-		}
-	}
-#elif defined(CONFIG_SOC_EXYNOS5422)
-	clk_child = clk_get(dev->device, "dout_aclk_333");
-	if (IS_ERR(clk_child)) {
-		pr_err("failed to get %s clock\n", __clk_get_name(clk_child));
-		return PTR_ERR(clk_child);
-	}
-#elif defined(CONFIG_SOC_EXYNOS5433)
-	/* Do not set clock rate */
-	return 0;
-
-	/*
-	clk_child = clk_get(dev->device, "dout_aclk_mfc_400");
-	if (IS_ERR(clk_child)) {
-		pr_err("failed to get %s clock\n", __clk_get_name(clk_child));
-		return PTR_ERR(clk_child);
-	}
-	*/
-#endif
-
-#ifdef CONFIG_ARM_EXYNOS5410_BUS_DEVFREQ
-	spin_lock(&int_div_lock);
-#endif
-	if(clk_child)
-		clk_set_rate(clk_child, rate * 1000);
-
-#ifdef CONFIG_ARM_EXYNOS5410_BUS_DEVFREQ
-	spin_unlock(&int_div_lock);
-#endif
-
-	if(clk_child)
-		clk_put(clk_child);
-
-	return 0;
-}
-#endif
 #endif
 
 void s5p_mfc_final_pm(struct s5p_mfc_dev *dev)
@@ -268,13 +207,7 @@ int s5p_mfc_clock_on(struct s5p_mfc_dev *dev)
 	unsigned long flags;
 
 	dev->pm.clock_on_steps = 1;
-#ifdef CONFIG_MFC_USE_BUS_DEVFREQ
 	MFC_TRACE_DEV("++ clock_on: Set clock rate(%d)\n", dev->curr_rate);
-	mutex_lock(&dev->curr_rate_lock);
-	s5p_mfc_clock_set_rate(dev, dev->curr_rate);
-	mutex_unlock(&dev->curr_rate_lock);
-#endif
-	dev->pm.clock_on_steps |= 0x1 << 1;
 	ret = clk_enable(dev->pm.clock);
 	if (ret < 0)
 		return ret;
@@ -282,13 +215,13 @@ int s5p_mfc_clock_on(struct s5p_mfc_dev *dev)
 	if (dev->pm.base_type != MFCBUF_INVALID)
 		s5p_mfc_init_memctrl(dev, dev->pm.base_type);
 
-	dev->pm.clock_on_steps |= 0x1 << 2;
+	dev->pm.clock_on_steps |= 0x1 << 1;
 	if (dev->curr_ctx_drm && dev->is_support_smc) {
 		spin_lock_irqsave(&dev->pm.clklock, flags);
 		mfc_debug(3, "Begin: enable protection\n");
 		ret = exynos_smc(SMC_PROTECTION_SET, 0,
 					dev->id, SMC_PROTECTION_ENABLE);
-		dev->pm.clock_on_steps |= 0x1 << 3;
+		dev->pm.clock_on_steps |= 0x1 << 2;
 		if (!ret) {
 			printk("Protection Enable failed! ret(%u)\n", ret);
 			spin_unlock_irqrestore(&dev->pm.clklock, flags);
@@ -300,13 +233,13 @@ int s5p_mfc_clock_on(struct s5p_mfc_dev *dev)
 	} else {
 		ret = s5p_mfc_mem_resume(dev->alloc_ctx[0]);
 		if (ret < 0) {
-			dev->pm.clock_on_steps |= 0x1 << 4;
+			dev->pm.clock_on_steps |= 0x1 << 3;
 			clk_disable(dev->pm.clock);
 			return ret;
 		}
 	}
 
-	dev->pm.clock_on_steps |= 0x1 << 5;
+	dev->pm.clock_on_steps |= 0x1 << 4;
 	if (IS_MFCV6(dev)) {
 		spin_lock_irqsave(&dev->pm.clklock, flags);
 		if ((atomic_inc_return(&dev->clk_ref) == 1) &&
@@ -320,7 +253,7 @@ int s5p_mfc_clock_on(struct s5p_mfc_dev *dev)
 		atomic_inc_return(&dev->clk_ref);
 	}
 
-	dev->pm.clock_on_steps |= 0x1 << 6;
+	dev->pm.clock_on_steps |= 0x1 << 5;
 	state = atomic_read(&dev->clk_ref);
 	mfc_debug(2, "+ %d\n", state);
 	MFC_TRACE_DEV("-- clock_on : ref state(%d)\n", state);

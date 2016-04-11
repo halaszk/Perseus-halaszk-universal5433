@@ -343,6 +343,14 @@ u32 cal_get_volt(u32 id, s32 level)
 	if (lock_volt > volt)
 		volt = lock_volt;
 
+#if defined(CONFIG_EXYNOS5433_ASV_NEON_WORKAROUND)
+	// Atlas 900 / 800 / 700 Mhz + 25mv		
+	if (id == SYSC_DVFS_EGL &&
+		(SYSC_DVFS_L16 <= idx && idx <= SYSC_DVFS_L18)) {
+		volt += 25000;
+	}
+#endif
+		
 	return volt;
 }
 

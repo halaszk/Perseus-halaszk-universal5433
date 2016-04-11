@@ -470,6 +470,17 @@ struct exynos_platform_fimc_is *fimc_is_parse_dt(struct device *dev)
 		err("use_module_check not use(%d)", pdata->use_module_check);
 	}
 
+#ifdef CONFIG_CAMERA_VARIABLE_MIPI_LANES
+	if (of_find_property(np, "vtcam_mipi_lane_num", NULL)) {
+		retVal = of_property_read_u32(np, "vtcam_mipi_lane_num", &pdata->vtcam_mipi_lane_num);
+		if (retVal) {
+			err("vtcam_mipi_lane_num read is fail(%d)", retVal);
+			pdata->vtcam_mipi_lane_num = 0;
+		}
+		info("vtcam_mipi_lane_num (%d)", pdata->vtcam_mipi_lane_num);
+	}
+#endif
+
 	pdata->skip_cal_loading = of_property_read_bool(np, "skip_cal_loading");
 	if (!pdata->skip_cal_loading) {
 		info("skip_cal_loading not use(%d)", pdata->skip_cal_loading);

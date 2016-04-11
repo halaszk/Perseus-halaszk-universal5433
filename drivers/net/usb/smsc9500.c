@@ -114,13 +114,13 @@ u32 mac_addr_lo32=0xFFFFFFFFUL;
 #endif
 MODULE_PARM_DESC(mac_addr_lo32,"Specifies the low 32 bits of the mac address");
 
-u32 phy_addr=0xFFFFFFFFUL;
+u32 smsc_phy_addr=0xFFFFFFFFUL;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0))
-	module_param(phy_addr, uint, 0);
+	module_param(smsc_phy_addr, uint, 0);
 #else
-	MODULE_PARM(phy_addr,"i");
+	MODULE_PARM(smsc_phy_addr,"i");
 #endif
-MODULE_PARM_DESC(phy_addr,"phy_addr, only valid if it is external phy set by strap; 0-31=external phy with specified address, else autodetect external phy addr");
+MODULE_PARM_DESC(smsc_phy_addr,"phy_addr, only valid if it is external phy set by strap; 0-31=external phy with specified address, else autodetect external phy addr");
 
 bool scatter_gather=FALSE;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0))
@@ -612,13 +612,13 @@ DONE:
 	up(&adapterData->eeprom_mutex);
 	return ret;
 
-} 
+}
 
 static int smsc9500_write_eeprom(struct usbnet *dev,  u32 dwOffset, u32 dwLength,  BYTE* pbValue)
 {
 	int i, retries = 10;
 	u32 dwValue;
-	
+
 	for (i = 0; i < retries; i++) {
 		if (smsc9500_do_write_eeprom(dev, dwOffset, dwLength, pbValue) == SMSC9500_SUCCESS)
 			return SMSC9500_SUCCESS;
@@ -629,7 +629,7 @@ static int smsc9500_write_eeprom(struct usbnet *dev,  u32 dwOffset, u32 dwLength
 	return SMSC9500_FAIL;
 }
 
-static int IsDataPortReady(struct usbnet *dev) 
+static int IsDataPortReady(struct usbnet *dev)
 {
 	int ret = FALSE;
 	int count = 0;
@@ -680,10 +680,10 @@ static int ReadDataPort(struct usbnet *dev, int ramSel, u32 startAddr, u32 lengt
 	CHECK_RETURN_STATUS(smsc9500_read_reg(dev, DP_SEL, &dwValue));
 	dwValue &= ~DP_SEL_RSEL;
 	switch(ramSel){
-		case RAMSEL_FCT: 	dwValue |= DP_SEL_RSEL_FCT; break;
-		case RAMSEL_EEPROM: dwValue |= DP_SEL_RSEL_EEPROM; break;
-		case RAMSEL_TXTLI: 	dwValue |= DP_SEL_RSEL_TXTLI; break;
-		case RAMSEL_RXTLI: 	dwValue |= DP_SEL_RSEL_RXTLI; break;
+		case RAMSEL_FCT:	dwValue |= DP_SEL_RSEL_FCT; break;
+		case RAMSEL_EEPROM:	dwValue |= DP_SEL_RSEL_EEPROM; break;
+		case RAMSEL_TXTLI:	dwValue |= DP_SEL_RSEL_TXTLI; break;
+		case RAMSEL_RXTLI:	dwValue |= DP_SEL_RSEL_RXTLI; break;
 	}
 	dwValue |= DP_SEL_TESTEN;
 	CHECK_RETURN_STATUS(smsc9500_write_reg(dev, DP_SEL, dwValue));
@@ -805,12 +805,12 @@ static int smsc9500_get_stats(struct usbnet *dev, char *data)
 	}
 
 	if(dev->chipDependFeatures[FEATURE_EEE]){
-		RxStatSize = sizeof(SMSC9500_RX_STATS);	
-		TxStatSize = sizeof(SMSC9500_TX_STATS);	
+		RxStatSize = sizeof(SMSC9500_RX_STATS);
+		TxStatSize = sizeof(SMSC9500_TX_STATS);
 	}else{
 		/* 20h for RX statistics. 28h for TX statistics */
-		RxStatSize = sizeof(SMSC9500_RX_STATS) - 8;	
-		TxStatSize = sizeof(SMSC9500_TX_STATS) - 8;	
+		RxStatSize = sizeof(SMSC9500_RX_STATS) - 8;
+		TxStatSize = sizeof(SMSC9500_TX_STATS) - 8;
 	}
 
 	do{
@@ -879,24 +879,22 @@ Return Value:
 {
 	PADAPTER_DATA pAdapter = (PADAPTER_DATA)(dev->data[0]);
 	u32 * pValue32=(u32 *)pStats;
-    	pSMSC9500_RX_STATS   pRxStats;
-    	pSMSC9500_TX_STATS   pTxStats;
+	pSMSC9500_RX_STATS   pRxStats;
+	pSMSC9500_TX_STATS   pTxStats;
 	int i=0;
 
-   
-    
    for (i=0; i<((sizeof(SMSC9500_RX_STATS)+sizeof(SMSC9500_RX_STATS))/4);i++){
-   		le32_to_cpus((u32*)&pValue32[i]);
+		le32_to_cpus((u32*)&pValue32[i]);
 		if ((i != 0)|| (i != 8) || (i != 9) || (i != 10) || (i != 20) || (i != 21))
 			pValue32[i] &= 0xFFFFF; //This counter has 20 bits.
-   	}
+	}
 
 	pRxStats = (pSMSC9500_RX_STATS) pStats;
 	pTxStats = (pSMSC9500_TX_STATS) (pStats + sizeof(SMSC9500_RX_STATS));
-	
+
     if(dev->chipDependFeatures[FEATURE_NEWSTATIS_CNT])
     {
-        // Good Tx (32Bit Counter)       
+        // Good Tx (32Bit Counter)
         if (pTxStats->TxGoodFrames >= pAdapter->tx_statistics.TxGoodFrames)
             pAdapter->TxGoodFrames += (u64)(pTxStats->TxGoodFrames - pAdapter->tx_statistics.TxGoodFrames);
         else
@@ -904,7 +902,7 @@ Return Value:
 
         pAdapter->tx_statistics.TxGoodFrames = pTxStats->TxGoodFrames;
 
-        // Tx Excess Collisions (20Bit Counter)       
+        // Tx Excess Collisions (20Bit Counter)
         if (pTxStats->TxExcessiveCollisionErrors >= pAdapter->tx_statistics.TxExcessiveCollisionErrors)
             pAdapter->TxExcessiveCollisionErrors += (pTxStats->TxExcessiveCollisionErrors - pAdapter->tx_statistics.TxExcessiveCollisionErrors);
         else
@@ -912,7 +910,7 @@ Return Value:
 
         pAdapter->tx_statistics.TxExcessiveCollisionErrors = pTxStats->TxExcessiveCollisionErrors;
 
-        // Tx Late Collisions (20Bit Counter)        
+        // Tx Late Collisions (20Bit Counter)
         if (pTxStats->TxLateCollisionErrors >= pAdapter->tx_statistics.TxLateCollisionErrors)
             pAdapter->TxLateCollisionErrors += (pTxStats->TxLateCollisionErrors - pAdapter->tx_statistics.TxLateCollisionErrors);
         else
@@ -920,7 +918,7 @@ Return Value:
 
         pAdapter->tx_statistics.TxLateCollisionErrors = pTxStats->TxLateCollisionErrors;
 
-        // Tx Underrun (20Bit Counter)       
+        // Tx Underrun (20Bit Counter)
         if (pTxStats->TxBufferUnderrunErrors >= pAdapter->tx_statistics.TxBufferUnderrunErrors)
             pAdapter->TxBufferUnderrunErrors += (pTxStats->TxBufferUnderrunErrors - pAdapter->tx_statistics.TxBufferUnderrunErrors);
         else
@@ -928,7 +926,7 @@ Return Value:
 
         pAdapter->tx_statistics.TxBufferUnderrunErrors = pTxStats->TxBufferUnderrunErrors;
 
-        // Tx Carrier Errors (20Bit Counter)        
+        // Tx Carrier Errors (20Bit Counter)
         if (pTxStats->TxCarrierErrors >= pAdapter->tx_statistics.TxCarrierErrors)
             pAdapter->TxCarrierErrors += (pTxStats->TxCarrierErrors - pAdapter->tx_statistics.TxCarrierErrors);
         else
@@ -936,7 +934,7 @@ Return Value:
 
         pAdapter->tx_statistics.TxCarrierErrors = pTxStats->TxCarrierErrors;
 
-        // Tx Single Collision (20Bit Counter)       
+        // Tx Single Collision (20Bit Counter)
         if (pTxStats->TxSingleCollisions >= pAdapter->tx_statistics.TxSingleCollisions)
             pAdapter->TxSingleCollisions += (pTxStats->TxSingleCollisions - pAdapter->tx_statistics.TxSingleCollisions);
         else
@@ -944,7 +942,7 @@ Return Value:
 
         pAdapter->tx_statistics.TxSingleCollisions = pTxStats->TxSingleCollisions;
 
-        // Tx Multiple Collision (20Bit Counter)        
+        // Tx Multiple Collision (20Bit Counter)
         if (pTxStats->TxMultipleCollisions >= pAdapter->tx_statistics.TxMultipleCollisions)
             pAdapter->TxMultipleCollisions += (pTxStats->TxMultipleCollisions - pAdapter->tx_statistics.TxMultipleCollisions);
         else
@@ -952,7 +950,7 @@ Return Value:
 
         pAdapter->tx_statistics.TxMultipleCollisions = pTxStats->TxMultipleCollisions;
 
-        // Tx Excessive Deferral (20Bit Counter)       
+        // Tx Excessive Deferral (20Bit Counter)
         if (pTxStats->TxExcessiveDeferralErrors >= pAdapter->tx_statistics.TxExcessiveDeferralErrors)
             pAdapter->TxExcessiveDeferralErrors += (pTxStats->TxExcessiveDeferralErrors - pAdapter->tx_statistics.TxExcessiveDeferralErrors);
         else
@@ -960,7 +958,7 @@ Return Value:
 
         pAdapter->tx_statistics.TxExcessiveDeferralErrors = pTxStats->TxExcessiveDeferralErrors;
 
-        // Tx Pause (20Bit Counter)       
+        // Tx Pause (20Bit Counter)
         if (pTxStats->TxPauseFrames >= pAdapter->tx_statistics.TxPauseFrames)
             pAdapter->TxPauseFrames += (pTxStats->TxPauseFrames - pAdapter->tx_statistics.TxPauseFrames);
         else
@@ -968,7 +966,7 @@ Return Value:
 
         pAdapter->tx_statistics.TxPauseFrames = pTxStats->TxPauseFrames;
 
-        // Tx Bad (20Bit Counter)       
+        // Tx Bad (20Bit Counter)
         if (pTxStats->TxBadFrames >= pAdapter->tx_statistics.TxBadFrames)
             pAdapter->TxBadFrames += (pTxStats->TxBadFrames - pAdapter->tx_statistics.TxBadFrames);
         else
@@ -976,7 +974,7 @@ Return Value:
 
         pAdapter->tx_statistics.TxPauseFrames = pTxStats->TxPauseFrames;
 
-        // Good Rx (32Bit Counter)       
+        // Good Rx (32Bit Counter)
         if (pRxStats->RxGoodFrames >= pAdapter->rx_statistics.RxGoodFrames)
             pAdapter->RxGoodFrames += (u64)(pRxStats->RxGoodFrames - pAdapter->rx_statistics.RxGoodFrames);
         else
@@ -984,7 +982,7 @@ Return Value:
 
         pAdapter->rx_statistics.RxGoodFrames = pRxStats->RxGoodFrames;
 
-        // Rx Crc (20Bit Counter)        
+        // Rx Crc (20Bit Counter)
         if (pRxStats->RxCrcErrors >= pAdapter->rx_statistics.RxCrcErrors)  
             pAdapter->RxCrcErrors += (pRxStats->RxCrcErrors - pAdapter->rx_statistics.RxCrcErrors);
         else
@@ -992,7 +990,7 @@ Return Value:
 
         pAdapter->rx_statistics.RxCrcErrors = pRxStats->RxCrcErrors;
 
-        // Rx Alignment (20Bit Counter)        
+        // Rx Alignment (20Bit Counter)
         if (pRxStats->RxAlignmentErrors >= pAdapter->rx_statistics.RxAlignmentErrors)
             pAdapter->RxAlignmentErrors += (pRxStats->RxAlignmentErrors - pAdapter->rx_statistics.RxAlignmentErrors);
         else
@@ -1000,7 +998,7 @@ Return Value:
 
         pAdapter->rx_statistics.RxAlignmentErrors = pRxStats->RxAlignmentErrors;
 
-        // Rx Resources (20Bit Counter)     
+        // Rx Resources (20Bit Counter)
         if (pRxStats->RxFifoDroppedFrames >= pAdapter->rx_statistics.RxFifoDroppedFrames)
             pAdapter->RxFifoDroppedFrames += (pRxStats->RxFifoDroppedFrames - pAdapter->rx_statistics.RxFifoDroppedFrames);
         else
@@ -1008,7 +1006,7 @@ Return Value:
 
         pAdapter->rx_statistics.RxFifoDroppedFrames = pRxStats->RxFifoDroppedFrames;
 
-        // Rx Runts (20Bit Counter)       
+        // Rx Runts (20Bit Counter)
         if (pRxStats->RxRuntFrameErrors >= pAdapter->rx_statistics.RxRuntFrameErrors)
             pAdapter->RxRuntFrameErrors += (pRxStats->RxRuntFrameErrors - pAdapter->rx_statistics.RxRuntFrameErrors);
         else
@@ -1016,7 +1014,7 @@ Return Value:
 
         pAdapter->rx_statistics.RxRuntFrameErrors = pRxStats->RxRuntFrameErrors;
 
-        // Rx TooLong (20Bit Counter)       
+        // Rx TooLong (20Bit Counter)
         if (pRxStats->RxFrameTooLongError >= pAdapter->rx_statistics.RxFrameTooLongError)
             pAdapter->RxFrameTooLongError += (pRxStats->RxFrameTooLongError - pAdapter->rx_statistics.RxFrameTooLongError);
         else
@@ -1213,9 +1211,9 @@ smsc9500_read_reg_async(struct usbnet *dev,   u32 index, void *data, int wait)
 	    expire = msecs_to_jiffies(USB_CTRL_SET_TIMEOUT);
 	    if (!wait_for_completion_timeout(&usb_context->notify, expire)) {
 
-	  		ret = ASYNC_RW_TIMEOUT;
-	  		SMSC_TRACE(DBG_WARNING,"urb timeout \n");
-	  		kfree(usb_context);
+			ret = ASYNC_RW_TIMEOUT;
+			SMSC_TRACE(DBG_WARNING,"urb timeout \n");
+			kfree(usb_context);
 	        usb_free_urb(urb);
 		return ASYNC_RW_FAIL;
 	    }
@@ -1317,18 +1315,18 @@ int NICStartRxPath(struct usbnet *dev)
 Routine Description:
 
     This function stops all activity on the Rx Path, both at the USB and Mac
-    
+
 Arguments:
 
     Adapter    - pointer to the MP_ADAPTER structure
-    
+
 Return value:
 
     VOID
 --*/
-{ 
+{
     u32 Value32;
-    int Status=-1;   
+    int Status=-1;
 
     // Enable the receiver at the Mac
     CHECK_RETURN_STATUS(smsc9500_read_reg(dev, MAC_CR, &Value32));
@@ -1347,41 +1345,38 @@ int NICStopRxPath(struct usbnet *dev)
 Routine Description:
 
     This function stops all activity on the Rx Path, both at the USB and Mac
-    
+
 Arguments:
 
     Adapter    - pointer to the MP_ADAPTER structure
-    
+
 Return value:
 
     VOID
 --*/
-{ 
+{
     u32 Value32,dwValue, Count = 0;
     int Status=-1;
 
-   
     // Clr the Rx Stop bit if not already
     dwValue=INT_STS_RX_STOP_;
     CHECK_RETURN_STATUS(smsc9500_write_reg(dev, INT_STS, dwValue));
-    
 
     // Disable the receiver at the Mac
     CHECK_RETURN_STATUS(smsc9500_read_reg(dev, MAC_CR, &Value32));
     Value32 &= (~MAC_CR_RXEN_);
 	CHECK_RETURN_STATUS(smsc9500_write_reg(dev, MAC_CR, Value32));
-   
 
-    // The Rx Stop bit should assert as soon as the packet "in flight" makes 
+    // The Rx Stop bit should assert as soon as the packet "in flight" makes
     // it into the Mac, worst case is 10 Mbps HD. This will be ~2ms tops
-    // Assuming one register read per (micro)frame the case of high speed USB 
-    // - 125us register read cycle time - is the worse and would need up to 
+    // Assuming one register read per (micro)frame the case of high speed USB
+    // - 125us register read cycle time - is the worse and would need up to
     // 16 reads. Let's just round up to 20.
-    do 
+    do
     {
         CHECK_RETURN_STATUS(smsc9500_read_reg(dev, INT_STS, &Value32));
         // Let it try to do the 20 reads even if the reg reads are failing
-        // If the previous write did go thru at least this way we have a better 
+        // If the previous write did go thru at least this way we have a better
         // chance of making sure the receiver did stop.
     }
     while ( (++Count<20) && ((Value32 & INT_STS_RX_STOP_) == 0) );
@@ -1399,27 +1394,26 @@ Routine Description:
 
     This function stops all activity on the Rx Path, both at the USB and Mac
     and then flushes the Receive Fifo.
-    
+
 Arguments:
 
     Adapter    - pointer to the MP_ADAPTER structure
-    
+
 Return value:
 
     VOID
 --*/
-{ 
+{
     int Status = -1;
     u32 Value32,dwValue;
 
     Status = NICStopRxPath(dev);
 
 	dwValue=RX_FIFO_FLUSH_;
-	 CHECK_RETURN_STATUS(smsc9500_write_reg(dev, RX_CFG, dwValue));
-    
+	CHECK_RETURN_STATUS(smsc9500_write_reg(dev, RX_CFG, dwValue));
+
     // Should self clear way before the read.
     CHECK_RETURN_STATUS(smsc9500_read_reg(dev, RX_CFG, &Value32));
-
     if (Value32 & RX_FIFO_FLUSH_)
     {
         // Flush did not self clear!
@@ -1431,7 +1425,6 @@ Return value:
 	}
 
 DONE:
-    
     return (Status);
 }
 
@@ -1484,7 +1477,7 @@ static int smsc9500_rx_setmulticastlist(struct usbnet *dev)
 
 	SMSC_TRACE(DBG_MCAST, "---------->in smsc9500_set_multicast\n");
 
-    	if(dev->net->flags & IFF_PROMISC) {
+	if(dev->net->flags & IFF_PROMISC) {
 		SMSC_TRACE(DBG_MCAST,"Promiscuous Mode Enabled");
 		adapterData->set_bits_mask = MAC_CR_PRMS_;
 		adapterData->clear_bits_mask = (MAC_CR_MCPAS_ | MAC_CR_HPFILT_);
@@ -1677,7 +1670,7 @@ static int Phy_GetLinkMode(struct usbnet *dev)
 					result = LINK_SPEED_100HD;
 				} else if ((WSpeedIndication & PHY_SPECIAL_SPD_)== PHY_SPECIAL_SPD_100FULL_) {
 					result = LINK_SPEED_100FD;
-				} 
+				}
 			}
 		} else {
 			if(wRegBcr & PHY_BCR_SPEED_SELECT_) {
@@ -1889,10 +1882,10 @@ static int Phy_CheckLink(void * ptr)
 {
 	struct usbnet		*dev = ptr;
 	char			statistics[sizeof(SMSC9500_RX_STATS) + sizeof(SMSC9500_TX_STATS)];
-    	int ret = SMSC9500_FAIL;
-        u32 dwValue;
+	int ret = SMSC9500_FAIL;
+	u32 dwValue;
 
-        BUG_ON(!dev);
+	BUG_ON(!dev);
 	SMSC_TRACE(DBG_LINK,"-------->in Phy_CheckLink");
 
 	if(Phy_UpdateLinkMode(dev) < 0)return ret;
@@ -1975,7 +1968,6 @@ static int phy_SetLink(struct usbnet *dev, u32 dwLinkRequest)
 		dwValue=(u32)(wTemp) &0x0000FFFFUL;
 		CHECK_RETURN_STATUS(smsc9500_write_phy(dev,PHY_BCR, dwValue));
 	} else {
-	
 		/* Automdix fix when force mode */
 		if (adapterData->internalPhy == TRUE) {
 			if ((auto_mdix >= AMDIX_ENABLE) && (dev->chipDependFeatures[FEATURE_MDIX_MODE] == TRUE)) {
@@ -2141,7 +2133,7 @@ static BOOLEAN Phy_Initialize(
 		CHECK_RETURN_STATUS(smsc9500_read_phy(dev, PHY_SILICON_REV, &dwTemp));
 		CHECK_RETURN_STATUS(smsc9500_write_phy(dev, PHY_SILICON_REV, (dwTemp & 0x03FF) | EDPDConfig));
 	}
-	
+
 	if (((dev->chipID == PID_LAN9730) ||
 		(dev->chipID == PID_LAN9735) ||
 		(dev->chipID == PID_LAN9530) ||
@@ -2149,21 +2141,21 @@ static BOOLEAN Phy_Initialize(
 		(dev->chipID == PID_LAN89530)) && (EnableEEE < 2))
 	{
 
-		CHECK_RETURN_STATUS(smsc9500_read_reg(dev,MAC_CR,&Value32));					
+		CHECK_RETURN_STATUS(smsc9500_read_reg(dev,MAC_CR,&Value32));
 		CHECK_RETURN_STATUS(smsc9500_read_phy(dev, PHY_SILICON_REV, &Temp32));
 		CHECK_RETURN_STATUS(smsc9500_read_phy(dev, PHY_ANEG_ADV, &dwTemp));
-		
-		if (EnableEEE==0) {	 
-			Value32 &= ~MAC_CR_ENABLE_EEE;    
-			Temp32 &= ~PHY_SILICON_REV_EEE_ENABLE;		   
+
+		if (EnableEEE==0) {
+			Value32 &= ~MAC_CR_ENABLE_EEE;
+			Temp32 &= ~PHY_SILICON_REV_EEE_ENABLE;
 			dwTemp &= ~PHY_ANEG_NEXT_PAGE;
 		} else if (EnableEEE==1) {
-			Value32 |= MAC_CR_ENABLE_EEE;		  
-			Temp32 |= PHY_SILICON_REV_EEE_ENABLE;		
+			Value32 |= MAC_CR_ENABLE_EEE;
+			Temp32 |= PHY_SILICON_REV_EEE_ENABLE;
 			dwTemp |= PHY_ANEG_NEXT_PAGE;
 		}
-		CHECK_RETURN_STATUS(smsc9500_write_phy(dev,PHY_ANEG_ADV, dwTemp));					
-		CHECK_RETURN_STATUS(smsc9500_write_phy(dev, PHY_SILICON_REV, Temp32));					
+		CHECK_RETURN_STATUS(smsc9500_write_phy(dev,PHY_ANEG_ADV, dwTemp));
+		CHECK_RETURN_STATUS(smsc9500_write_phy(dev, PHY_SILICON_REV, Temp32));
 		CHECK_RETURN_STATUS(smsc9500_write_reg(dev, MAC_CR, Value32)) ;
 	}
 
@@ -2212,8 +2204,6 @@ static int smsc9500_get_settings(struct net_device *net, struct ethtool_cmd *cmd
 			cmd->transceiver=XCVR_INTERNAL;
 			cmd->maxtxpkt=0;
 			cmd->maxrxpkt=0;
-
-
 			return 0;
 
 }
@@ -2262,7 +2252,6 @@ static int smsc9500_set_settings(struct net_device *net, struct ethtool_cmd *cmd
 		}
 	}
 
-	
 	linkRequest |= adapterData->dwLinkSettings  & (LINK_SYMMETRIC_PAUSE | LINK_ASYMMETRIC_PAUSE); //Keep flow control setting
 	adapterData->dwLinkSettings = linkRequest;
 	adapterData->dwSavedLinkSettings = linkRequest;
@@ -2273,12 +2262,6 @@ static int smsc9500_set_settings(struct net_device *net, struct ethtool_cmd *cmd
 
 	return result;
 }
-
-
-
-
-
-
 
 void smsc9500_get_drvinfo (struct net_device *net, struct ethtool_drvinfo *info)
 {
@@ -2327,7 +2310,7 @@ smsc9500_get_regs(struct net_device *net, struct ethtool_regs *regs,
 }
 
 
-int smsc9500_nway_restart (struct usbnet *dev)
+int smsc9500_nway_restart(struct usbnet *dev)
 {
 	uint bmcr;
 	int r = -EINVAL;
@@ -2347,9 +2330,7 @@ int smsc9500_nway_restart (struct usbnet *dev)
 int smsc9500_nway_reset(struct net_device *net)
 {
 	struct usbnet *dev = netdev_priv(net);
-
 	return smsc9500_nway_restart(dev);
-	
 }
 
 static u32 smsc9500_get_link (struct net_device *net)
@@ -2416,7 +2397,7 @@ static BOOLEAN IsEepromContentValid(struct usbnet *dev)
 	PADAPTER_DATA  adapterData=(PADAPTER_DATA)(dev->data[0]);
 
 	CHECK_RETURN_STATUS(smsc9500_read_reg(dev, ID_REV, &idRev));
-	idRev = idRev >> 16;	
+	idRev = idRev >> 16;
 
 	if((idRev == ID_REV_9500_CHIPID) || (idRev == ID_REV_9500A_CHIPID)) {
 		CHECK_RETURN_STATUS(smsc9500_read_reg(dev, STRAP_DBG, &strapVal));
@@ -2436,7 +2417,7 @@ static BOOLEAN IsEepromContentValid(struct usbnet *dev)
 		validContent = FALSE;
 	}
 DONE:
-	adapterData->eepromContentValid = validContent;	
+	adapterData->eepromContentValid = validContent;
 	return validContent;
 
 }
@@ -2452,7 +2433,7 @@ static int smsc9500_eeprom_size(struct usbnet *dev)
 	PADAPTER_DATA  adapterData=(PADAPTER_DATA)(dev->data[0]);
 
 	CHECK_RETURN_STATUS(smsc9500_read_reg(dev, ID_REV, &idRev));
-	idRev = idRev >> 16;	
+	idRev = idRev >> 16;
 
 	if((idRev == ID_REV_9500_CHIPID) || (idRev == ID_REV_9500A_CHIPID)) {
 		CHECK_RETURN_STATUS(smsc9500_read_reg(dev, STRAP_DBG, &strapVal));
@@ -2464,7 +2445,7 @@ static int smsc9500_eeprom_size(struct usbnet *dev)
 		} else if (!(strapVal & EEPROM_SIZE)) {
 			size = 128;
 			goto CheckValid;
-		} 
+		}
 	}
 
 	if(smsc9500_read_eeprom(dev, 0, sizeof(u32), (BYTE*)&start) < 0) {
@@ -2507,7 +2488,7 @@ CheckValid:
 		validContent = FALSE;
 	}
 DONE:
-	adapterData->eepromContentValid = validContent;	
+	adapterData->eepromContentValid = validContent;
 	return size;
 
 }
@@ -2657,17 +2638,15 @@ static int smsc9500_ethtool_set_rx_csum(struct net_device *netdev, u32 val)
 
 static void smsc9500_get_ethtool_stats(struct net_device *netdev,struct ethtool_stats *stats, u64 *data)
 {
-	
 	struct usbnet *dev = netdev_priv(netdev);
 	PADAPTER_DATA  adapterData=(PADAPTER_DATA)(dev->data[0]);
 	char			statistics[sizeof(SMSC9500_RX_STATS) + sizeof(SMSC9500_TX_STATS)];
-	
-	
+
 	//Get statistics counters
 	if(smsc9500_get_stats(dev, statistics) > 0){
 		UpdateStatCounters(dev,statistics);
 	}
-		
+
 	data[0]=dev->stats.rx_packets;
 	data[1]=dev->stats.tx_packets;
 	data[2]=dev->stats.rx_bytes;
@@ -2697,7 +2676,7 @@ static void smsc9500_get_ethtool_stats(struct net_device *netdev,struct ethtool_
 	data[26]=adapterData->TxBufferUnderrunErrors;
 	data[27]=adapterData->TxExcessiveDeferralErrors;
 	data[28]=adapterData->TxCarrierErrors;
-	data[29]=adapterData->TxBadFrames;	
+	data[29]=adapterData->TxBadFrames;
 }
 
 static void smsc9500_get_strings(struct net_device *netdev, u32 stringset,u8 *data)
@@ -2705,8 +2684,8 @@ static void smsc9500_get_strings(struct net_device *netdev, u32 stringset,u8 *da
 	memcpy(data, ethtool_stats_keys, sizeof(ethtool_stats_keys));
 }
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24))
-static int smsc9500_get_sset_count(struct net_device *netdev) 
-{	
+static int smsc9500_get_sset_count(struct net_device *netdev)
+{
 	return ARRAY_SIZE(ethtool_stats_keys);
 }
 #else
@@ -2738,7 +2717,7 @@ static struct ethtool_ops smsc9500_ethtool_ops = {
 	.get_msglevel		= smsc9500_get_msglevel,
 	.set_msglevel		= smsc9500_set_msglevel,
 	.nway_reset         = smsc9500_nway_reset,
-	.get_link		    = smsc9500_get_link,	
+	.get_link		    = smsc9500_get_link,
 	.get_eeprom_len		= smsc9500_get_eeprom_len,
 	.get_eeprom		    = smsc9500_get_eeprom,
 	.set_eeprom		    = smsc9500_set_eeprom,
@@ -3008,23 +2987,23 @@ PHY_ACCESS_FAILURE:
         break;
     case COMMAND_SET_EEPROM_BUFFER:
     {
-	unsigned int len;
-	BYTE * dataBuf;
+		unsigned int len;
+		BYTE * dataBuf;
 
-        offset = ioctlData->Data[0];
-	len = ioctlData->Data[1];
-	dataBuf = (BYTE *)&ioctlData->Data[2];
-	privateData->eepromSize = smsc9500_eeprom_size(dev);
-        if(offset < privateData->eepromSize) {
-            if(smsc9500_write_eeprom(dev, offset, len, dataBuf) >= 0){
-                success=TRUE;
-            } 
-        } else {
-            SMSC_WARNING("Writing EEPROM Failed");
-            if(!(offset < privateData->eepromSize)) {
-                SMSC_WARNING("  Invalid eeprom offset == 0x%d",offset);
-            }
-        }
+		offset = ioctlData->Data[0];
+		len = ioctlData->Data[1];
+		dataBuf = (BYTE *)&ioctlData->Data[2];
+		privateData->eepromSize = smsc9500_eeprom_size(dev);
+		if(offset < privateData->eepromSize) {
+			if(smsc9500_write_eeprom(dev, offset, len, dataBuf) >= 0){
+				success=TRUE;
+			}
+		} else {
+			SMSC_WARNING("Writing EEPROM Failed");
+			if(!(offset < privateData->eepromSize)) {
+				SMSC_WARNING("  Invalid eeprom offset == 0x%d",offset);
+			}
+		}
     }
         break;
 
@@ -3081,7 +3060,6 @@ PHY_ACCESS_FAILURE:
 			}
 		};break;
 	case COMMAND_GET_MAC_ADDRESS:
-
 		if(privateData->LanInitialized) {
 			CHECK_RETURN_STATUS(smsc9500_read_reg(dev, ADDRH, &dwBuf));
             ioctlData->Data[0] = dwBuf;
@@ -3102,9 +3080,7 @@ PHY_ACCESS_FAILURE:
 
 			if((((dwHigh16 & 0xFFFF) == 0x0UL) && (dwLow32 == 0x0UL))
 				|| (0x01 & LOBYTE(LOWORD(dwLow32)))) {
-				
 					SMSC_WARNING("Not a Valid MAC Address");
-					
 			} else {
 					CHECK_RETURN_STATUS(smsc9500_write_reg(dev, ADDRH, dwHigh16));
 					CHECK_RETURN_STATUS(smsc9500_write_reg(dev, ADDRL, dwLow32));
@@ -3117,7 +3093,7 @@ PHY_ACCESS_FAILURE:
 					dev->net->dev_addr[5]=HIBYTE(LOWORD(dwHigh16));
 
 					success=TRUE;
-			} 
+			}
 		} else {
 			SMSC_WARNING("Lan Not Initialized,");
 			SMSC_WARNING("Use ifconfig to bring interface UP");
@@ -3139,7 +3115,7 @@ PHY_ACCESS_FAILURE:
 				}
 			} else {
 				SMSC_WARNING("EEPROM contents not valid");
-			}	
+			}
 		} else {
 			SMSC_WARNING("Lan Not Initialized");
 			SMSC_WARNING("Use ifconfig to bring interface UP");
@@ -3277,8 +3253,15 @@ static int smsc9500_eth_mac_addr(struct net_device *netdev, void *p)
 
 	return 0;
 }
-//#endif 
+//#endif
 
+/*
+direction is 1 - Output config
+direction is 0 - Input config
+pull is 1 - push pull
+pull is 0 - open drain
+*/
+#ifdef CONFIG_USB_NOTIFY_LAYER
 static int smsc9500_gpio_init(struct usbnet * dev, int gpio, int direction, int pull)
 {
 	u32 gpio_cfg;
@@ -3294,6 +3277,12 @@ static int smsc9500_gpio_init(struct usbnet * dev, int gpio, int direction, int 
 	if (!direction) {
 		gpio_cfg &=~(GPIO_CFG_GPO0_TYPE << (gpio-3));
 		gpio_cfg &=~(GPIO_CFG_GPO0_DIR_ << (gpio-3));
+	} else {
+		if (pull)
+			gpio_cfg |= (GPIO_CFG_GPO0_TYPE << (gpio-3));
+		else
+			gpio_cfg &=~(GPIO_CFG_GPO0_TYPE << (gpio-3));
+		gpio_cfg |= (GPIO_CFG_GPO0_DIR_ << (gpio-3));
 	}
 
 	if((ret = smsc9500_write_reg(dev, GPIO_CFG, gpio_cfg)) < 0) {
@@ -3321,7 +3310,6 @@ static int smsc9500_gpio_get(struct usbnet * dev, int gpio)
 	return ret;
 }
 
-#ifdef CONFIG_USB_HOST_NOTIFY
 int smsc9500_ovc_gpio_check(void *data)
 {
 	struct usbnet *dev = (struct usbnet *)data;
@@ -3333,14 +3321,14 @@ int smsc9500_ovc_gpio_check(void *data)
 		ret = HNOTIFY_HIGH;
 	else if (gpio == 0)
 		ret = HNOTIFY_LOW;
-	else if (gpio < 0)
+	else
 		ret = HNOTIFY_INITIAL;
 	return ret;
 }
 #endif
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,29))
-static const struct net_device_ops smsc95xx_netdev_ops = 
+static const struct net_device_ops smsc95xx_netdev_ops =
 {
         .ndo_open               = smscusbnet_open,
         .ndo_stop               = smscusbnet_stop,
@@ -3496,8 +3484,7 @@ static int smsc9500_bind(struct usbnet *dev, struct usb_interface *intf)
 		if(dev->dynamicSuspend || dev->linkDownSuspend){
 		dev->dynamicSuspend = dev->linkDownSuspend = 0;
 		}
-	} 
-	
+	}
 #ifndef CONFIG_PM
 	if(dev->dynamicSuspend || dev->linkDownSuspend){
 		SMSC_WARNING("Power management has to be enabled in the kernel configuration to support dynamicsuspend and linkdownsuspend");
@@ -3571,11 +3558,11 @@ static int smsc9500_bind(struct usbnet *dev, struct usb_interface *intf)
 	netif_carrier_off(dev->net);
 	if (dynamicsuspend || linkdownsuspend)
 		usb_enable_autosuspend(dev->udev);
-	
+
 #ifdef CONFIG_USB_NOTIFY_LAYER
 	register_ovc_func(smsc9500_ovc_gpio_check, dev);
 	send_otg_notify(o_notify, NOTIFY_EVENT_SMSC_OVC, 1);
-#endif	
+#endif
 
 	SMSC_TRACE(DBG_INIT,"<--------out of bind, return 0\n");
 	return 0;
@@ -3597,10 +3584,9 @@ static void smsc9500_unbind(struct usbnet *dev, struct usb_interface *intf)
 #endif
 	PADAPTER_DATA  adapterData=(PADAPTER_DATA)(dev->data[0]);
 	SMSC_TRACE(DBG_CLOSE,"------->in smsc9500_unbind\n");
-	
 #ifdef CONFIG_USB_NOTIFY_LAYER
 	send_otg_notify(o_notify, NOTIFY_EVENT_SMSC_OVC, 0);
-#endif	
+#endif
 
 	if (adapterData != NULL){
 		SMSC_TRACE(DBG_CLOSE,"free adapterData\n");
@@ -3719,21 +3705,25 @@ static int smsc9500_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
 //If we allocate a big skb buffer, but only part of buffer hold valid data like turbo mode did,
 //Kernel accumulate received data with skb->truesize, so total received data might be over limit. But
 //actual data size isn't, then kernel may drop the subsequent packets.
-			if(TurboMode){
-				ax_skb = alloc_skb (skb->len + NET_IP_ALIGN, GFP_ATOMIC);
-	            skb_reserve (ax_skb, NET_IP_ALIGN);
-	            skb_put(ax_skb, skb->len);
-	            memcpy(ax_skb->data, skb->data, skb->len);
-
-				vlan_tag = (u16*)&ax_skb->cb[0];
-				*vlan_tag = VLAN_DUMMY; //Reserved value
-	            smscusbnet_skb_return(dev, ax_skb);
-	            ret = RX_FIXUP_INVALID_SKB;
-			}else{
-				ret = RX_FIXUP_VALID_SKB;
-				vlan_tag = (u16*)&skb->cb[0];
-				*vlan_tag = VLAN_DUMMY; //Reserved value
+		if(TurboMode){
+			ax_skb = alloc_skb (skb->len + NET_IP_ALIGN, GFP_ATOMIC);
+			if (!ax_skb) {
+				SMSC_TRACE(DBG_RX,"no ax_skb\n");
+				return RX_FIXUP_ERROR;
 			}
+			skb_reserve (ax_skb, NET_IP_ALIGN);
+			skb_put(ax_skb, skb->len);
+			memcpy(ax_skb->data, skb->data, skb->len);
+
+			vlan_tag = (u16*)&ax_skb->cb[0];
+			*vlan_tag = VLAN_DUMMY; //Reserved value
+			smscusbnet_skb_return(dev, ax_skb);
+			ret = RX_FIXUP_INVALID_SKB;
+		}else{
+			ret = RX_FIXUP_VALID_SKB;
+			vlan_tag = (u16*)&skb->cb[0];
+			*vlan_tag = VLAN_DUMMY; //Reserved value
+		}
 #else
 //FIXME: We are not supposed to change truesize, but this is the easy way to cheat kernel without memory copy
 			skb->truesize = skb->len + sizeof(struct sk_buff);
@@ -3744,7 +3734,7 @@ static int smsc9500_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
 		}
 
 
-		if (size > (ETH_FRAME_LEN+12)) {    			//  ETH_FRAME_LEN+4(CRC)+2(COE)+4(Vlan)
+		if (size > (ETH_FRAME_LEN+12)) {	// ETH_FRAME_LEN+4(CRC)+2(COE)+4(Vlan)
 			SMSC_TRACE(DBG_RX,"size > (ETH_FRAME_LEN+12), hearder=  0x%08x\n", header);
 			return RX_FIXUP_ERROR;
 		}
@@ -3752,8 +3742,12 @@ static int smsc9500_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
 #ifndef RX_SKB_COPY
                ax_skb = skb_clone(skb, GFP_ATOMIC);
 #else
-			ax_skb = alloc_skb (size + NET_IP_ALIGN, GFP_ATOMIC);
-            skb_reserve (ax_skb, NET_IP_ALIGN);
+		ax_skb = alloc_skb (size + NET_IP_ALIGN, GFP_ATOMIC);
+		if (!ax_skb) {
+			SMSC_TRACE(DBG_RX,"no ax_skb\n");
+			return RX_FIXUP_ERROR;
+		}
+               skb_reserve (ax_skb, NET_IP_ALIGN);
 #endif
      if (ax_skb) {
 #ifndef RX_SKB_COPY
@@ -3867,7 +3861,7 @@ static struct sk_buff *smsc9500_tx_fixup(struct usbnet *dev, struct sk_buff *skb
 
 		#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19))
 
-	 		if (skb->ip_summed == CHECKSUM_HW)
+			if (skb->ip_summed == CHECKSUM_HW)
 			{
 			int Chsum_start_offset=0;
 			CalculateTxChecksumOffset(
@@ -3937,7 +3931,7 @@ static struct sk_buff *smsc9500_tx_fixup(struct usbnet *dev, struct sk_buff *skb
 					AlignmentSize = skb->len % STATUS_WORD_LEN;
 					if(AlignmentSize)AlignmentSize = STATUS_WORD_LEN - AlignmentSize;
 					if (tx_skb_clone && (!skb_cloned(skb))
-	   					 && ((headroom + tailroom) >= (12 + AlignmentSize))) {
+						&& ((headroom + tailroom) >= (12 + AlignmentSize))) {
 						if( (headroom < 12 ) || (tailroom < AlignmentSize) ){
 							skb->data = memmove(skb->head +12, skb->data, skb->len);
 							SkbSize = skb->len;
@@ -3955,8 +3949,8 @@ static struct sk_buff *smsc9500_tx_fixup(struct usbnet *dev, struct sk_buff *skb
 							return NULL;
 					}
 
-	        		skb_push(skb, STATUS_WORD_LEN);
-	        		memcpy(skb->data, &dwTxCsumPreamble, STATUS_WORD_LEN);
+					skb_push(skb, STATUS_WORD_LEN);
+					memcpy(skb->data, &dwTxCsumPreamble, STATUS_WORD_LEN);
 
 					skb_push(skb, STATUS_WORD_LEN);
 					TxCommandB=(u32)(skb->len-STATUS_WORD_LEN)|TX_CMD_B_CSUM_ENABLE;
@@ -3982,7 +3976,6 @@ static struct sk_buff *smsc9500_tx_fixup(struct usbnet *dev, struct sk_buff *skb
 
 					skb_put(skb2, SkbSize);
 
-
 					{
 
 						TxCommandA=TX_CMD_A_FIRST_SEG_ |((u32)sizeof(u32));
@@ -3993,15 +3986,15 @@ static struct sk_buff *smsc9500_tx_fixup(struct usbnet *dev, struct sk_buff *skb
 
 						memcpy(skb2->data, &TxCommandA, STATUS_WORD_LEN);
 						memcpy(skb2->data+STATUS_WORD_LEN, &TxCommandB, STATUS_WORD_LEN);
-	         				memcpy(skb2->data+8, &dwTxCsumPreamble, STATUS_WORD_LEN);
-	      				 }
+						memcpy(skb2->data+8, &dwTxCsumPreamble, STATUS_WORD_LEN);
+					}
 
 					{
 
 
 						TxCommandA =
 							((((unsigned long)(skb->data))&0x03UL)<<16) | //u32 alignment adjustment
-					  		  ((u32)((skb->len)-(skb->data_len)));
+							((u32)((skb->len)-(skb->data_len)));
 						TxCommandB=
 							((u32)(skb->len+STATUS_WORD_LEN));
 						cpu_to_le32s((u32*)&TxCommandA);
@@ -4023,11 +4016,9 @@ static struct sk_buff *smsc9500_tx_fixup(struct usbnet *dev, struct sk_buff *skb
 
 						void *frag_addr = (void *)skb_frag_address(frag);
 #endif
-
-
 						TxCommandA=
 							((((unsigned long)(frag_addr))&0x03UL)<<16) | //alignment adjustment
-				 			 ((u32)(frag->size));
+							((u32)(frag->size));
 
 
 						if (i==(skbFragCnt-1)){
@@ -4072,7 +4063,7 @@ static struct sk_buff *smsc9500_tx_fixup(struct usbnet *dev, struct sk_buff *skb
 
 						TxCommandA =((((unsigned long)(skb->data))&0x03UL)<<16) | //u32 alignment adjustment
 										TX_CMD_A_FIRST_SEG_ |
-					  		  			(u32)((skb->len)-(skb->data_len));
+										(u32)((skb->len)-(skb->data_len));
 
 						TxCommandB=TX_CMD_B_CSUM_ENABLE |((u32)(skb->len));
 						cpu_to_le32s((u32*)&TxCommandA);
@@ -4100,7 +4091,7 @@ static struct sk_buff *smsc9500_tx_fixup(struct usbnet *dev, struct sk_buff *skb
 
 						TxCommandA=
 							((((unsigned long)(frag_addr))&0x03UL)<<16) | //u32 alignment adjustment
-				 			 ((u32)(frag->size));
+							((u32)(frag->size));
 
 
 						if (i==(skbFragCnt-1)){
@@ -4465,8 +4456,8 @@ static int smsc9500_reset(struct usbnet *dev)
 
 	/* Set TX COE */
 	if(adapterData->UseTxCsum)
- 	{
- 		if ((ret = smsc9500_read_reg(dev,	COE_CR,&dwReadBuf)< 0)) {
+	{
+		if ((ret = smsc9500_read_reg(dev,	COE_CR,&dwReadBuf)< 0)) {
 			SMSC_WARNING("Failed to read COE_CR: %d", ret);
 			return ret;
 		}
@@ -4511,7 +4502,7 @@ static int smsc9500_reset(struct usbnet *dev)
 
 	/* Set Vlan */
 	 {
-	 	dwWriteBuf=(u32)ETH_P_8021Q;
+		dwWriteBuf=(u32)ETH_P_8021Q;
 		if ((ret = smsc9500_write_reg(dev,VLAN1, dwWriteBuf)< 0)) {
 			SMSC_WARNING("Failed to write VAN1: %d", ret);
 			return ret;
@@ -4722,9 +4713,9 @@ static int smsc9500_reset(struct usbnet *dev)
 	smsc9500_rx_setmulticastlist(dev);
 
 	adapterData->dwSavedLinkSettings = link_mode;
-	if (!Phy_Initialize(dev, phy_addr, link_mode))
+	if (!Phy_Initialize(dev, smsc_phy_addr, link_mode))
 		return SMSC9500_FAIL;
-#ifdef CONFIG_USB_HOST_NOTIFY
+#ifdef CONFIG_USB_NOTIFY_LAYER
 	smsc9500_gpio_init(dev, 3, 0, 0);
 #endif
 	SMSC_TRACE(DBG_INIT,"<--------out of smsc9500_reset, return 0\n");
@@ -4856,7 +4847,7 @@ Return Value:
     int ret = SMSC9500_FAIL;
     int Count = 0;
 
-  	SMSC_TRACE(DBG_RX,"--> smsc9500_stopRxPath\n");
+	SMSC_TRACE(DBG_RX,"--> smsc9500_stopRxPath\n");
 
    // Clr the Rx Stop bit if not already
     CHECK_RETURN_STATUS(smsc9500_write_reg(dev, INT_STS, INT_STS_RX_STOP_));
@@ -4941,12 +4932,12 @@ static int EepromLessPMESetting(struct usbnet *dev)
 	int ret;
 
 		//API for customer to provide MAC address
-/*		
+/*
 		GetMacAddr(&dev->net->dev_addr);
-				
+
 			   dwAddrL = dev->net->dev_addr[0] | dev->net->dev_addr[1] << 8 | dev->net->dev_addr[2] << 16 | dev->net->dev_addr[3] << 24;
 			   dwAddrH = dev->net->dev_addr[4] | dev->net->dev_addr[5] << 8;
-			
+
 				if ((ret = smsc9500_write_reg(dev,ADDRL, dwAddrL)< 0)) {
 					SMSC_WARNING("Failed to write ADDRL: %d", ret);
 					return ret;
@@ -4971,27 +4962,21 @@ static int EepromLessPMESetting(struct usbnet *dev)
 		//FLAG_ATTR_PME_WAKE_PHY           PHY linkup wakeup supported, otherwise Magic packet wakeup supported
 		//FLAG_ATTR_PME_GPIO10_HIGH        Active-high detection for GPIO10
         dwRead |= FLAG_ATTR_PME_ENABLE | FLAG_ATTR_PME_POL;
-		
-               		
+
 		if ((ret = smsc9500_write_reg(dev,FLAG_ATTR, dwRead)< 0)) {
 				SMSC_WARNING("Failed to write FLAG_ATTR: %d", ret);
 				return ret;
-		}	
-
-		
+		}
 		if ((ret = smsc9500_read_reg(dev,HW_CFG, &dwRead)< 0)) {
 				SMSC_WARNING("Failed to read HW_CFG: %d", ret);
 				return ret;
 		}
-		
 		dwRead |= HW_CFG_EEM|HW_CFG_RST_PROTECT;
-				
 		if ((ret = smsc9500_write_reg(dev,HW_CFG, dwRead)< 0)) {
 				SMSC_WARNING("Failed to write HW_CFG: %d", ret);
 				return ret;
 		}
-		return ret;		
-
+		return ret;
     }
 #endif
 
@@ -5071,7 +5056,7 @@ static int SetGpo(struct usbnet * dev,  u32 Gpo, u32 State)
     {
         if (State > 1)
         {
-        	SMSC_WARNING("Gpo%d state (%d) is out of range [0:1] in NICSetGpo\n", Gpo, State);
+			SMSC_WARNING("Gpo%d state (%d) is out of range [0:1] in NICSetGpo\n", Gpo, State);
         }
         goto Exit_NICSetGpo;
     }
@@ -5079,7 +5064,7 @@ static int SetGpo(struct usbnet * dev,  u32 Gpo, u32 State)
     if (Gpo < 8)
     {
         if(smsc9500_read_reg( dev, GPIO_CFG, &Value32 ) < 0){
-        	SMSC_WARNING("Failed to read GPIO_CFG\n");
+			SMSC_WARNING("Failed to read GPIO_CFG\n");
             goto Exit_NICSetGpo;
         }
 
@@ -5092,14 +5077,14 @@ static int SetGpo(struct usbnet * dev,  u32 Gpo, u32 State)
     }
     else
     {
-        Status = smsc9500_read_reg(dev, LED_GPIO_CFG, &Value32 );
+        Status = smsc9500_read_reg(dev, LED_GPIO_CFG, &Value32);
         if (Status < 0)
              goto Exit_NICSetGpo;
 
         Value32 &= (~(LED_GPIO_CFG_GPDATA_08_ << (Gpo-8)));
         Value32 |= (State << (Gpo-8));
 
-        Status = smsc9500_write_reg(dev, LED_GPIO_CFG, Value32 );
+        Status = smsc9500_write_reg(dev, LED_GPIO_CFG, Value32);
         if (Status < 0)
              goto Exit_NICSetGpo;
       }
@@ -5136,7 +5121,7 @@ static int SetWakeupOnSuspend3(struct net_device *netdev)
 	if((Value32 & 0xFFFF) != 0){
 		SMSC_TRACE(DBG_PWR,"Rx FIFO is not empty\n");
 		Value32 = RX_FIFO_FLUSH_;
-		CHECK_RETURN_STATUS(smsc9500_write_reg(dev, RX_CFG, Value32));	
+		CHECK_RETURN_STATUS(smsc9500_write_reg(dev, RX_CFG, Value32));
 	}else{
 		SMSC_TRACE(DBG_PWR,"Rx FIFO is empty, continue suspend\n");
 	}
@@ -5514,7 +5499,7 @@ static int SetLinkDownWakeupEvents(struct usbnet *dev, int wakeUpMode)
 			dwValue |= PHY_BCR_AUTO_NEG_ENABLE_;
 			CHECK_RETURN_STATUS(smsc9500_write_phy(dev,PHY_BCR,dwValue));
 		}
-		
+
 		//Enable the energy detect power-down mode
 		CHECK_RETURN_STATUS(smsc9500_read_phy(dev,PHY_MODE_CTRL_STS,&dwValue));
 		wValue=(u16)dwValue;
@@ -5561,7 +5546,6 @@ static int SetLinkDownWakeupEvents(struct usbnet *dev, int wakeUpMode)
 
 		SMSC_TRACE(DBG_PWR,"Setting Suspend0 mode\n");
 	}
-
     ret = 0;
 DONE:
     return ret;
@@ -5607,7 +5591,7 @@ static int ResetLinkDownWakeupEvents(struct usbnet *dev)
 	if((adapterData->dwSavedLinkSettings&LINK_AUTO_NEGOTIATE) == 0)
 	{
 		phy_SetLink(dev,adapterData->dwSavedLinkSettings);
-  	}	
+	}
 	ret = 0;
 DONE:
 	return ret;
@@ -5780,10 +5764,10 @@ static int Smsc9500_suspend (struct usb_interface *intf, pm_message_t state)
     if(0)
 #endif
     {
-    	ret = Smsc9500AutoSuspend(intf, state);
+		ret = Smsc9500AutoSuspend(intf, state);
     }else
     {//It is system suspend
-    	ret = Smsc9500SystemSuspend(intf, state);
+		ret = Smsc9500SystemSuspend(intf, state);
     }
 
     SMSC_TRACE(DBG_PWR,"<----Smsc9500_suspend\n");
@@ -5966,10 +5950,10 @@ static int Smsc9500_resume(struct usb_interface *intf)
     if(0)
 #endif
     {
-    	ret = Smsc9500AutoResume(intf);
+		ret = Smsc9500AutoResume(intf);
     }else
     {
-    	ret = Smsc9500SystemResume(intf);
+		ret = Smsc9500SystemResume(intf);
     }
 	SMSC_TRACE(DBG_PWR,"------->out of in Smsc9500_resume\n");
 	return ret;
@@ -6055,7 +6039,7 @@ static int Smsc9500SystemResume(struct usb_interface *intf)
     //test if hcd is still alive
 
     if(smsc9500_read_reg_async(dev, MAC_CR, &dwValue, TRUE) == ASYNC_RW_SUCCESS){
-    	SMSC_TRACE(DBG_PWR,"hcd is alive\n");
+		SMSC_TRACE(DBG_PWR,"hcd is alive\n");
 
         ret=smsc9500_reset(dev);
         StartTxPath(dev);
@@ -6064,7 +6048,7 @@ static int Smsc9500SystemResume(struct usb_interface *intf)
         ResetWakeupEvents(dev->net);
 
     }else{//This will happen on suspend-to-disk, if we access usb bus, will hang on usb_kill_urb
-    	SMSC_TRACE(DBG_PWR,"no hcd\n");
+		SMSC_TRACE(DBG_PWR,"no hcd\n");
     }
 
     Tx_WakeQueue(dev,0x04UL);
@@ -6140,19 +6124,19 @@ static int smsc9500_eth_phy_boost(struct usbnet *dev, int mode)
 		if (mode == 1) {
 			/* set boost */
 			dwTemp = PHY_TSTCNTL_TEST_MODE;
-			CHECK_RETURN_STATUS(smsc9500_write_phy(dev, PHY_TSTCNTL, dwTemp));	
-			CHECK_RETURN_STATUS(smsc9500_write_phy(dev, PHY_TSTCNTL, 0 ));	
-			CHECK_RETURN_STATUS(smsc9500_write_phy(dev, PHY_TSTCNTL, dwTemp));	
+			CHECK_RETURN_STATUS(smsc9500_write_phy(dev, PHY_TSTCNTL, dwTemp));
+			CHECK_RETURN_STATUS(smsc9500_write_phy(dev, PHY_TSTCNTL, 0 ));
+			CHECK_RETURN_STATUS(smsc9500_write_phy(dev, PHY_TSTCNTL, dwTemp));
 
 			dwTemp = 0x85E8;
-			CHECK_RETURN_STATUS(smsc9500_write_phy(dev, PHY_TSTWRITE, dwTemp));	
+			CHECK_RETURN_STATUS(smsc9500_write_phy(dev, PHY_TSTWRITE, dwTemp));
 			//dwTemp = 0x4416;
 			dwTemp = (PHY_TSTCNTL_WRITE | PHY_TSTCNTL_TEST_MODE | 0x16);
-			CHECK_RETURN_STATUS(smsc9500_write_phy(dev, PHY_TSTCNTL, dwTemp));	
+			CHECK_RETURN_STATUS(smsc9500_write_phy(dev, PHY_TSTCNTL, dwTemp));
 			/* Loop until write is completed w/timeout */
 			for(Count=1;Count<100;Count++){
 				dwTemp = 0;
-				CHECK_RETURN_STATUS(smsc9500_read_phy(dev, PHY_TSTCNTL, &dwTemp));	
+				CHECK_RETURN_STATUS(smsc9500_read_phy(dev, PHY_TSTCNTL, &dwTemp));
 				if(!(dwTemp & PHY_TSTCNTL_WRITE))
 					break;
 				udelay(1);
@@ -6166,11 +6150,11 @@ static int smsc9500_eth_phy_boost(struct usbnet *dev, int mode)
 			/* read and verify the value */
 			//dwTemp = 0x86C0;
 			dwTemp = (PHY_TSTCNTL_READ | PHY_TSTCNTL_TEST_MODE | 0xC0);
-			CHECK_RETURN_STATUS(smsc9500_write_phy(dev, PHY_TSTCNTL, dwTemp));	
+			CHECK_RETURN_STATUS(smsc9500_write_phy(dev, PHY_TSTCNTL, dwTemp));
 			/* Loop until read is completed w/timeout */
 			for(Count=1;Count<100;Count++){
 				dwTemp = 0;
-				CHECK_RETURN_STATUS(smsc9500_read_phy(dev, PHY_TSTCNTL, &dwTemp));	
+				CHECK_RETURN_STATUS(smsc9500_read_phy(dev, PHY_TSTCNTL, &dwTemp));
 				if(!(dwTemp & PHY_TSTCNTL_READ))
 					break;
 				udelay(1);
@@ -6178,35 +6162,34 @@ static int smsc9500_eth_phy_boost(struct usbnet *dev, int mode)
 
 			if (Count < 100){
 				dwTemp = 0;
-				CHECK_RETURN_STATUS(smsc9500_read_phy(dev, PHY_TSTREAD1, &dwTemp));	
+				CHECK_RETURN_STATUS(smsc9500_read_phy(dev, PHY_TSTREAD1, &dwTemp));
 				if (dwTemp != 0x85E8) {
 					SMSC_WARNING("XXX=Failed to set Ethernet Boost: 0x%x \n", dwTemp);
 				} else{
 					SMSC_TRACE(DBG_INIT, "Ethernet Boost: 0x%x \n", dwTemp);
 				}
-			
 			}else{
 				SMSC_WARNING("Timed out reading PHY_TSTREAD1 register\n");
 				return 1;
 			}
 			#endif
 
-			CHECK_RETURN_STATUS(smsc9500_write_phy(dev, PHY_TSTCNTL, 0 ));	
+			CHECK_RETURN_STATUS(smsc9500_write_phy(dev, PHY_TSTCNTL, 0 ));
 		} else {
 			#if 0
                         dwTemp = PHY_TSTCNTL_TEST_MODE;
-			CHECK_RETURN_STATUS(smsc9500_write_phy(dev, PHY_TSTCNTL, dwTemp));	
-			CHECK_RETURN_STATUS(smsc9500_write_phy(dev, PHY_TSTCNTL, 0 ));	
-			CHECK_RETURN_STATUS(smsc9500_write_phy(dev, PHY_TSTCNTL, dwTemp));	
+			CHECK_RETURN_STATUS(smsc9500_write_phy(dev, PHY_TSTCNTL, dwTemp));
+			CHECK_RETURN_STATUS(smsc9500_write_phy(dev, PHY_TSTCNTL, 0 ));
+			CHECK_RETURN_STATUS(smsc9500_write_phy(dev, PHY_TSTCNTL, dwTemp));
 
 			/* read and verify the value */
 			//dwTemp = 0x86C0;
 			dwTemp = (PHY_TSTCNTL_READ | PHY_TSTCNTL_TEST_MODE | 0xC0);
-			CHECK_RETURN_STATUS(smsc9500_write_phy(dev, PHY_TSTCNTL, dwTemp));	
+			CHECK_RETURN_STATUS(smsc9500_write_phy(dev, PHY_TSTCNTL, dwTemp));
 			/* Loop until read is completed w/timeout */
 			for(Count=1;Count<100;Count++){
 				dwTemp = 0;
-				CHECK_RETURN_STATUS(smsc9500_read_phy(dev, PHY_TSTCNTL, &dwTemp));	
+				CHECK_RETURN_STATUS(smsc9500_read_phy(dev, PHY_TSTCNTL, &dwTemp));
 				if(!(dwTemp & PHY_TSTCNTL_READ))
 					break;
 				udelay(1);
@@ -6214,13 +6197,12 @@ static int smsc9500_eth_phy_boost(struct usbnet *dev, int mode)
 
 			if (Count < 100){
 				dwTemp = 0;
-				CHECK_RETURN_STATUS(smsc9500_read_phy(dev, PHY_TSTREAD1, &dwTemp));	
+				CHECK_RETURN_STATUS(smsc9500_read_phy(dev, PHY_TSTREAD1, &dwTemp));
 				if (dwTemp != 0x85E8) {
 					SMSC_WARNING("XXX=Failed to set Ethernet Boost: 0x%x \n", dwTemp);
 				} else{
 					SMSC_TRACE(DBG_INIT, "Ethernet Boost: 0x%x \n", dwTemp);
 				}
-			
 			}else{
 				SMSC_WARNING("Timed out reading PHY_TSTREAD1 register\n");
 				return 1;
@@ -6234,7 +6216,6 @@ static int smsc9500_eth_phy_boost(struct usbnet *dev, int mode)
 DONE:
 	return 1;
 }
-	
 
 static const struct driver_info smsc9500_info = {
 	.description = "smsc9500 USB 2.0 Ethernet",
@@ -6302,14 +6283,13 @@ static struct usb_driver smsc9500_driver = {
 
 static int __init smsc9500_init(void)
 {
-
- 	return usb_register(&smsc9500_driver);
+	return usb_register(&smsc9500_driver);
 }
 module_init(smsc9500_init);
 
 static void __exit smsc9500_exit(void)
 {
- 	usb_deregister(&smsc9500_driver);
+	usb_deregister(&smsc9500_driver);
 }
 module_exit(smsc9500_exit);
 

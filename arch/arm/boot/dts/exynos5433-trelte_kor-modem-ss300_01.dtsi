@@ -50,6 +50,7 @@
 		ap_dump_int: ap_dump_int {
 			samsung,pins = "gpr2-0";
 			samsung,pin-function = <1>;
+			samsung,pin-pud = <0>;
 			samsung,pin-con-pdn = <3>;
 			samsung,pin-pud-pdn = <0>;
 		};
@@ -193,8 +194,6 @@
 
 &pinctrl_5 {
 	sleep5: sleep-state {
-		PIN_SLP(gpr2-0, INPUT, DOWN);	/* AP_DUMP_INT */
-
 		PIN_SLP(gpr3-1, PREV, NONE);	/* CP_ON */
 	};
 };

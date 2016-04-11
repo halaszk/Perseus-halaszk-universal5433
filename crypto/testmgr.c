@@ -27,7 +27,9 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <crypto/rng.h>
+#ifdef CONFIG_CRYPTO_DRBG
 #include <crypto/drbg.h>
+#endif
 
 #include "internal.h"
 
@@ -123,10 +125,12 @@ struct cprng_test_suite {
 	unsigned int count;
 };
 
+#ifdef CONFIG_CRYPTO_DRBG
 struct drbg_test_suite {
 	struct drbg_testvec *vecs;
 	unsigned int count;
 };
+#endif
 
 struct alg_test_desc {
 	const char *alg;
@@ -141,7 +145,9 @@ struct alg_test_desc {
 		struct pcomp_test_suite pcomp;
 		struct hash_test_suite hash;
 		struct cprng_test_suite cprng;
+#ifdef CONFIG_CRYPTO_DRBG
 		struct drbg_test_suite drbg;
+#endif
 	} suite;
 };
 
@@ -1665,6 +1671,7 @@ static int alg_test_cprng(const struct alg_test_desc *desc, const char *driver,
 	return err;
 }
 
+#ifdef CONFIG_CRYPTO_DRBG
 static int drbg_cavs_test(struct drbg_testvec *test, int pr,
 			  const char *driver, u32 type, u32 mask)
 {
@@ -1757,6 +1764,7 @@ static int alg_test_drbg(const struct alg_test_desc *desc, const char *driver,
 	return err;
 
 }
+#endif
 
 static int alg_test_null(const struct alg_test_desc *desc,
 			     const char *driver, u32 type, u32 mask)
@@ -2339,6 +2347,7 @@ static const struct alg_test_desc alg_test_descs[] = {
 		.alg = "digest_null",
 		.test = alg_test_null,
 	}, {
+#ifdef CONFIG_CRYPTO_DRBG
 		.alg = "drbg_nopr_ctr_aes128",
 		.test = alg_test_drbg,
 		.fips_allowed = 1,
@@ -2485,6 +2494,7 @@ static const struct alg_test_desc alg_test_descs[] = {
 		.fips_allowed = 1,
 		.test = alg_test_null,
 	}, {
+#endif /* CONFIG_CRYPTO_DRBG */
 		.alg = "ecb(__aes-aesni)",
 		.test = alg_test_null,
 		.fips_allowed = 1,

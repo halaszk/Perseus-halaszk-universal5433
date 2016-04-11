@@ -39,10 +39,10 @@
 #include "mdnie_lite_table_tabs297.h"
 #endif
 
-#define POWER_IS_ON(pwr)		(pwr <= FB_BLANK_NORMAL)
-#define LEVEL_IS_HBM(auto_brightness)	(auto_brightness >= 6)
-#define LEVEL_IS_CAPS_OFF(level)	(level <= IBRIGHTNESS_39NT)
-#define LEVEL_IS_ACL_OFF(brightness)	(brightness == 255)
+#define POWER_IS_ON(pwr)				(pwr <= FB_BLANK_NORMAL)
+#define LEVEL_IS_HBM(auto_brightness, brightness)	(auto_brightness >= 6 && brightness == MAX_BRIGHTNESS)
+#define LEVEL_IS_CAPS_OFF(level)			(level <= IBRIGHTNESS_39NT)
+#define LEVEL_IS_ACL_OFF(auto_brightness, brightness)	(auto_brightness < 6 && brightness == MAX_BRIGHTNESS)
 
 #define MIN_BRIGHTNESS			0
 #define MAX_BRIGHTNESS			255
@@ -146,6 +146,7 @@ struct lcd_info {
 
 	/* temporary sysfs to figure out what causes read problem */
 	unsigned int			panic_enable;
+	unsigned int			upi_clk_change;
 
 	struct mipi_dsim_device		*dsim;
 
@@ -364,14 +365,10 @@ static int ana38401_read_date(struct lcd_info *lcd)
 
 	if (ret < 1)
 		dev_err(&lcd->ld->dev, "%s failed\n", __func__);
-	else
-		dev_info(&lcd->ld->dev, "%s: %02x %02x\n", __func__, buf[0], buf[1]);
 
 	/* manufacture date */
-	if (!lcd->date[0] && !lcd->date[1]) {
-		lcd->date[0] = buf[0];	/* 127th */
-		lcd->date[1] = buf[1];	/* 128th */
-	}
+	lcd->date[0] = buf[0];	/* 127th */
+	lcd->date[1] = buf[1];	/* 128th */
 
 	return ret;
 }
@@ -687,7 +684,7 @@ static int ana38401_set_acl(struct lcd_info *lcd, u8 force)
 	if (lcd->siop_enable)
 		goto acl_update;
 
-	if (!lcd->acl_enable && LEVEL_IS_ACL_OFF(lcd->brightness))
+	if (!lcd->acl_enable && LEVEL_IS_ACL_OFF(lcd->auto_brightness, lcd->brightness))
 		level = ACL_STATUS_0P;
 
 acl_update:
@@ -699,7 +696,7 @@ acl_update:
 		ret += ana38401_write(lcd, ACL_OPR_TABLE[level], DEFAULT_PARAM_SIZE);
 
 		lcd->current_acl = ACL_CUTOFF_TABLE[level][1];
-		dev_info(&lcd->ld->dev, "acl: %d, brightness: %d\n", lcd->current_acl, lcd->brightness);
+		dev_info(&lcd->ld->dev, "acl: %d, brightness: %d, auto: %d\n", lcd->current_acl, lcd->brightness, lcd->auto_brightness);
 	}
 
 	if (!ret)
@@ -748,7 +745,7 @@ static int ana38401_set_elvss(struct lcd_info *lcd, u8 force)
 		}
 	}
 
-	if (!lcd->acl_enable && LEVEL_IS_ACL_OFF(lcd->bl))
+	if (!lcd->acl_enable && LEVEL_IS_ACL_OFF(lcd->auto_brightness, lcd->brightness))
 		acl = ACL_STATUS_0P;
 
 	elvss.offset = lcd->elvss_table[lcd->temperature][acl][elvss_level][1];
@@ -763,7 +760,7 @@ static int ana38401_set_elvss(struct lcd_info *lcd, u8 force)
 elvss_update:
 	ret += ana38401_write(lcd, SEQ_ELVSS_SET_1, DEFAULT_PARAM_SIZE);
 	ret += ana38401_write(lcd, lcd->elvss_table[lcd->temperature][acl][elvss_level], DEFAULT_PARAM_SIZE);
-	dev_info(&lcd->ld->dev, "temperature: %d, elvss: %d, %x\n", lcd->temperature, elvss_level, elvss.value);
+	dev_info(&lcd->ld->dev, "temperature: %d, elvss: %d, %x, auto: %d\n", lcd->temperature, elvss_level, elvss.value, lcd->auto_brightness);
 	lcd->current_elvss.value = elvss.value;
 	if (!ret)
 		ret = -EPERM;
@@ -774,7 +771,7 @@ exit:
 
 static int ana38401_set_elvss_base(struct lcd_info *lcd, u8 force)
 {
-	int ret = 0, level = LEVEL_IS_HBM(lcd->auto_brightness);
+	int ret = 0, level = LEVEL_IS_HBM(lcd->auto_brightness, lcd->brightness);
 
 	if (force || lcd->current_elvss_base != lcd->elvss_base_table[level][1]) {
 		ret += ana38401_write(lcd, SEQ_ELVSS_BASE_SET_1, DEFAULT_PARAM_SIZE);
@@ -1180,7 +1177,7 @@ static int update_brightness(struct lcd_info *lcd, u8 force)
 
 	lcd->bl = get_backlight_level_from_brightness(lcd->brightness);
 
-	if (LEVEL_IS_HBM(lcd->auto_brightness) && (lcd->brightness == lcd->bd->props.max_brightness))
+	if (LEVEL_IS_HBM(lcd->auto_brightness, lcd->brightness))
 		lcd->bl = IBRIGHTNESS_500NT;
 
 	if (force || lcd->ldi_enable) {
@@ -1225,8 +1222,6 @@ static int ana38401_ldi_init(struct lcd_info *lcd)
 	ana38401_write(lcd, SEQ_TSP_SETTING_1, ARRAY_SIZE(SEQ_TSP_SETTING_1));
 	ana38401_write(lcd, SEQ_TSP_SETTING_2, ARRAY_SIZE(SEQ_TSP_SETTING_2));
 	ana38401_write(lcd, SEQ_TEAR_SCANLINE, ARRAY_SIZE(SEQ_TEAR_SCANLINE));
-	ana38401_write(lcd, SEQ_GAMMA_UPDATE_1, ARRAY_SIZE(SEQ_GAMMA_UPDATE_1));
-	ana38401_write(lcd, SEQ_GAMMA_UPDATE_2, ARRAY_SIZE(SEQ_GAMMA_UPDATE_2));
 
 	/* 11-2. Change Gamma_Offset_Index */
 	ana38401_write(lcd, SEQ_CHANGE_GAMMA_OFFSET_INDEX_1, ARRAY_SIZE(SEQ_CHANGE_GAMMA_OFFSET_INDEX_1));
@@ -1236,10 +1231,11 @@ static int ana38401_ldi_init(struct lcd_info *lcd)
 	/* 13. ELVSS Temp Compensation */
 	update_brightness(lcd, 1);
 
-	/* temporary patch to check manufacture date without ramdump */
-	usleep_range(5000, 6000);
-
-	ana38401_read_date(lcd);
+	/* UPLL_F Setting */
+	if (lcd->upi_clk_change) {
+		ana38401_write(lcd, SEQ_UPI_CLK_CHANGE_1, ARRAY_SIZE(SEQ_UPI_CLK_CHANGE_1));
+		ana38401_write(lcd, SEQ_UPI_CLK_CHANGE_2, ARRAY_SIZE(SEQ_UPI_CLK_CHANGE_2));
+	}
 
 	return ret;
 }
@@ -1506,7 +1502,7 @@ static ssize_t auto_brightness_store(struct device *dev,
 		return rc;
 	else {
 		if (lcd->auto_brightness != value) {
-			dev_info(dev, "%s: %d, %d\n", __func__, lcd->auto_brightness, value);
+			dev_info(&lcd->ld->dev, "%s: %d, %d\n", __func__, lcd->auto_brightness, value);
 			mutex_lock(&lcd->bl_lock);
 			lcd->auto_brightness = value;
 			mutex_unlock(&lcd->bl_lock);
@@ -1887,6 +1883,11 @@ static int ana38401_probe(struct mipi_dsim_device *dsim)
 #if defined(CONFIG_ESD_FG)
 	esd_fg_init(lcd);
 #endif
+
+	if (of_find_node_with_property(NULL, "upi_clk_change")) {
+		dev_info(&lcd->ld->dev, "UPI CLK change: UPLL_F Setting is 37\n");
+		lcd->upi_clk_change = 1;
+	}
 
 	dev_info(&lcd->ld->dev, "%s lcd panel driver has been probed.\n", __FILE__);
 	return 0;

@@ -124,8 +124,8 @@
 
 		PIN_IN(gpd2-5, DOWN, LV1);	/* NC */
 
-		PIN_IN(gpd4-3, DOWN, LV1);	/* SENSOR_I2C_SDA */
-		PIN_IN(gpd4-4, DOWN, LV1);	/* SENSOR_I2C_SCL */
+		PIN_IN(gpd4-3, NONE, LV1);	/* SENSOR_I2C_SDA */
+		PIN_IN(gpd4-4, NONE, LV1);	/* SENSOR_I2C_SCL */
 
 		PIN_IN(gpd8-0, DOWN, LV1);	/* NC */
 
@@ -141,8 +141,8 @@
 		PIN_IN(gpf0-6, DOWN, LV1);	/* NC */
 		PIN_IN(gpf0-7, DOWN, LV1);	/* CCI_MODE(NC) */
 
-		PIN_IN(gpf4-1, DOWN, LV1);	/* SENSOR_I2C_SCL acc/grip */
-		PIN_IN(gpf4-2, DOWN, LV1);	/* SENSOR_I2C_SDA acc/grip */
+		PIN_IN(gpf4-1, NONE, LV1);	/* SENSOR_I2C_SCL acc/grip */
+		PIN_IN(gpf4-2, NONE, LV1);	/* SENSOR_I2C_SDA acc/grip */
 		PIN_IN(gpf5-5, DOWN, LV1);	/* GRIP_INT */
 	};
 	sleep5: sleep-state {
@@ -216,8 +216,8 @@
 		PIN_SLP(gpd4-0, PREV, NONE);	/* MOTOR_EN */
 		PIN_SLP(gpd4-1, PREV, DOWN);	/* BTP_OCP_EN  */
 		PIN_SLP(gpd4-2, INPUT, DOWN);	/* NC */
-		PIN_SLP(gpd4-3, INPUT, DOWN);	/* SENSOR_I2C_SDA */
-		PIN_SLP(gpd4-4, INPUT, DOWN);	/* SENSOR_I2C_SCL */
+		PIN_SLP(gpd4-3, INPUT, NONE);	/* SENSOR_I2C_SDA */
+		PIN_SLP(gpd4-4, INPUT, NONE);	/* SENSOR_I2C_SCL */
 
 		PIN_SLP(gpd5-0, OUT0, DOWN);	/* BTP_SPI_CLK */
 		PIN_SLP(gpd5-1, OUT0, DOWN);	/* BTP_SPI_CS_N */
@@ -269,8 +269,8 @@
 		PIN_SLP(gpf3-5, PREV, NONE);	/* BOOT_LDO */
 
 		PIN_SLP(gpf4-0, PREV, DOWN);	/* BTP_LDO_EN */
-		PIN_SLP(gpf4-1, INPUT, DOWN);	/* SENSOR_I2C_SCL acc/grip */
-		PIN_SLP(gpf4-2, INPUT, DOWN);	/*  SENSOR_I2C_SDA acc/grip */
+		PIN_SLP(gpf4-1, INPUT, NONE);	/* SENSOR_I2C_SCL acc/grip */
+		PIN_SLP(gpf4-2, INPUT, NONE);	/*  SENSOR_I2C_SDA acc/grip */
 		PIN_SLP(gpf4-3, INPUT, DOWN);	/* AP2CP_STATUS */
 		PIN_SLP(gpf4-4, INPUT, DOWN);	/* AP2CP_DUMP_NOTI_n */
 		PIN_SLP(gpf4-5, INPUT, DOWN);	/* NC */

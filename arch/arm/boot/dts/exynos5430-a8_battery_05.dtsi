@@ -45,7 +45,7 @@
 			fuelgauge,capacity_max = <990>;
 			fuelgauge,capacity_max_margin = <50>;
 			fuelgauge,capacity_min = <0>;
-			fuelgauge,capacity_calculation_type = <28>;
+			fuelgauge,capacity_calculation_type = <12>;
 			fuelgauge,type_str = "SDI";
 		};
 	};
@@ -64,7 +64,7 @@
 		battery0,dtcd_value = <0x1>;
 		battery0,rs_value = <0x1ae 0x47a 0x3800 0x00a4>; /*rs mix_factor max min*/
 		battery0,vit_period = <0x350a>;
-		battery0,mix_value = <0x0a03 0x0004>; /*mix_rate init_blank*/
+		battery0,mix_value = <0x0503 0x0004>; /*mix_rate init_blank*/
 		battery0,topoff_soc = <0x0 0x5>; /*enable soc*/
 		battery0,volt_cal = <0x8000>;
 		battery0,curr_cal = <0x7c00>;
@@ -237,13 +237,14 @@
 		battery,chg_polarity_en = <0>;
 		battery,chg_gpio_status = <0>;
 		battery,chg_polarity_status = <0>;
-		battery,chg_float_voltage = <4400>;
+		battery,chg_float_voltage = <4390>;
 		chg_autostop = <0>;
-		chg_autoset = <0>;
-		chg_aiclen = <0>;
-		chg_aiclth = <4500>;
+		chg_autoset = <1>;
+		chg_aiclen = <1>;
+		chg_aiclth = <4300>;
 		fg_vol_val = <4350>;
 		fg_soc_val = <95>;
 		fg_curr_avr_val = <150>;
+
 	};
 };

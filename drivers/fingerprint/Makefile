@@ -7,6 +7,5 @@
 ccflags-y := $(KBUILD_FP_SENSOR_CFLAGS)
 
 obj-$(CONFIG_SENSORS_FINGERPRINT_SYSFS)		+= fingerprint_sysfs.o
-obj-$(CONFIG_SENSORS_VFS61XX_KO)		+= vfs61xx.o
+obj-$(CONFIG_SENSORS_VFS61XX)		+= vfs61xx.o
 obj-$(CONFIG_SENSORS_VFS7XXX)		+= vfs7xxx.o
-obj-$(CONFIG_SENSORS_ET310)			+= et310-spi.o et310-spi_data_transfer.o

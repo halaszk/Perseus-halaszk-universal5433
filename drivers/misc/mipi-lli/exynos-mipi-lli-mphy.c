@@ -62,6 +62,7 @@ int exynos_mphy_cmn_init(struct exynos_mphy *phy)
 	/* Basic tune for series-A */
 #if defined(CONFIG_SOC_EXYNOS5433) && defined(CONFIG_UMTS_MODEM_SS333)
 	writel(0x06, phy->loc_regs + (0x0A*4));
+	writel(0x41, phy->loc_regs + (0x1C*4));
 #else
  	writel(0x05, phy->loc_regs + (0x0A*4));
 #endif

@@ -1272,13 +1272,13 @@
 #define ARIZONA_FCL_COEFF_START                  0xF18
 #define ARIZONA_FCL_COEFF_END                    0xF69
 #define ARIZONA_FCR_FILTER_CONTROL               0xF70
-#define CLEARWATER_FCR_FILTER_CONTROL                0xF71
+#define CLEARWATER_FCR_FILTER_CONTROL            0xF71
 #define ARIZONA_FCR_ADC_REFORMATTER_CONTROL      0xF72
-#define CLEARWATER_FCR_ADC_REFORMATTER_CONTROL       0xF73
+#define CLEARWATER_FCR_ADC_REFORMATTER_CONTROL   0xF73
 #define ARIZONA_FCR_COEFF_START                  0xF73
 #define ARIZONA_FCR_COEFF_END                    0xFC4
-#define CLEARWATER_FCR_COEFF_START                   0xF74
-#define CLEARWATER_FCR_COEFF_END                     0xFC5
+#define CLEARWATER_FCR_COEFF_START               0xF74
+#define CLEARWATER_FCR_COEFF_END                 0xFC5
 #define ARIZONA_DSP1_CONTROL_1                   0x1100
 #define ARIZONA_DSP1_CLOCKING_1                  0x1101
 #define ARIZONA_DSP1_STATUS_1                    0x1104

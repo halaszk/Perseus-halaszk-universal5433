@@ -65,12 +65,12 @@ static const struct of_device_id exynos_dwc3_match[] = {
 MODULE_DEVICE_TABLE(of, exynos_dwc3_match);
 #endif
 
-static int dwc3_exynos_get_id_state(struct dwc3_exynos_rsw *rsw)
+static inline int dwc3_exynos_get_id_state(struct dwc3_exynos_rsw *rsw)
 {
 	return gpio_get_value(rsw->id_gpio);
 }
 
-static int dwc3_exynos_get_b_sess_state(struct dwc3_exynos_rsw *rsw)
+static inline int dwc3_exynos_get_b_sess_state(struct dwc3_exynos_rsw *rsw)
 {
 	return gpio_get_value(rsw->b_sess_gpio);
 }
@@ -612,6 +612,9 @@ static struct platform_driver dwc3_exynos_driver = {
 		.name	= "exynos-dwc3",
 		.of_match_table = of_match_ptr(exynos_dwc3_match),
 		.pm	= DEV_PM_OPS,
+#ifdef CONFIG_MULTITHREAD_PROBE
+		.multithread_probe = 1,
+#endif
 	},
 };
 

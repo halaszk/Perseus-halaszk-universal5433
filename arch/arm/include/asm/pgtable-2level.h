@@ -297,20 +297,31 @@ extern void cpu_v7_timal2group_set_pte_commit(void *tima_l2group_entry_ptr,
 #define pmd_addr_end(addr,end) (end)
 
 #ifdef CONFIG_RKP_DBLMAP_PROT
+#define RAM_SIZE (0xbfffffffUL)
 //the space is reserved in vmlinux.lds.S
 extern u8 rkp_double_bitmap[];
-static u8 rkp_is_pg_double_mapped(unsigned long va)
+static u8 rkp_is_pg_double_mapped(unsigned long pa)
 {
-	uint32_t paddr = __pa(va);
-	uint32_t index = (paddr>>PAGE_SHIFT);
-	uint32_t *p = (uint32_t *)rkp_double_bitmap;
-	uint32_t tmp = (index>>5);
-	uint32_t rindex;
+	unsigned long addr, bit_index, u8_index;
 	u8 val;
 
-	p += (tmp);
-	rindex = index % 32;
-	val = (((*p) & (1<<rindex))?1:0);
+	if (pa < PHYS_OFFSET){ return 0; }
+
+	addr = pa - PHYS_OFFSET;
+	bit_index = (addr>>PAGE_SHIFT);
+	u8_index = bit_index >> 3;
+
+	//larger than bit map size, ignore
+	if (u8_index >= 0x18000) { return 0; }
+
+	val = (((rkp_double_bitmap[u8_index]) & (1<< (bit_index % 8)))?1:0);
+	if(val){
+		printk("DBLMAP pa=0x%08lx, pa-PHYS_OFFSET=0x%08lx\n", pa, addr);
+		printk("DBLMAP bitmap=0x%08lx, byte addr=0x%08lx, byte val=0x%02x\n", 
+				(unsigned long)rkp_double_bitmap, 
+				(unsigned long) (&rkp_double_bitmap[u8_index]), 
+				rkp_double_bitmap[u8_index]);
+	}
 	return val;
 }
 #endif 
@@ -331,7 +342,7 @@ static inline void set_pte_ext(pte_t *ptep,pte_t pte,unsigned int ext)
 #else
 	#ifdef CONFIG_RKP_DBLMAP_PROT
 		static inline void set_pte_ext(pte_t *ptep,pte_t pte,unsigned int ext){			
-			if (rkp_is_pg_double_mapped((u32)ptep)) {
+			if (rkp_is_pg_double_mapped((u32)pte)) {
 //				panic("\n Trying to double map the page \n");
 				return;
 			}	

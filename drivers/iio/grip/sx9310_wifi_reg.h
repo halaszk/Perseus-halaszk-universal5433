@@ -153,7 +153,11 @@ static const struct smtc_reg_data setup_reg[] = {
 	},
 	{
 		.reg = SX9310_CPS_CTRL7_REG,
+#ifdef CONFIG_SENSORS_SX9310_WIFI_DEFENCE_CODE_FOR_DAMAGE
+		.val = 0x73,
+#else
 		.val = 0x4B,
+#endif
 	},
 	{
 		.reg = SX9310_CPS_CTRL8_REG,

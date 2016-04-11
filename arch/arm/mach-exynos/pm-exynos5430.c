@@ -22,8 +22,6 @@
 #include <linux/clk.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
-#include <linux/gpio.h>
-#include <linux/wakeup_reason.h>
 
 #include <asm/cacheflush.h>
 #include <asm/smp_scu.h>
@@ -95,13 +93,12 @@ static struct sleep_save exynos_enable_xxti[] = {
 	{ .reg = EXYNOS5_XXTI_SYS_PWR_REG,		.val = 0x1, },
 };
 
+
 extern void exynos5430_secondary_up(unsigned int cpu_id);
 extern void exynos5430_cpu_down(unsigned int cpu_id);
 extern unsigned int exynos5430_cpu_state(unsigned int cpu_id);
 
-static void __iomem *exynos_eint_base;
-extern u32 exynos_eint_to_pin_num(int eint);
-
+#if 0
 static void exynos_show_wakeup_reason_eint(void)
 {
 	int bit;
@@ -109,26 +106,28 @@ static void exynos_show_wakeup_reason_eint(void)
 	long unsigned int ext_int_pend;
 	unsigned long eint_wakeup_mask;
 	bool found = 0;
+	extern void __iomem *exynos_eint_base;
 
 	eint_wakeup_mask = __raw_readl(EXYNOS5430_EINT_WAKEUP_MASK);
 
 	for (reg_eintstart = 0; reg_eintstart <= 31; reg_eintstart += 8) {
 		ext_int_pend =
-			__raw_readl(EXYNOS543x_EINT_PEND(exynos_eint_base,
-						reg_eintstart));
+			__raw_readl(EINT_PEND(exynos_eint_base,
+					      IRQ_EINT(reg_eintstart)));
 
 		for_each_set_bit(bit, &ext_int_pend, 8) {
-			u32 gpio;
-			int irq;
+			int irq = IRQ_EINT(reg_eintstart) + bit;
+			struct irq_desc *desc = irq_to_desc(irq);
 
 			if (eint_wakeup_mask & (1 << (reg_eintstart + bit)))
 				continue;
 
-			gpio = exynos_eint_to_pin_num(reg_eintstart + bit);
-			irq = gpio_to_irq(gpio);
+			if (desc && desc->action && desc->action->name)
+				pr_info("Resume caused by IRQ %d, %s\n", irq,
+					desc->action->name);
+			else
+				pr_info("Resume caused by IRQ %d\n", irq);
 
-			log_wakeup_reason(irq);
-			update_wakeup_reason_stats(irq, reg_eintstart + bit);
 			found = 1;
 		}
 	}
@@ -136,41 +135,21 @@ static void exynos_show_wakeup_reason_eint(void)
 	if (!found)
 		pr_info("Resume caused by unknown EINT\n");
 }
-
-#ifdef CONFIG_SEC_PM_DEBUG
-static void exynos_show_wakeup_registers(unsigned long wakeup_stat)
-{
-	pr_info("WAKEUP_STAT: 0x%08lx\n", wakeup_stat);
-	pr_info("EINT_PEND: 0x%08x, 0x%08x 0x%08x, 0x%08x\n",
-			__raw_readl(EXYNOS543x_EINT_PEND(exynos_eint_base, 0)),
-			__raw_readl(EXYNOS543x_EINT_PEND(exynos_eint_base, 8)),
-			__raw_readl(EXYNOS543x_EINT_PEND(exynos_eint_base, 16)),
-			__raw_readl(EXYNOS543x_EINT_PEND(exynos_eint_base, 24)));
-}
-#else
-static void exynos_show_wakeup_registers(unsigned long wakeup_stat) {}
 #endif
-
 static void exynos_show_wakeup_reason(void)
 {
 	unsigned long wakeup_stat;
 
 	wakeup_stat = __raw_readl(EXYNOS5430_WAKEUP_STAT);
 
-	exynos_show_wakeup_registers(wakeup_stat);
-
 	if (wakeup_stat & EXYNOS_WAKEUP_STAT_RTC_ALARM)
 		pr_info("Resume caused by RTC alarm\n");
-	else if (wakeup_stat & EXYNOS_WAKEUP_STAT_EINT)
-		exynos_show_wakeup_reason_eint();
+	//else if (wakeup_stat & EXYNOS_WAKEUP_STAT_EINT)
+		//exynos_show_wakeup_reason_eint();
 	else
 		pr_info("Resume caused by wakeup_stat=0x%08lx\n",
 			wakeup_stat);
 }
-
-#ifdef CONFIG_SEC_GPIO_DVS
-extern void gpio_dvs_check_sleepgpio(void);
-#endif
 
 static int exynos_cpu_suspend(unsigned long arg)
 {
@@ -178,14 +157,6 @@ static int exynos_cpu_suspend(unsigned long arg)
 	unsigned int addr;
 	int i;
 
-#ifdef CONFIG_SEC_GPIO_DVS
-	/************************ Caution !!! ****************************/
-	/* This function must be located in appropriate SLEEP position
-	 * in accordance with the specification of each BB vendor.
-	 */
-	/************************ Caution !!! ****************************/
-	gpio_dvs_check_sleepgpio();
-#endif
 	flush_cache_all();
 
 	/* W/A for kfc */
@@ -222,7 +193,6 @@ static int exynos_cpu_suspend(unsigned long arg)
 				BUG();
 		} while (exynos5430_cpu_state(i));
 	}
-
 
 	return 1; /* abort suspend */
 }
@@ -346,14 +316,6 @@ arch_initcall(exynos_pm_drvinit);
 
 static __init int exynos_pm_syscore_init(void)
 {
-	exynos_eint_base = ioremap(EXYNOS543x_PA_GPIO_ALIVE, SZ_4K);
-
-	if (exynos_eint_base == NULL) {
-		pr_err("%s: unable to ioremap for EINT base address\n",
-				__func__);
-		BUG();
-	}
-
 	register_syscore_ops(&exynos_pm_syscore_ops);
 	return 0;
 }

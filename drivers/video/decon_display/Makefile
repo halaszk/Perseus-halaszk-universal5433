@@ -1,6 +1,7 @@
 obj-y                                   += decon_debug.o
 obj-$(CONFIG_DECON_MIC)			+= decon_mic.o
 obj-$(CONFIG_DECON_MIPI_DSI)		+= decon_mipi_dsi.o decon_mipi_dsi_lowlevel.o
+obj-$(CONFIG_SOC_EXYNOS5433)		+= decon_dt_exynos5430.o decon_pm_exynos5430.o decon_fb.o
 obj-$(CONFIG_SOC_EXYNOS5420)		+= fimd_dt_exynos.o fimd_pm_exynos.o fimd_fb.o
 obj-$(CONFIG_SOC_EXYNOS5422)		+= fimd_dt_exynos.o fimd_pm_exynos.o fimd_fb.o
 obj-$(CONFIG_DECON_DISPLAY)		+= decon_display_driver.o

@@ -217,6 +217,7 @@ int init_display_decon_clocks(struct device *dev)
 	else
 		dev_err(dev, "%s: resolution %d:%d is missing\n", __func__, lcd->xres, lcd->yres);
 
+	exynos_display_set_divide(dev, "dout_aclk_disp_333", 1);
 	exynos_display_set_parent(dev, "mout_aclk_disp_333_a", "mout_mfc_pll_div2");
 	exynos_display_set_parent(dev, "mout_aclk_disp_333_b", "mout_aclk_disp_333_a");
 	exynos_display_set_divide(dev, "dout_pclk_disp", 2);

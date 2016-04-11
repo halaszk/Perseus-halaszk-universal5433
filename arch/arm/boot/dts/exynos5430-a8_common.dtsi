@@ -103,11 +103,6 @@
 		clk_str_num = <6>;
 		num-ref-clks = <8>;
 		ciu_clkin = <25 50 50 100 200 100 200 400>;
-		tp_mon_depth = <3>;
-						/* Byte/s,	 MIF clk, CPU clk, KFC clk*/
-		tp_mon_table = <18000000 825000	2000000 1500000
-						12000000 413000	0	0
-						0	 0	0	0>;
 		pinctrl-names = "default";
 		//pinctrl-0 = <&sd1_clk &sd1_cmd &sd1_bus1 &sd1_bus4>;
 		pinctrl-0 = <&sd1_clk &sd1_cmd &sd1_bus1 &sd1_bus4 &cfg_wlanen &cfg_wlanhostwake>; /* Set WLAN_EN configuration of power down mode */
@@ -184,10 +179,6 @@
 
 	serial@11460000 {
 		samsung,uart-wake-peer;
-		irq_affinity = <4>;
-		mif_qos_val = <633000>;
-		cpu_qos_val = <800000>;
-		qos_timeout = <1000000>;
 	};
 
 	pinctrl@10580000 {
@@ -362,6 +353,7 @@
 			abov,irq-gpio = <&gpa1 6 1>;
 			abov,regulator_ic = "vtouch_2.8v";
 			abov,regulator_led = "vtouch_led_2.8v";
+			abov,boot-on-ldo = "true";
 		};
 	};
 
@@ -371,7 +363,7 @@
 		pinctrl-names = "default";
 		pinctrl-0 = <&motor_en &vibetonz_pwm>;
 		haptic,max_timeout = <10000>;
-		haptic,duty = <31800>;   /* ratio = 83.1% */
+		haptic,duty = <31900>;   /* ratio = 83.7% */
 		haptic,period = <38110>; /* freq = 205 * 128 = 26240hz */
 		haptic,pwm_id = <0>;
 		haptic,en = <&gpd4 0 0>;
@@ -500,9 +492,9 @@
 				regulator = "VCC_3.0V_LCD_AP", "VCC_1.8V_LCD_AP";
 			};
 			reset_display_driver_panel {
-				type = "gpio,high", "delay,usleep", "gpio,low", "delay,usleep", "gpio,high", "delay,usleep";
+				type = "delay,usleep","gpio,high", "delay,usleep", "gpio,low", "delay,usleep", "gpio,high", "delay,usleep";
 				gpios = <&gpv7 2 0x1>, <&gpv7 2 0x1>, <&gpv7 2 0x1>;
-				delay = <5000 6000>, <5000 6000>, <10000 11000>;
+				delay = <5000 6000>, <5000 6000>, <5000 6000>, <10000 11000>;
 			};
 		};
 	};
@@ -995,9 +987,9 @@
 
 			/* Frequency table */
 			/* for level	:		1_Head, 2_Tail, 3_Head, 4_Head/Tail, 5_Head, 9_Head, 9_Tail */
-			input_booster,cpu_freqs = <0 0 0 0 0 1800000 1400000>;
-			input_booster,hmp_boost = <0 0 0 0 0 1 1>;
-			input_booster,kfc_freqs = <1300000 1200000 1200000 1200000 1200000 1300000 1300000>;
+			input_booster,cpu_freqs = <1200000 0 0 0 0 1800000 1400000>;
+			input_booster,hmp_boost = <1 0 0 0 0 1 1>;
+			input_booster,kfc_freqs = <0 1200000 1200000 1200000 1200000 1300000 1300000>;
 			input_booster,mif_freqs = <633000 413000 413000 413000 413000 825000 825000>;
 			input_booster,int_freqs = <267000 0 0 0 0 400000 400000>;
 
@@ -1060,7 +1052,7 @@
 				"mfc_nfw",
 				"secdma";
 
-		contig = <0 0x400000 0x0>,
+		contig = <0 0x600000 0x0>,
 			<2 0x100000 0x0>,
 			<10 0x800000 0x0>,
 			<11 0x8100000 0x0>,
@@ -1167,6 +1159,26 @@
 			 net_boost,table_size = <1>;
 			/* <Throughput(Mbps) ARM_min ARM_max KFC_min KFC_max MIF INT Task Irq HMPBoost> */
 			 net_boost,table= <64 0 0 1300000 0 825000 0 0 0 0>;
+		 };
+		 boot_device@3 {
+			net_boost,label="P2P";
+			net_boost,node="p2p-wlan0-0";
+			net_boost,table_size = <3>;
+			net_boost,table= <
+				30 1000000 0 800000 0 0 200000 0 0 0
+				50 1200000 0 1000000 0 0 200000 0 0 0
+				90 1700000 0 1300000 0 543000 267000 0 0 1
+				>;
+		};
+		boot_device@4 {
+			 net_boost,label="WIFI";
+			 net_boost,node="wlan0";
+			net_boost,table_size = <3>;
+			net_boost,table= <
+				20 1000000 0 800000 0 0 200000 0 0 0
+				60 1500000 0 1200000 0 0 200000 0 0 0
+				180 1800000 0 1300000 0 543000 267000 1 1 1
+				>;
 		 };
 	};
 
@@ -1300,7 +1312,14 @@
 		prox_i2c: prox_i2c {
 		samsung,pins = "gpd4-3",  "gpd4-4";
 		samsung,pin-function = <0x0>;
-		samsung,pin-pud = <1>;
+		samsung,pin-pud = <0>;
+		samsung,pin-drv = <0>;
+	      };
+
+		accel_i2c: accel_i2c {
+		samsung,pins = "gpf4-1",  "gpf4-2";
+		samsung,pin-function = <0x0>;
+		samsung,pin-pud = <0>;
 		samsung,pin-drv = <0>;
 	      };
 	};
@@ -1309,6 +1328,7 @@
 		gpios = <&gpd4 3 0x0 /*sda*/
 				&gpd4 4 0x0  /*scl*/
 				>;
+		i2c-gpio,scl-output-only;
 		i2c-gpio,delay-us = <2>;
 		#address-cells = <1>;
 		#size-cells = <0>;
@@ -1345,9 +1365,12 @@
 		gpios = <&gpf4 2 0x0 /*sda*/
 				&gpf4 1 0x0  /*scl*/
 				>;
+		i2c-gpio,scl-output-only;
 		i2c-gpio,delay-us = <2>;
 		#address-cells = <1>;
 		#size-cells = <0>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&accel_i2c>;
 		status = "ok";
 		bma_acc@10 {
 			compatible = "bma2x2";
@@ -1558,14 +1581,15 @@
 
 				ldo24_reg: LDO24 {
 					regulator-name = "VT_CAM_1.2V";
-					regulator-min-microvolt = <1200000>;
-					regulator-max-microvolt = <1200000>;
+					regulator-min-microvolt = <1250000>;
+					regulator-max-microvolt = <1250000>;
 				};
 
 				ldo25_reg: LDO25 {
 					regulator-name = "vtouch_2.8v";
 					regulator-min-microvolt = <2800000>;
 					regulator-max-microvolt = <2800000>;
+					regulator-boot-on;
 				};
 
 				ldo26_reg: LDO26 {

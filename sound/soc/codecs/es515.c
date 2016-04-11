@@ -163,6 +163,9 @@ bool ES515_SR_BIT;
 
 struct es515_priv es515_priv_glb;
 
+static int es515_dai_word_length[4];
+static int es515_device_word_length(int dai_id, int bits_per_sample);
+
 #if defined(CONFIG_SND_SOC_ES515_SLIMBUS)
 static unsigned int es515_ap_tx1_ch_cnt = 1;
 unsigned int es515_rx1_route_enable;
@@ -362,6 +365,10 @@ static struct es515_route_configs es515_def_route_configs[] = {
 			0x90, 0x0C, 0x11, 0x00,
 			/* 30 dB */
 			0x90, 0x0D, 0x00, 0x14,
+			/* set HP Ramped Gain switch */
+			0x90, 0x0C, 0x1F, 0x61,
+			/* turn off */
+			0x90, 0x0D, 0x00, 0x00,
 			0xff,
 		},
 /*		.active_out_codec_port = ES515_CODEC_PORT_SPEAKER,*/
@@ -2805,7 +2812,7 @@ static int es515_wakeup(struct es515_priv *es515)
 	return rc;
 }
 
-#ifdef CONFIG_PM
+#if defined(CONFIG_PM) && defined(CONFIG_SND_SOC_ES515_POWERSAVE)
 static int es515_sleep(struct es515_priv *es515)
 {
 	int rc;
@@ -3102,6 +3109,9 @@ static void es515_i2s_shutdown(struct snd_pcm_substream *substream,
 
 	pr_debug("%s(): dai->name = %s, dai->id = %d\n", __func__,
 			dai->name, dai->id);
+
+	if (!dai->active)
+		es515_device_word_length(dai->id, 0);
 }
 
 static int es515_device_word_length (int dai_id, int bits_per_sample)
@@ -3109,6 +3119,14 @@ static int es515_device_word_length (int dai_id, int bits_per_sample)
 	int rc = 0;
 
 	pr_debug("%s(): id = %d\n", __func__, dai_id);
+
+	/* Update, if changed */
+	if (bits_per_sample == es515_dai_word_length[dai_id])
+		return 0;
+
+	es515_dai_word_length[dai_id] = bits_per_sample;
+	if (!bits_per_sample)
+		return 0;
 
 	/* Set Device Param ID for wordlength */
 	rc = es515_write(NULL, ES515_DEVICE_PARAM_ID, 0x0A00 + (dai_id << 8));
@@ -3314,23 +3332,27 @@ static struct snd_soc_dai_ops es515_portx_dai_ops = {
 #ifdef CONFIG_PM
 static int es515_codec_suspend(struct snd_soc_codec *codec)
 {
+#ifdef CONFIG_SND_SOC_ES515_POWERSAVE
 	struct es515_priv *es515 = snd_soc_codec_get_drvdata(codec);
 
 	es515_set_bias_level(codec, SND_SOC_BIAS_OFF);
-
 	es515_sleep(es515);
-
+#else
+	es515_set_bias_level(codec, SND_SOC_BIAS_OFF);
+#endif
 	return 0;
 }
 
 static int es515_codec_resume(struct snd_soc_codec *codec)
 {
+#ifdef CONFIG_SND_SOC_ES515_POWERSAVE
 	struct es515_priv *es515 = snd_soc_codec_get_drvdata(codec);
 
 	es515_wakeup(es515);
-
 	es515_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
-
+#else
+	es515_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
+#endif
 	return 0;
 }
 #else
