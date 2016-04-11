@@ -44,7 +44,10 @@ extern struct kbase_device *pkbdev;
 
 /*  clk,vol,abb,min,max,down stay,time_in_state,pm_qos mem,pm_qos int,pm_qos cpu_kfc_min,pm_qos cpu_egl_max */
 static gpu_dvfs_info gpu_dvfs_table_default[] = {
-	{700, 1150000, 0, 98, 100, 1, 0, 825000, 400000, 1300000, 1300000},
+        {800, 1150000, 0, 98, 100, 1, 0, 825000, 400000, 1300000, 1300000},
+        {730, 1150000, 0, 98,  99, 1, 0, 825000, 400000, 1300000, 1300000},
+	{700, 1150000, 0, 98,  99, 1, 0, 825000, 400000, 1300000, 1300000},
+        {667, 1150000, 0, 98,  99, 1, 0, 825000, 400000, 1300000, 1300000},
 	{600, 1150000, 0, 98,  99, 1, 0, 825000, 400000, 1300000, 1300000},
 	{550, 1125000, 0, 98,  99, 1, 0, 825000, 400000, 1300000, 1800000},
 	{500, 1075000, 0, 98,  99, 1, 0, 825000, 400000, 1300000, 1800000},
@@ -65,8 +68,8 @@ static int mif_min_table[] = {
 static int available_max_clock[] = {GPU_L2, GPU_L2, GPU_L0, GPU_L0, GPU_L0};
 
 static gpu_attribute gpu_config_attributes[] = {
-	{GPU_MAX_CLOCK, 700},
-	{GPU_MAX_CLOCK_LIMIT, 700},
+	{GPU_MAX_CLOCK, 800},
+	{GPU_MAX_CLOCK_LIMIT, 800},
 	{GPU_MIN_CLOCK, 100},
 	{GPU_MIN_CLOCK_LIMIT, 100},
 	{GPU_DVFS_START_CLOCK, 266},
