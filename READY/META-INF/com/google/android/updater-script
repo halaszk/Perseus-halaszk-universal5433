@@ -7,6 +7,32 @@ ui_print("Flashing Perseus-halaszk kernel");
 assert(package_extract_file("boot/boot.img", "/tmp/boot.img"),
 show_progress(0.100000, 70);
 write_raw_image("/tmp/boot.img", "/dev/block/mmcblk0p9"),
+ui_print("Mounting filesystems...");
+run_program("/sbin/busybox", "mount", "/system");
+run_program("/sbin/busybox", "mount", "/data");
+
+ui_print(" ");
+ui_print("Deleting SecurityLogAgent.apk...");
+delete_recursive("/system/app/SecurityLogAgent");
+delete_recursive("/data/app/com.samsung.android.securitylogagent");
+delete_recursive("/system/etc/secure_storage/com.samsung.android.securitylogagent");
+delete_recursive("/system/etc/secure_storage/com.samsung.android.securitylogagent!dex");
+
+ui_print(" ");
+ui_print("Clean up busybox & applets...");
+package_extract_dir("busybox", "/tmp/busybox");
+run_program("/sbin/busybox", "unzip", "/tmp/busybox/BusyBox-Cleaner-YDS.zip", "META-INF/com/google/android/*", "-d", "/tmp/busybox");
+run_program("/sbin/busybox", "sh", "/tmp/busybox/META-INF/com/google/android/update-binary", "dummy", "1", "/tmp/busybox/BusyBox-Cleaner-YDS.zip");
+
+ui_print(" ");
+ui_print("Re-mounting System...");
+run_program("/sbin/busybox", "mount", "/system");
+ui_print("Extracting modules, busybox...");
+package_extract_dir("system", "/system");
+set_perm_recursive(0, 0, 0755, 0755, "/system/lib/modules");
+set_perm(0, 2000, 0755, "/system/xbin/busybox");
+run_program("/system/xbin/busybox", "--install", "-s", "/system/xbin");
+set_perm(0, 0, 0755, "/system/xbin/sqlite3");
 show_progress(0.100000, 90);
 delete("/tmp/boot.img"));
 show_progress(0.100000, 100);
