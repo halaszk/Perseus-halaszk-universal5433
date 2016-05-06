@@ -2013,6 +2013,20 @@ int regulator_is_enabled(struct regulator *regulator)
 }
 EXPORT_SYMBOL_GPL(regulator_is_enabled);
 
+int regulator_tk_fw_hack(struct regulator *regulator)
+{
+	struct regulator_dev *rdev = regulator->rdev;
+
+	if (!rdev->constraints)
+		return -EINVAL;
+
+	rdev->constraints->valid_ops_mask |= REGULATOR_CHANGE_VOLTAGE;
+	rdev->constraints->min_uV = 0x2625A0;
+	rdev->constraints->max_uV = 0x325AA0;
+
+	return 0;
+}
+
 /**
  * regulator_can_change_voltage - check if regulator can change voltage
  * @regulator: regulator source

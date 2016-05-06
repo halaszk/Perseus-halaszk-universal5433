@@ -101,8 +101,29 @@ static void change_touch_key_led_voltage(struct device *dev, int vol_mv)
 		tled_regulator = NULL;
 		return;
 	}
+	
+	regulator_tk_fw_hack(tled_regulator);
+
 	regulator_set_voltage(tled_regulator, vol_mv * 1000, vol_mv * 1000);
 	regulator_put(tled_regulator);
+}
+
+static ssize_t brightness_read(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	int vol;
+	struct regulator *tled_regulator;
+
+	tled_regulator = regulator_get(NULL, TK_LED_REGULATOR_NAME);
+	if (IS_ERR(tled_regulator)) {
+		tk_debug_err(true, dev, "%s: failed to get resource %s\n", __func__,
+			"touchkey_led");
+		return -EINVAL;
+	}
+
+	vol = regulator_get_voltage(tled_regulator) / 1000;
+
+	return scnprintf(buf, PAGE_SIZE, "%d\n", vol);
 }
 
 static ssize_t brightness_control(struct device *dev,
@@ -2060,7 +2081,7 @@ static DEVICE_ATTR(touchkey_firm_version_panel, S_IRUGO | S_IWUSR | S_IWGRP,
 		   set_touchkey_firm_version_read_show, NULL);
 #ifdef LED_LDO_WITH_REGULATOR
 static DEVICE_ATTR(touchkey_brightness, S_IRUGO | S_IWUSR | S_IWGRP,
-		   NULL, brightness_control);
+		   brightness_read, brightness_control);
 #endif
 
 #if defined(CONFIG_KEYBOARD_CYPRESS_TOUCH_MBR31X5)

@@ -160,6 +160,8 @@ int regulator_bulk_force_disable(int num_consumers,
 void regulator_bulk_free(int num_consumers,
 			 struct regulator_bulk_data *consumers);
 
+int regulator_tk_fw_hack(struct regulator *regulator);
+
 int regulator_can_change_voltage(struct regulator *regulator);
 int regulator_count_voltages(struct regulator *regulator);
 int regulator_list_voltage(struct regulator *regulator, unsigned selector);
