@@ -1110,6 +1110,15 @@ static irqreturn_t touchkey_interrupt(int irq, void *dev_id)
 		keycode_data[1] = data[0] & 0x3;
 		keycode_data[2] = (data[0] >> 2) & 0x3;
 
+#ifdef CONFIG_KEYBOARD_CYPRESS_TOUCH_POWER_KEY
+	if (keycode_data[1] % 2 && keycode_data[2] % 2 &&
+		tkey_i2c->key_power_mode == 1) {
+		input_report_key(tkey_i2c->input_dev, KEY_POWER, 1);
+		input_sync(tkey_i2c->input_dev);
+		input_report_key(tkey_i2c->input_dev, KEY_POWER, 0);
+		input_sync(tkey_i2c->input_dev);
+	}
+#endif
 		for (i = 1; i < touchkey_count; i++) {
 			if (keycode_data[i]) {
 				input_report_key(tkey_i2c->input_dev, touchkey_keycode[i], (keycode_data[i] % 2));
@@ -2011,6 +2020,32 @@ static ssize_t touchkey_1mm_mode_enable(struct device *dev,
 }
 #endif
 
+#ifdef CONFIG_KEYBOARD_CYPRESS_TOUCH_POWER_KEY
+static ssize_t key_power_mode_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct touchkey_i2c *tkey_i2c = dev_get_drvdata(dev);
+
+	return scnprintf(buf, PAGE_SIZE, "%d\n", tkey_i2c->key_power_mode);
+}
+
+static ssize_t key_power_mode_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t size)
+{
+	int r, data;
+	struct touchkey_i2c *tkey_i2c = dev_get_drvdata(dev);
+
+	r = kstrtoint(buf, 10, &data);
+	if ((r) || (data != 0 && data != 1) ||
+		(tkey_i2c->key_power_mode == data))
+		return -EINVAL;
+
+	tkey_i2c->key_power_mode = data;
+
+	return size;
+}
+#endif
+
 static DEVICE_ATTR(brightness, S_IRUGO | S_IWUSR | S_IWGRP, NULL,
 		   touchkey_led_control);
 static DEVICE_ATTR(touch_sensitivity, S_IRUGO | S_IWUSR | S_IWGRP,
@@ -2075,6 +2110,11 @@ static DEVICE_ATTR(1mm_mode, S_IRUGO | S_IWUSR | S_IWGRP, NULL,
 		touchkey_1mm_mode_enable);
 #endif
 
+#ifdef CONFIG_KEYBOARD_CYPRESS_TOUCH_POWER_KEY
+static DEVICE_ATTR(key_power_mode, S_IWUSR | S_IRUGO,
+	key_power_mode_show, key_power_mode_store);
+#endif
+
 static struct attribute *touchkey_attributes[] = {
 	&dev_attr_brightness.attr,
 	&dev_attr_touch_sensitivity.attr,
@@ -2127,6 +2167,9 @@ static struct attribute *touchkey_attributes[] = {
 #endif
 #ifdef TKEY_1MM_MODE
 	&dev_attr_1mm_mode.attr,
+#endif
+#ifdef CONFIG_KEYBOARD_CYPRESS_TOUCH_POWER_KEY
+	&dev_attr_key_power_mode.attr,
 #endif
 	NULL,
 };
@@ -2474,6 +2517,10 @@ static int i2c_touchkey_probe(struct i2c_client *client,
 
 	for (i = 1; i < touchkey_count; i++)
 		set_bit(touchkey_keycode[i], input_dev->keybit);
+
+#ifdef CONFIG_KEYBOARD_CYPRESS_TOUCH_POWER_KEY
+	input_set_capability(input_dev, EV_KEY, KEY_POWER);
+#endif
 
 	input_set_drvdata(input_dev, tkey_i2c);
 	i2c_set_clientdata(client, tkey_i2c);

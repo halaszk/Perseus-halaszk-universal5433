@@ -257,6 +257,9 @@ struct touchkey_i2c {
 	int ic_mode;
 	int tsk_enable_glove_mode;
 	int support_multi_touch;
+#ifdef CONFIG_KEYBOARD_CYPRESS_TOUCH_POWER_KEY
+	int key_power_mode;
+#endif
 };
 
 extern struct class *sec_class;

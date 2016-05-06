@@ -15,3 +15,11 @@ config KEYBOARD_CYPRESS_TOUCH_MBR31X5
 	  Say Y here to enable the cypress touchkey.
 
 	  To compile this driver as a module, choose M here.
+
+config KEYBOARD_CYPRESS_TOUCH_POWER_KEY
+	bool "Cypress power touchkey support"
+	depends on KEYBOARD_CYPRESS_TOUCH_20075 || KEYBOARD_CYPRESS_TOUCH_MBR31X5
+	default n
+	help
+	  Say Y here to enable power-key emulation using 'back'
+	  and 'recent' keys.
