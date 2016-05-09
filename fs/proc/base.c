@@ -924,7 +924,7 @@ static int __init init_cpuset(void)
 }
 rootfs_initcall(init_cpuset);
 
-static inline void oom_adj_apply_to_cpusets(pid_t pid, int oom_score_adj)
+static inline void oom_adj_apply_to_cpusets(struct task_struct *tsk, int oom_score_adj)
 {
 	int oom_adj = oom_score_adj_to_oom_adj(oom_score_adj);
 	int cgrp_level = 0;
@@ -939,16 +939,16 @@ static inline void oom_adj_apply_to_cpusets(pid_t pid, int oom_score_adj)
 #ifdef CONFIG_FG_BG_CPUSET_OOM_ADJ_DEBUG
 	switch (cgrp_level) {
 	case 0:
-		pr_info("cpuset: moving %d(oom_adj:%3d) to the foreground\n",
-			pid, oom_adj);
+		pr_info("cpuset: moving%6d(oom_adj:%3d)('%s') to the foreground\n",
+			tsk->pid, oom_adj, tsk->comm);
 		break;
 	case 1:
-		pr_info("cpuset: moving %d(oom_adj:%3d) to the background\n",
-			pid, oom_adj);
+		pr_info("cpuset: moving%6d(oom_adj:%3d)('%s') to the background\n",
+			tsk->pid, oom_adj, tsk->comm);
 		break;
 	case 2:
-		pr_info("cpuset: moving %d(oom_adj:%3d) to the invisible\n",
-			pid, oom_adj);
+		pr_info("cpuset: moving%6d(oom_adj:%3d)('%s') to the invisible\n",
+			tsk->pid, oom_adj, tsk->comm);
 		break;
 	default:
 		/* unimplemented */
@@ -961,7 +961,7 @@ static inline void oom_adj_apply_to_cpusets(pid_t pid, int oom_score_adj)
 		pr_err("cpuset: cgrp is NULL!\n");
 	} else {
 		cpuset_work->cgrp_level = cgrp_level;
-		cpuset_work->pid = pid;
+		cpuset_work->pid = tsk->pid;
 		schedule_work_on(0, &cpuset_work->worker);
 	}
 }
@@ -1104,7 +1104,7 @@ static ssize_t oom_adj_write(struct file *file, const char __user *buf,
 #endif
 #ifdef CONFIG_FG_BG_CPUSET_OOM_ADJ
 	/* int oom_adj is actually oom_score_adj at this point */
-	oom_adj_apply_to_cpusets(task->pid, oom_adj);
+	oom_adj_apply_to_cpusets(task, oom_adj);
 #endif
 	trace_oom_score_adj_update(task);
 err_sighand:
@@ -1231,7 +1231,7 @@ static ssize_t oom_score_adj_write(struct file *file, const char __user *buf,
 	if (has_capability_noaudit(current, CAP_SYS_RESOURCE))
 		task->signal->oom_score_adj_min = (short)oom_score_adj;
 #ifdef CONFIG_FG_BG_CPUSET_OOM_ADJ
-	oom_adj_apply_to_cpusets(task->pid, oom_score_adj);
+	oom_adj_apply_to_cpusets(task, oom_score_adj);
 #endif
 	trace_oom_score_adj_update(task);
 
